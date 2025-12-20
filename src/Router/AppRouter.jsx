@@ -11,7 +11,8 @@ export function AppRoute() {
     const LoginPage = React.lazy(async () => ({ default: (await import("../Pages/Authentication/Login.jsx")).LoginPage }));
     const ForgottenPage = React.lazy(async () => ({ default: (await import("../Pages/Authentication/ForgottenPassword.jsx")).ForgottenPassword }));
     const LandingPage = React.lazy(async () => ({ default: (await import("../Pages/LandingPage/LandingPage.jsx")).LandingPage }));
-    const NursePage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/Nurse.jsx")).Nurse }));
+    const NurseWaitingRoomPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/WaitingRoom.jsx")).WaitingRoom }));
+    const NurseAppointmentsPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/NurseAppointments.jsx")).NurseAppointments }));
     const NotFoundPage = React.lazy(async () => ({ default: (await import("../GlobalComponents/NotFound.jsx")).NotFound }));
     const NurseMedicalStaffsPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/MedicalStaffs.jsx")).MedicalStaffs }));
     const ConsultationHistoryPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/ConsultationHistory.jsx")).ConsultationHistory }));
@@ -97,9 +98,10 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.welcomePage} element={<LandingPage />} />
                 <Route path={AppRoutesPaths.loginPage} element={<LoginPage />} />
                 <Route path={AppRoutesPaths.forgottenPasswordPage} element={<ForgottenPage />} />
-                <Route path={AppRoutesPaths.nursePage} element={<NursePage />} />
+                <Route path={AppRoutesPaths.nursePage} element={<NurseWaitingRoomPage />} />
+                <Route path={AppRoutesPaths.nurseWaitingRoomPage} element={<NurseWaitingRoomPage />} />
+                <Route path={AppRoutesPaths.nurseAppointmentsPage} element={<NurseAppointmentsPage />} />
                 <Route path={AppRoutesPaths.pharmacyPage} element={<PharmacyPage />} />
-                <Route path={AppRoutesPaths.nurseMedicalStaffsPage} element={<NurseMedicalStaffsPage />} />
                 <Route path={AppRoutesPaths.consultationHistoryPage} element={<ConsultationHistoryPage />} />
                 <Route path={AppRoutesPaths.helpCenterPage} element={<HelpCenterPage />} />
                 <Route path={AppRoutesPaths.patientDetailsPage} element={<PatientDetailsPage />} />

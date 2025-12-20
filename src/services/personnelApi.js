@@ -78,6 +78,7 @@ export const updatePersonnel = async (id, personnelData) => {
  * 
  * @param {number} id - ID du personnel a supprimer
  * @returns {Promise} Confirmation de suppression
+ * @throws {Error} Erreur avec message explicite si suppression impossible
  */
 export const deletePersonnel = async (id) => {
     try {
@@ -85,6 +86,23 @@ export const deletePersonnel = async (id) => {
         return response.data;
     } catch (error) {
         console.error(`Error deleting personnel ${id}:`, error);
+
+        // Gestion de l'erreur ProtectedError (FK constraint)
+        if (error.response?.status === 500) {
+            const responseData = error.response?.data || '';
+            const dataString = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
+
+            if (dataString.includes('ProtectedError')) {
+                const customError = new Error(
+                    'Ce personnel ne peut pas etre supprime car il possede des enregistrements lies ' +
+                    '(sessions, consultations, rendez-vous, etc.). ' +
+                    'Veuillez d\'abord supprimer ou reassigner ces enregistrements.'
+                );
+                customError.isProtectedError = true;
+                throw customError;
+            }
+        }
+
         throw error;
     }
 };

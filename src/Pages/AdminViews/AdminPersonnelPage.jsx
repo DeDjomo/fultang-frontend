@@ -53,7 +53,9 @@ export function AdminPersonnelPage() {
                     message.success(t('personnel.deleteSuccess'));
                     fetchPersonnel();
                 } catch (error) {
-                    message.error(t('common.error'));
+                    // Afficher le message d'erreur specifique si disponible
+                    const errorMessage = error.message || t('common.error');
+                    message.error(errorMessage, 5); // 5 secondes pour les messages longs
                 }
             }
         });
