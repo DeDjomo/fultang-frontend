@@ -121,3 +121,20 @@ export const getPatientsEnAttente = async (service, poste) => {
         throw error;
     }
 };
+
+/**
+ * Met a jour le statut d'une session.
+ * 
+ * @param {number} sessionId - ID de la session
+ * @param {string} statut - Nouveau statut ('en attente', 'en cours', 'terminee')
+ * @returns {Promise} Session mise a jour
+ */
+export const updateSessionStatus = async (sessionId, statut) => {
+    try {
+        const response = await axiosInstance.patch(`${BASE_URL}/${sessionId}/`, { statut });
+        return response.data;
+    } catch (error) {
+        console.error('Error updating session status:', error);
+        throw error;
+    }
+};

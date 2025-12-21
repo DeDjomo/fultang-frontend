@@ -8,6 +8,7 @@ import { NurseNavBar } from "./NurseNavBar.jsx";
 import { getPatientsEnAttente, selectionnerPatient } from '../../services/sessionsApi';
 import { getPersonnelById } from '../../services/personnelApi';
 import { useAuthentication } from "../../Utils/Provider.jsx";
+import { useNavigate } from 'react-router-dom';
 import Loader from "../../GlobalComponents/Loader.jsx";
 import ServerErrorPage from "../../GlobalComponents/ServerError.jsx";
 
@@ -17,6 +18,7 @@ import ServerErrorPage from "../../GlobalComponents/ServerError.jsx";
  */
 export function WaitingRoom() {
     const { userData } = useAuthentication();
+    const navigate = useNavigate();
     const [patients, setPatients] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -85,11 +87,17 @@ export function WaitingRoom() {
         }
     };
 
-    const handleSelectPatient = async (sessionId) => {
+    const handleSelectPatient = async (patient) => {
         try {
-            await selectionnerPatient(sessionId);
+            await selectionnerPatient(patient.id_session);
             message.success('Patient selectionne avec succes');
-            fetchPatientsEnAttente(serviceName);
+            navigate('/nurse/patient-management', {
+                state: {
+                    patient: patient,
+                    sessionId: patient.id_session,
+                    service: serviceName
+                }
+            });
         } catch (error) {
             console.error('Error selecting patient:', error);
             message.error('Erreur lors de la selection du patient');
@@ -191,7 +199,7 @@ export function WaitingRoom() {
                                                 <div className="w-full items-center justify-center flex gap-4">
                                                     <Tooltip title="Selectionner ce patient">
                                                         <button
-                                                            onClick={() => handleSelectPatient(patient.id_session)}
+                                                            onClick={() => handleSelectPatient(patient)}
                                                             className="flex items-center justify-center w-9 h-9 text-green-600 text-xl hover:bg-gray-300 hover:rounded-full transition-all duration-300"
                                                         >
                                                             <FaUserCheck />

@@ -13,6 +13,7 @@ export function AppRoute() {
     const LandingPage = React.lazy(async () => ({ default: (await import("../Pages/LandingPage/LandingPage.jsx")).LandingPage }));
     const NurseWaitingRoomPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/WaitingRoom.jsx")).WaitingRoom }));
     const NurseAppointmentsPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/NurseAppointments.jsx")).NurseAppointments }));
+    const PatientManagementPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/PatientManagement.jsx")).PatientManagement }));
     const NotFoundPage = React.lazy(async () => ({ default: (await import("../GlobalComponents/NotFound.jsx")).NotFound }));
     const NurseMedicalStaffsPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/MedicalStaffs.jsx")).MedicalStaffs }));
     const ConsultationHistoryPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/ConsultationHistory.jsx")).ConsultationHistory }));
@@ -100,6 +101,7 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.forgottenPasswordPage} element={<ForgottenPage />} />
                 <Route path={AppRoutesPaths.nursePage} element={<NurseWaitingRoomPage />} />
                 <Route path={AppRoutesPaths.nurseWaitingRoomPage} element={<NurseWaitingRoomPage />} />
+                <Route path="/nurse/patient-management" element={<PatientManagementPage />} />
                 <Route path={AppRoutesPaths.nurseAppointmentsPage} element={<NurseAppointmentsPage />} />
                 <Route path={AppRoutesPaths.pharmacyPage} element={<PharmacyPage />} />
                 <Route path={AppRoutesPaths.consultationHistoryPage} element={<ConsultationHistoryPage />} />
