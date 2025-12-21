@@ -25,11 +25,11 @@ const token = localStorage.getItem("token_key_fultang");
 
 const axiosInstance = axios.create(
     {
-    baseURL: import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL,
-    headers:
+        baseURL: import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL,
+        headers:
         {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
         }
     }
 );

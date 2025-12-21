@@ -43,7 +43,7 @@ export function AdminNavBar() {
                         </Tooltip>
                         <Tooltip placement={"top"} title={"Profile"}>
                             <div className="ml-3 flex">
-                                <p className="font-bold text-secondary text-xl mt-2">{"Hello " + userData?.username + "!"}</p>
+                                <p className="font-bold text-secondary text-xl mt-2">{"Hello " + (userData?.nom || "Admin") + "!"}</p>
                                 <img src={userIcon} alt={"user-icon"} className="w-12 h-12 ml-2 mr-3" />
 
                             </div>

@@ -16,9 +16,9 @@ export function Cashier() {
   useEffect(() => {
     const interval = setInterval(() => {
       setTime(new Date().toLocaleTimeString());
-    }, 1000); 
+    }, 1000);
 
-    return () => clearInterval(interval); 
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export function Cashier() {
               <p className="text-white text-4xl font-bold mt-6">
                 Welcome Back!
               </p>
-              <p className="text-2xl mt-2 text-white"> {userData.username}</p>
+              <p className="text-2xl mt-2 text-white"> {userData?.nom || "Cashier"}</p>
             </div>
           </div>
           <div>

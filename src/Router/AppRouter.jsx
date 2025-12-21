@@ -21,9 +21,7 @@ export function AppRoute() {
     const PatientDetailsPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/PatientParameters.jsx")).PatientParameters }));
     const PharmacyPage = React.lazy(async () => ({ default: (await import("../Pages/Pharmacy/Pharmacy.jsx")).Pharmacy }));
     const ReceptionistPage = React.lazy(async () => ({ default: (await import("../Pages/Receptionist/Receptionist.jsx")).Receptionist }));
-    const DoctorPage = React.lazy(async () => ({ default: (await import("../Pages/Doctor/Doctor.jsx")).Doctor }));
     /*const LaboratoryAssistantPage = React.lazy(async () => ({default: (await import("../Pages/Laboratory/LaboratoryAssistant.jsx")).LaboratoryAssistant}));*/
-    const SpecialistPage = React.lazy(async () => ({ default: (await import("../Pages/Doctor/Specialist.jsx")).Specialist }));
     const CashierPage = React.lazy(async () => ({ default: (await import("../Pages/Cashier/Cashier.jsx")).Cashier }));
     const ExamsList = React.lazy(async () => ({ default: (await import("../Pages/Cashier/ExamsList.jsx")).ExamsList }));
     const Hospitalisations = React.lazy(async () => ({ default: (await import("../Pages/Cashier/Hospitalisations.jsx")).Hospitalisations }));
@@ -55,14 +53,9 @@ export function AppRoute() {
     const AccountDetailsPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/AccountDetailsPage.jsx")).AccountDetailsPage }));
     const AccountList = React.lazy(async () => ({ default: (await import("../Pages/Accountant/AccountList.jsx")).AccountList }));
 
-    const DoctorPatientList = React.lazy(async () => ({ default: (await import("../Pages/Doctor/DoctorPatientList.jsx")).DoctorPatientList }));
-    const DoctorConsultationList = React.lazy(async () => ({ default: (await import("../Pages/Doctor/DoctorConsultationList.jsx")).DoctorConsultationList }));
     const DoctorAppointments = React.lazy(async () => ({ default: (await import("../Pages/Doctor/AppointmentList.jsx")).AppointmentList }));
-    const DoctorConsultationHistory = React.lazy(async () => ({ default: (await import("../Pages/Doctor/ConsultationHistory.jsx")).ConsultationHistory }));
-    const DoctorConsultationDetails = React.lazy(async () => ({ default: (await import("../Pages/Doctor/DoctorConsultationDetail.jsx")).DoctorConsultationDetails }));
-    const DoctorConsultationHistoryDetails = React.lazy(async () => ({ default: (await import("../Pages/Doctor/ConsultationHistoryDetails.jsx")).ConsultationHistoryDetails }));
-    const DoctorExamList = React.lazy(async () => ({ default: (await import("../Pages/Doctor/DoctorExamsList.jsx")).DoctorExamsList }));
-    const DoctorPatientMedicalFolder = React.lazy(async () => ({ default: (await import("../Pages/Doctor/PatientMedicalFolder.jsx")).PatientMedicalFolder }));
+    const DoctorWaitingRoom = React.lazy(async () => ({ default: (await import("../Pages/Doctor/DoctorWaitingRoom.jsx")).DoctorWaitingRoom }));
+    const DoctorConsultation = React.lazy(async () => ({ default: (await import("../Pages/Doctor/ConsultationPage.jsx")).ConsultationPage }));
 
 
     const FinancialContributions = React.lazy(async () => ({ default: (await import("../Pages/Accountant/FinancialContribution.jsx")).FinancialContributions, }));
@@ -113,9 +106,7 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.financialReport} element={<FinancialReport />} />
                 <Route path={AppRoutesPaths.helpCenter} element={<HelpCenter />} />
                 <Route path={AppRoutesPaths.receptionistPage} element={<ReceptionistPage />} />
-                <Route path={AppRoutesPaths.doctorPage} element={<DoctorPage />} />
                 {/*<Route path={AppRoutesPaths.laboratoryAssistantPage} element={<LaboratoryAssistantPage />} />*/}
-                <Route path={AppRoutesPaths.specialistPage} element={<SpecialistPage />} />
                 <Route path={AppRoutesPaths.adminHomePage} element={<AdminHomePage />} />
                 <Route path={AppRoutesPaths.adminServicesPage} element={<AdminServicesPage />} />
                 <Route path={AppRoutesPaths.adminPersonnelPage} element={<AdminPersonnelPage />} />
@@ -143,15 +134,9 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.accountList} element={<AccountList />} />
                 <Route path={AppRoutesPaths.notFound} element={<NotFoundPage />} />
 
-                <Route path={AppRoutesPaths.doctorExamList} element={<DoctorExamList />} />
-                <Route path={AppRoutesPaths.doctorConsultationHistory} element={<DoctorConsultationHistory />} />
                 <Route path={AppRoutesPaths.doctorAppointment} element={<DoctorAppointments />} />
-                <Route path={AppRoutesPaths.doctorPatientList} element={<DoctorPatientList />} />
-                <Route path={AppRoutesPaths.doctorConsultationList} element={<DoctorConsultationList />} />
-                <Route path={AppRoutesPaths.doctorConsultationDetailsPage} element={<DoctorConsultationDetails />} />
-                <Route path={AppRoutesPaths.doctorConsultationHistoryDetails} element={<DoctorConsultationHistoryDetails />} />
-                <Route path={AppRoutesPaths.doctorPatientMedicalFolderPage} element={<DoctorPatientMedicalFolder />} />
-
+                <Route path="/doctor/waiting-room" element={<DoctorWaitingRoom />} />
+                <Route path="/doctor/consultation" element={<DoctorConsultation />} />
 
                 <Route path={AppRoutesPaths.financialContributions} element={<FinancialContributions />} />
                 <Route path={AppRoutesPaths.financialReportsAccountant} element={<FinancialReportsAccountant />} />

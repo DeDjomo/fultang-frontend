@@ -44,7 +44,7 @@ export function AccountantNavBar() {
             <Tooltip placement={"top"} title={"Profile"}>
               <button className="ml-3 flex">
                 <p className="font-bold text-secondary text-xl mt-2">
-                  {"Hello " + userData?.username + "!"}
+                  {"Hello " + (userData?.nom || "Accountant") + "!"}
                 </p>
                 <img
                   src={userIcon}
