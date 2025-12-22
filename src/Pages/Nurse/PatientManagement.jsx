@@ -85,7 +85,7 @@ export function PatientManagement() {
         e.preventDefault();
 
         if (!observation.trim()) {
-            message.warning('Veuillez saisir une observation');
+            message.warning('Please saisir une observation');
             return;
         }
 
@@ -101,7 +101,7 @@ export function PatientManagement() {
             setObservation('');
         } catch (error) {
             console.error('Error saving observation:', error);
-            message.error('Erreur lors de l\'enregistrement de l\'observation');
+            message.error('Error during de l\'enregistrement de l\'observation');
         } finally {
             setSubmittingObs(false);
         }
@@ -111,7 +111,7 @@ export function PatientManagement() {
         e.preventDefault();
 
         if (!redirectValue) {
-            message.warning('Veuillez selectionner une destination');
+            message.warning('Please selectionner une destination');
             return;
         }
 
@@ -134,7 +134,7 @@ export function PatientManagement() {
             }, 1000);
         } catch (error) {
             console.error('Error redirecting patient:', error);
-            message.error('Erreur lors de la redirection du patient');
+            message.error('Error during de la redirection du patient');
         } finally {
             setSubmittingRedirect(false);
         }
@@ -182,7 +182,7 @@ export function PatientManagement() {
                                         <span>
                                             {patient.date_naissance
                                                 ? `${patient.date_naissance} (${calculateAge(patient.date_naissance)} ans)`
-                                                : 'Non disponible'}
+                                                : 'Non available'}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2 text-white">
@@ -261,7 +261,7 @@ export function PatientManagement() {
                                                 <span className="text-md font-bold">Allergies</span>
                                             </div>
                                             <p className="text-gray-700">
-                                                {dossier.allergies || 'Aucune allergie connue'}
+                                                {dossier.allergies || 'No known allergies'}
                                             </p>
                                         </div>
 
@@ -271,14 +271,14 @@ export function PatientManagement() {
                                                 <span className="text-md font-bold">Antecedents</span>
                                             </div>
                                             <p className="text-gray-700">
-                                                {dossier.antecedents || 'Aucun antecedent connu'}
+                                                {dossier.antecedents || 'No known medical history'}
                                             </p>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="text-center py-12 text-gray-500">
                                         <FileText className="w-16 h-16 mx-auto mb-3 text-gray-300" />
-                                        <p className="text-lg font-medium">Aucun dossier medical disponible</p>
+                                        <p className="text-lg font-medium">No medical record available</p>
                                         <p className="text-sm mt-1">Ce patient n'a pas encore de dossier medical enregistre</p>
                                     </div>
                                 )}
@@ -317,7 +317,7 @@ export function PatientManagement() {
                                             }`}
                                     >
                                         <Save className="w-5 h-5" />
-                                        {submittingObs ? 'Enregistrement...' : 'Enregistrer Observation'}
+                                        {submittingObs ? 'Saving...' : 'Save Observation'}
                                     </button>
                                 </form>
                             </div>
@@ -326,7 +326,7 @@ export function PatientManagement() {
                                 <div className="bg-gradient-to-r from-primary-end to-primary-start p-4">
                                     <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                                         <ArrowRight className="w-7 h-7" />
-                                        Redirection Patient
+                                        Redirecting...tient
                                     </h2>
                                 </div>
 
@@ -399,7 +399,7 @@ export function PatientManagement() {
                                             }`}
                                     >
                                         <ArrowRight className="w-5 h-5" />
-                                        {submittingRedirect ? 'Redirection...' : 'Rediriger Patient'}
+                                        {submittingRedirect ? 'Redirecting...' : 'Redirect Patient'}
                                     </button>
                                 </form>
                             </div>

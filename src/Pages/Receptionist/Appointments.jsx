@@ -97,7 +97,7 @@ export function Appointments() {
             onOk: async () => {
                 try {
                     await deleteRendezVous(rdv.id);
-                    message.success('Rendez-vous supprimé');
+                    message.success('Appointment deleted');
                     fetchRendezVous();
                 } catch (error) {
                     message.error('Erreur lors de la suppression');
@@ -141,7 +141,7 @@ export function Appointments() {
             };
 
             await createRendezVous(dataToSend);
-            message.success('Rendez-vous créé avec succès');
+            message.success('Appointment created successfully');
             setShowAddModal(false);
             resetForm();
             fetchRendezVous();
@@ -187,7 +187,7 @@ export function Appointments() {
             <div className="mt-5 flex flex-col relative">
                 {/* Header avec barre de recherche */}
                 <div className="flex justify-between mb-5">
-                    <p className="font-bold text-xl mt-2 ml-5">Liste des Rendez-vous</p>
+                    <p className="font-bold text-xl mt-2 ml-5">Appointments List</p>
                     <div className="flex mr-5">
                         <div className="flex w-[300px] h-10 border-2 border-secondary rounded-lg">
                             <FaSearch className="text-xl text-secondary m-2" />
@@ -276,7 +276,7 @@ export function Appointments() {
                     <button
                         onClick={() => setShowAddModal(true)}
                         className="fixed bottom-5 right-16 rounded-full w-14 h-14 bg-gradient-to-r text-3xl font-bold text-white from-primary-start to-primary-end hover:scale-110 transition-all duration-300 flex items-center justify-center shadow-lg"
-                        title="Nouveau rendez-vous"
+                        title="New appointment"
                     >
                         <FaPlus />
                     </button>
@@ -288,7 +288,7 @@ export function Appointments() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 backdrop-blur-sm transition-all duration-300">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
                         <div className="bg-gradient-to-r from-primary-end to-primary-start px-6 py-4 rounded-t-lg flex justify-between items-center">
-                            <h3 className="text-2xl font-bold text-white">Nouveau Rendez-vous</h3>
+                            <h3 className="text-2xl font-bold text-white">New Appointment</h3>
                             <button onClick={() => { resetForm(); setShowAddModal(false); }} className="text-white hover:text-gray-200">
                                 <XIcon className="w-6 h-6" />
                             </button>
@@ -360,7 +360,7 @@ export function Appointments() {
                                     }}
                                     className={applyFormStyle(errors.matricule_medecin)}
                                 >
-                                    <option value="">Sélectionner un médecin</option>
+                                    <option value="">Select a doctor</option>
                                     {medecins.map(m => (
                                         <option key={m.id} value={m.matricule}>Dr. {m.nom} {m.prenom} - {m.specialite}</option>
                                     ))}
@@ -382,7 +382,7 @@ export function Appointments() {
                                             if (errors.date_rendez_vous) setErrors(prev => ({ ...prev, date_rendez_vous: null }));
                                         }}
                                         className={`w-full ${errors.date_rendez_vous ? 'border-red-500' : ''}`}
-                                        placeholder="Sélectionner date"
+                                        placeholder="Select date"
                                         disabledDate={(current) => current && current < dayjs().startOf('day')}
                                     />
                                     {errors.date_rendez_vous && <p className="text-red-500 text-xs mt-1">{errors.date_rendez_vous}</p>}
@@ -400,7 +400,7 @@ export function Appointments() {
                                             if (errors.heure_rendez_vous) setErrors(prev => ({ ...prev, heure_rendez_vous: null }));
                                         }}
                                         className={`w-full ${errors.heure_rendez_vous ? 'border-red-500' : ''}`}
-                                        placeholder="Sélectionner heure"
+                                        placeholder="Select time"
                                         minuteStep={15}
                                     />
                                     {errors.heure_rendez_vous && <p className="text-red-500 text-xs mt-1">{errors.heure_rendez_vous}</p>}
@@ -413,7 +413,7 @@ export function Appointments() {
                                     onClick={handleSubmit}
                                     className="px-6 py-2 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg font-bold hover:opacity-90 transition-all duration-300"
                                 >
-                                    Enregistrer
+                                    Save
                                 </button>
                                 <button
                                     onClick={() => { resetForm(); setShowAddModal(false); }}

@@ -135,7 +135,7 @@ export function Receptionist() {
 
                 {/*Header content with search bar*/}
                 <div className="flex justify-between mb-5">
-                    <p className="font-bold text-xl mt-2 ml-5">Liste des Patients</p>
+                    <p className="font-bold text-xl mt-2 ml-5">Patient List</p>
                     <div className="flex mr-5">
                         <div className="flex w-[300px] h-10 border-2 border-secondary rounded-lg">
                             <FaSearch className="text-xl text-secondary m-2" />

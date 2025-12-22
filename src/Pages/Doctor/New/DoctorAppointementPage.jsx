@@ -66,7 +66,7 @@ export const AppointmentForm2 = () => {
     try {
       // await createAppointment(appointmentPayload);
       setNotification({
-        message: "Rendez-vous enregistré avec succès",
+        message: "Rendez-vous saved avec succès",
         type: "success",
       })
     } catch (error) {

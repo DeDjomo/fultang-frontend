@@ -35,7 +35,7 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess }) {
             setServices(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Error fetching services:', error);
-            message.error('Erreur lors du chargement des services');
+            message.error('Error during du chargement des services');
         } finally {
             setLoadingServices(false);
         }
@@ -43,7 +43,7 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess }) {
 
     const handleSubmit = async () => {
         if (!selectedService) {
-            message.warning('Veuillez sélectionner un service');
+            message.warning('Please sélectionner un service');
             return;
         }
 
@@ -56,13 +56,13 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess }) {
             };
 
             await createSession(requestData);
-            message.success('Session ouverte avec succès!');
+            message.success('Session ouverte successfully!');
             setSelectedService(null);
             if (onSuccess) onSuccess();
             onClose();
         } catch (error) {
             console.error('Error creating session:', error);
-            const errorMessage = error.response?.data?.detail || error.response?.data?.error || 'Erreur lors de l\'ouverture de la session';
+            const errorMessage = error.response?.data?.detail || error.response?.data?.error || 'Error during de l\'ouverture de la session';
             message.error(errorMessage);
         } finally {
             setLoading(false);
@@ -120,7 +120,7 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess }) {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         <div className="flex items-center gap-2">
                             <Building2 className="w-4 h-4" />
-                            Sélectionner le service
+                            Select service
                         </div>
                     </label>
                     <Select
@@ -142,7 +142,7 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess }) {
                     />
                     {services.length === 0 && !loadingServices && (
                         <p className="text-sm text-orange-600 mt-2">
-                            Aucun service disponible. Veuillez en créer un d'abord.
+                            Aucun service available. Please en créer un d'abord.
                         </p>
                     )}
                 </div>

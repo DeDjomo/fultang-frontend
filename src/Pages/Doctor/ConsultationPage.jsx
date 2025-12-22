@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, message, Modal } from 'antd';
 import {
     FileText, Activity, Pill, FlaskConical,
-    ClipboardList, Hotel, ArrowLeft, CheckCircle, User, History
+    ClipboardList, Hotel, ArrowLeft, CheckCircle, User, History, DollarSign
 } from 'lucide-react';
 import { DoctorNavBar } from './DoctorComponents/DoctorNavBar';
 import { CustomDashboard } from '../../GlobalComponents/CustomDashboard';
@@ -16,7 +16,8 @@ import {
     prescriptionExamen,
     enregistrerResultatExamen,
     hospitaliserPatient,
-    getChambresDisponibles
+    getChambresDisponibles,
+    redirectToCashier
 } from '../../services/medecinsApi';
 import { getDossierByPatientId } from '../../services/dossiersApi';
 import {
@@ -49,11 +50,11 @@ export function ConsultationPage() {
 
     // Lists
     const [chambresDisponibles, setChambresDisponibles] = useState([]);
-    const [prescriptionsExamens, setPrescriptionsExamens] = useState([]);
+    const [prescriptionsExams, setPrescriptionsExams] = useState([]);
     const [observationsSession, setObservationsSession] = useState([]);
 
     // History states
-    const [historique, setHistorique] = useState({
+    const [historique, setHistory] = useState({
         observations: [],
         medicaments: [],
         examens: [],
@@ -86,7 +87,7 @@ export function ConsultationPage() {
             }
         } catch (error) {
             console.error('Error loading dossier:', error);
-            message.error('Erreur lors du chargement du dossier patient');
+            message.error('Error during du loading dossier patient');
         } finally {
             setLoading(false);
         }
@@ -126,7 +127,7 @@ export function ConsultationPage() {
                 getPatientResultatsExamens(patient.id)
             ]);
 
-            setHistorique({
+            setHistory({
                 observations: obsResp.data || [],
                 medicaments: medResp.data || [],
                 examens: examResp.data || [],
@@ -134,7 +135,7 @@ export function ConsultationPage() {
             });
         } catch (error) {
             console.error('Error loading patient history:', error);
-            message.error('Erreur lors du chargement de l\'historique');
+            message.error('Error during du chargement de l\'historique');
         } finally {
             setLoadingHistory(false);
         }
@@ -142,7 +143,7 @@ export function ConsultationPage() {
 
     const handleEnregistrerObservation = async () => {
         if (!observation.trim()) {
-            message.warning('Veuillez saisir une observation');
+            message.warning('Please saisir une observation');
             return;
         }
 
@@ -152,18 +153,18 @@ export function ConsultationPage() {
                 observation: observation,
                 id_session: sessionId
             });
-            message.success('Observation enregistrée avec succès');
+            message.success('Observation saved successfully');
             setObservation('');
             loadObservations(); // Refresh list
         } catch (error) {
             console.error('Error saving observation:', error);
-            message.error('Erreur lors de l\'enregistrement de l\'observation');
+            message.error('Error during de l\'enregistrement de l\'observation');
         }
     };
 
     const handlePrescriptionMedicaments = async () => {
         if (!medicaments.trim()) {
-            message.warning('Veuillez saisir les médicaments à prescrire');
+            message.warning('Please saisir les médicaments à prescrire');
             return;
         }
 
@@ -173,17 +174,17 @@ export function ConsultationPage() {
                 liste_medicaments: medicaments,
                 id_session: sessionId
             });
-            message.success('Prescription de médicaments enregistrée');
+            message.success('Prescription de médicaments saved');
             setMedicaments('');
         } catch (error) {
             console.error('Error saving prescription:', error);
-            message.error('Erreur lors de l\'enregistrement de la prescription');
+            message.error('Error during de l\'enregistrement de la prescription');
         }
     };
 
     const handlePrescriptionExamen = async () => {
         if (!nomExamen.trim()) {
-            message.warning('Veuillez saisir le nom de l\'examen');
+            message.warning('Please saisir le nom de l\'examen');
             return;
         }
 
@@ -193,24 +194,24 @@ export function ConsultationPage() {
                 nom_examen: nomExamen,
                 id_session: sessionId
             });
-            message.success('Examen prescrit avec succès');
+            message.success('Examen prescrit successfully');
             setNomExamen('');
             if (response.data) {
-                setPrescriptionsExamens([...prescriptionsExamens, response.data]);
+                setPrescriptionsExams([...prescriptionsExams, response.data]);
             }
         } catch (error) {
             console.error('Error prescribing exam:', error);
-            message.error('Erreur lors de la prescription de l\'examen');
+            message.error('Error during de la prescription de l\'examen');
         }
     };
 
     const handleEnregistrerResultat = async () => {
         if (!selectedPrescriptionExamen) {
-            message.warning('Veuillez sélectionner une prescription d\'examen');
+            message.warning('Please sélectionner une prescription d\'examen');
             return;
         }
         if (!resultatExamen.trim()) {
-            message.warning('Veuillez saisir le résultat');
+            message.warning('Please saisir le résultat');
             return;
         }
 
@@ -220,18 +221,18 @@ export function ConsultationPage() {
                 resultat: resultatExamen,
                 id_prescription: selectedPrescriptionExamen
             });
-            message.success('Résultat enregistré avec succès');
+            message.success('Résultat saved successfully');
             setResultatExamen('');
             setSelectedPrescriptionExamen(null);
         } catch (error) {
             console.error('Error saving result:', error);
-            message.error('Erreur lors de l\'enregistrement du résultat');
+            message.error('Error during de l\'enregistrement du résultat');
         }
     };
 
     const handleHospitaliser = async () => {
         if (!selectedChambre) {
-            message.warning('Veuillez sélectionner une chambre');
+            message.warning('Please sélectionner une chambre');
             return;
         }
 
@@ -247,12 +248,33 @@ export function ConsultationPage() {
                         id_chambre: selectedChambre,
                         id_medecin: userData.id
                     });
-                    message.success('Patient hospitalisé avec succès');
+                    message.success('Patient hospitalisé successfully');
                     setSelectedChambre(null);
                     loadChambresDisponibles(); // Refresh available rooms
                 } catch (error) {
                     console.error('Error hospitalizing patient:', error);
-                    message.error('Erreur lors de l\'hospitalisation');
+                    message.error('Error during de l\'hospitalisation');
+                }
+            }
+        });
+    };
+
+    const handleRedirectToCashier = async () => {
+        Modal.confirm({
+            title: 'Redirect to Cashier',
+            content: `Are you sure you want to redirect ${patient.prenom} ${patient.nom} to the cashier?`,
+            okText: 'Confirm',
+            cancelText: 'Cancel',
+            onOk: async () => {
+                try {
+                    await redirectToCashier(sessionId);
+                    message.success('Patient successfully redirected to cashier');
+                    setTimeout(() => {
+                        navigate('/doctor/waiting-room');
+                    }, 1500);
+                } catch (error) {
+                    console.error('Error redirecting to cashier:', error);
+                    message.error('Error redirecting patient to cashier');
                 }
             }
         });
@@ -268,7 +290,7 @@ export function ConsultationPage() {
             label: (
                 <span className="flex items-center gap-2">
                     <FileText className="w-4 h-4" />
-                    Dossier Patient
+                    Patient Record
                 </span>
             ),
             children: (
@@ -281,11 +303,11 @@ export function ConsultationPage() {
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gray-50 p-4 rounded-lg">
-                                    <h4 className="font-semibold text-gray-700 mb-2">Groupe Sanguin</h4>
+                                    <h4 className="font-semibold text-gray-700 mb-2">Blood Group</h4>
                                     <p>{dossier.groupe_sanguin || 'N/A'}</p>
                                 </div>
                                 <div className="bg-gray-50 p-4 rounded-lg">
-                                    <h4 className="font-semibold text-gray-700 mb-2">Facteur Rhésus</h4>
+                                    <h4 className="font-semibold text-gray-700 mb-2">Rhesus Factor</h4>
                                     <p>{dossier.facteur_rhesus || 'N/A'}</p>
                                 </div>
                                 <div className="bg-gray-50 p-4 rounded-lg">
@@ -299,15 +321,15 @@ export function ConsultationPage() {
                             </div>
                             <div className="bg-gray-50 p-4 rounded-lg">
                                 <h4 className="font-semibold text-gray-700 mb-2">Allergies</h4>
-                                <p className="whitespace-pre-wrap">{dossier.allergies || 'Aucune allergie connue'}</p>
+                                <p className="whitespace-pre-wrap">{dossier.allergies || 'No known allergies'}</p>
                             </div>
                             <div className="bg-gray-50 p-4 rounded-lg">
                                 <h4 className="font-semibold text-gray-700 mb-2">Antécédents</h4>
-                                <p className="whitespace-pre-wrap">{dossier.antecedents || 'Aucun antécédent'}</p>
+                                <p className="whitespace-pre-wrap">{dossier.antecedents || 'No medical history'}</p>
                             </div>
                         </div>
                     ) : (
-                        <p className="text-gray-500 text-center">Aucun dossier médical disponible</p>
+                        <p className="text-gray-500 text-center">No medical record available</p>
                     )}
                 </div>
             )
@@ -375,7 +397,7 @@ export function ConsultationPage() {
                             className="bg-gradient-to-r from-primary-end to-primary-start text-white px-6 py-3 rounded-lg hover:opacity-80 transition-opacity flex items-center gap-2"
                         >
                             <CheckCircle className="w-5 h-5" />
-                            Enregistrer Observation
+                            Save Observation
                         </button>
                     </div>
                 </div>
@@ -386,7 +408,7 @@ export function ConsultationPage() {
             label: (
                 <span className="flex items-center gap-2">
                     <Pill className="w-4 h-4" />
-                    Médicaments
+                    Medications
                 </span>
             ),
             children: (
@@ -394,7 +416,7 @@ export function ConsultationPage() {
                     <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Liste des Médicaments
+                                Liste des Medications
                             </label>
                             <textarea
                                 value={medicaments}
@@ -409,7 +431,7 @@ export function ConsultationPage() {
                             className="bg-gradient-to-r from-primary-end to-primary-start text-white px-6 py-3 rounded-lg hover:opacity-80 transition-opacity flex items-center gap-2"
                         >
                             <Pill className="w-5 h-5" />
-                            Enregistrer Prescription
+                            Save Prescription
                         </button>
                     </div>
                 </div>
@@ -420,7 +442,7 @@ export function ConsultationPage() {
             label: (
                 <span className="flex items-center gap-2">
                     <FlaskConical className="w-4 h-4" />
-                    Examens
+                    Exams
                 </span>
             ),
             children: (
@@ -454,7 +476,7 @@ export function ConsultationPage() {
             label: (
                 <span className="flex items-center gap-2">
                     <ClipboardList className="w-4 h-4" />
-                    Résultats
+                    Results
                 </span>
             ),
             children: (
@@ -469,8 +491,8 @@ export function ConsultationPage() {
                                 onChange={(e) => setSelectedPrescriptionExamen(e.target.value)}
                                 className="w-full p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-end"
                             >
-                                <option value="">Sélectionner une prescription</option>
-                                {prescriptionsExamens.map((prescription) => (
+                                <option value="">Select a prescription</option>
+                                {prescriptionsExams.map((prescription) => (
                                     <option key={prescription.id} value={prescription.id}>
                                         {prescription.nom_examen}
                                     </option>
@@ -494,7 +516,7 @@ export function ConsultationPage() {
                             className="bg-gradient-to-r from-primary-end to-primary-start text-white px-6 py-3 rounded-lg hover:opacity-80 transition-opacity flex items-center gap-2"
                         >
                             <CheckCircle className="w-5 h-5" />
-                            Enregistrer Résultat
+                            Save Result
                         </button>
                     </div>
                 </div>
@@ -513,7 +535,7 @@ export function ConsultationPage() {
                     {chambresDisponibles.length === 0 ? (
                         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                             <p className="text-yellow-800">
-                                Aucune chambre disponible pour le moment.
+                                No available rooms at the moment.
                             </p>
                         </div>
                     ) : (
@@ -527,10 +549,10 @@ export function ConsultationPage() {
                                     onChange={(e) => setSelectedChambre(e.target.value)}
                                     className="w-full p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-end"
                                 >
-                                    <option value="">Sélectionner une chambre</option>
+                                    <option value="">Select a room</option>
                                     {chambresDisponibles.map((chambre) => (
                                         <option key={chambre.id} value={chambre.id}>
-                                            {chambre.numero_chambre} - {chambre.nombre_places_dispo} place(s) disponible(s) - {chambre.tarif_journalier} FCFA/jour
+                                            {chambre.numero_chambre} - {chambre.nombre_places_dispo} place(s) available(s) - {chambre.tarif_journalier} FCFA/jour
                                         </option>
                                     ))}
                                 </select>
@@ -547,12 +569,12 @@ export function ConsultationPage() {
                 </div>
             )
         }
-        ,{
+        , {
             key: '7',
             label: (
                 <span className="flex items-center gap-2">
                     <History className="w-4 h-4" />
-                    Historique
+                    History
                 </span>
             ),
             children: (
@@ -560,7 +582,7 @@ export function ConsultationPage() {
                     {!loadingHistory && historique.observations.length === 0 ? (
                         <button onClick={loadPatientHistory} className="bg-gradient-to-r from-primary-end to-primary-start text-white px-6 py-3 rounded-lg hover:opacity-80 transition-opacity flex items-center gap-2 mb-6">
                             <History className="w-5 h-5" />
-                            Charger l'Historique Complet
+                            Charger l'History Complet
                         </button>
                     ) : loadingHistory ? (
                         <div className="flex justify-center items-center h-64">
@@ -571,7 +593,7 @@ export function ConsultationPage() {
                             <div>
                                 <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                                     <Activity className="w-5 h-5 text-primary-end" />
-                                    Observations Médicales ({historique.observations.length})
+                                    Medical Observations ({historique.observations.length})
                                 </h3>
                                 {historique.observations.length > 0 ? (
                                     <div className="space-y-3">
@@ -588,12 +610,12 @@ export function ConsultationPage() {
                                             </div>
                                         ))}
                                     </div>
-                                ) : <p className="text-gray-500 text-center py-4">Aucune observation</p>}
+                                ) : <p className="text-gray-500 text-center py-4">No observations</p>}
                             </div>
                             <div>
                                 <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                                     <Pill className="w-5 h-5 text-primary-end" />
-                                    Prescriptions Médicaments ({historique.medicaments.length})
+                                    Prescriptions Medications ({historique.medicaments.length})
                                 </h3>
                                 {historique.medicaments.length > 0 ? (
                                     <div className="space-y-3">
@@ -608,12 +630,12 @@ export function ConsultationPage() {
                                             </div>
                                         ))}
                                     </div>
-                                ) : <p className="text-gray-500 text-center py-4">Aucune prescription</p>}
+                                ) : <p className="text-gray-500 text-center py-4">No prescriptions</p>}
                             </div>
                             <div>
                                 <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                                     <FlaskConical className="w-5 h-5 text-primary-end" />
-                                    Examens Prescrits ({historique.examens.length})
+                                    Exams Prescrits ({historique.examens.length})
                                 </h3>
                                 {historique.examens.length > 0 ? (
                                     <div className="space-y-3">
@@ -628,12 +650,12 @@ export function ConsultationPage() {
                                             </div>
                                         ))}
                                     </div>
-                                ) : <p className="text-gray-500 text-center py-4">Aucun examen prescrit</p>}
+                                ) : <p className="text-gray-500 text-center py-4">No exams prescribed</p>}
                             </div>
                             <div>
                                 <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                                     <ClipboardList className="w-5 h-5 text-primary-end" />
-                                    Résultats d'Examens ({historique.resultats.length})
+                                    Results d'Exams ({historique.resultats.length})
                                 </h3>
                                 {historique.resultats.length > 0 ? (
                                     <div className="space-y-3">
@@ -648,7 +670,7 @@ export function ConsultationPage() {
                                             </div>
                                         ))}
                                     </div>
-                                ) : <p className="text-gray-500 text-center py-4">Aucun résultat</p>}
+                                ) : <p className="text-gray-500 text-center py-4">No results</p>}
                             </div>
                         </div>
                     )}
@@ -697,7 +719,14 @@ export function ConsultationPage() {
                         className="flex items-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
                     >
                         <ArrowLeft className="w-5 h-5" />
-                        Retour
+                        Back
+                    </button>
+                    <button
+                        onClick={handleRedirectToCashier}
+                        className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md"
+                    >
+                        <DollarSign className="w-5 h-5" />
+                        Send to Cashier
                     </button>
                 </div>
             </div>

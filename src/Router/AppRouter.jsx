@@ -26,6 +26,7 @@ export function AppRoute() {
     const ExamsList = React.lazy(async () => ({ default: (await import("../Pages/Cashier/ExamsList.jsx")).ExamsList }));
     const Hospitalisations = React.lazy(async () => ({ default: (await import("../Pages/Cashier/Hospitalisations.jsx")).Hospitalisations }));
     const FinancialReport = React.lazy(async () => ({ default: (await import("../Pages/Cashier/FinancialReport.jsx")).FinancialReport }));
+    const FinancialHistory = React.lazy(async () => ({ default: (await import("../Pages/Cashier/FinancialHistory.jsx")).default }));
     const HelpCenter = React.lazy(async () => ({ default: (await import("../GlobalComponents/HelpCenter.jsx")).HelpCenter }));
     const AdminHomePage = React.lazy(async () => ({ default: (await import("../Pages/AdminViews/AdminHomePage.jsx")).AdminHomePage }));
     const AdminServicesPage = React.lazy(async () => ({ default: (await import("../Pages/AdminViews/AdminServicesPage.jsx")).AdminServicesPage }));
@@ -49,7 +50,6 @@ export function AppRoute() {
     const AdminConsultationDetails = React.lazy(async () => ({ default: (await import("../Pages/AdminViews/ConsultationDetails.jsx")).ConsultationDetails }));
     /*const CurrentExamsLaboratoryPage = React.lazy(async () => ({default: (await import("../Pages/Laboratory/CurrentExams.jsx")).CurrentExams}));
     const ExamsHistoryLaboratoryPage = React.lazy(async () => ({default: (await import("../Pages/Laboratory/ExamsHistory.jsx")).ExamHistory}));*/
-    const FinancialHistory = React.lazy(async () => ({ default: (await import("../Pages/Cashier/FinancialHistory.jsx")).FinancialHistory }));
     const AccountDetailsPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/AccountDetailsPage.jsx")).AccountDetailsPage }));
     const AccountList = React.lazy(async () => ({ default: (await import("../Pages/Accountant/AccountList.jsx")).AccountList }));
 
@@ -101,6 +101,7 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.helpCenterPage} element={<HelpCenterPage />} />
                 <Route path={AppRoutesPaths.patientDetailsPage} element={<PatientDetailsPage />} />
                 <Route path={AppRoutesPaths.cashierPage} element={<CashierPage />} />
+                <Route path={AppRoutesPaths.financialHistory} element={<FinancialHistory />} />
                 <Route path={AppRoutesPaths.examsList} element={<ExamsList />} />
                 <Route path={AppRoutesPaths.hospitalisations} element={<Hospitalisations />} />
                 <Route path={AppRoutesPaths.financialReport} element={<FinancialReport />} />

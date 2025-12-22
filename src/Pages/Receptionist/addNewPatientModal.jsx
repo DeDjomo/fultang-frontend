@@ -147,7 +147,7 @@ export function AddNewPatientModal({ isOpen, onClose, setCanOpenSuccessModal, se
             const response = await axiosInstance.post("/patients/", dataToSend);
             if (response.status === 201) {
                 setIsLoading(false);
-                setSuccessMessage("Patient enregistré avec succès !");
+                setSuccessMessage("Patient saved avec succès !");
                 setCanOpenSuccessModal(true);
                 resetForm();
                 onClose();

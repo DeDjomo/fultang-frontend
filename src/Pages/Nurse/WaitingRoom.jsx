@@ -52,7 +52,7 @@ export function WaitingRoom() {
                 if (service) {
                     fetchPatientsEnAttente(service);
                 } else {
-                    setErrorMessage("Aucun service affecté. Veuillez contacter l'administrateur.");
+                    setErrorMessage("No assigned service. Please contact the administrator.");
                     console.error("Aucun service trouvé pour le personnel");
                 }
             } catch (error) {
@@ -123,9 +123,9 @@ export function WaitingRoom() {
                     {/* Header */}
                     <div className="flex justify-between mb-5">
                         <div className="flex flex-col ml-5">
-                            <p className="font-bold text-3xl mt-2">Salle d'attente</p>
+                            <p className="font-bold text-3xl mt-2">Waiting Room</p>
                             <p className="text-gray-500 text-md">
-                                Service: {serviceName || 'Non defini'}
+                                Service: {serviceName || 'Not defined'}
                             </p>
                         </div>
                         <div className="flex mr-5 mt-2">
@@ -216,7 +216,7 @@ export function WaitingRoom() {
                         <div className="flex flex-col items-center justify-center py-12 px-4 text-center mt-20">
                             <Users className="w-36 h-36 text-gray-300" />
                             <h3 className="font-bold text-2xl mt-4 mb-2 text-gray-800">
-                                Aucun patient en attente
+                                No pending patients
                             </h3>
                             <p className="text-gray-600 mb-6 max-w-xl text-md font-medium">
                                 {serviceName ?

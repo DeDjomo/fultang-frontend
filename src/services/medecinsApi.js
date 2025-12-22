@@ -100,3 +100,14 @@ export const getChambresDisponibles = async () => {
     });
     return response.data;
 };
+
+/**
+ * Rediriger un patient vers la caisse
+ * @param {number} sessionId - ID de la session
+ */
+export const redirectToCashier = async (sessionId) => {
+    const response = await axiosInstance.post('/medecin/redirect-to-cashier/', {
+        session_id: sessionId
+    });
+    return response.data;
+};

@@ -120,7 +120,7 @@ export function DoctorWaitingRoom() {
                         <div className="flex items-center gap-3">
                             <Users className="w-8 h-8" />
                             <div>
-                                <h1 className="text-2xl font-bold">Salle d'Attente - Médecin</h1>
+                                <h1 className="text-2xl font-bold">Doctor's Waiting Room</h1>
                                 <p className="text-sm opacity-90">Service: {serviceName || 'Non défini'}</p>
                             </div>
                         </div>
