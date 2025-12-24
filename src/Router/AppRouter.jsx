@@ -3,10 +3,6 @@ import { Route, Routes } from "react-router-dom";
 import { Loading } from "../GlobalComponents/Loading.jsx";
 import { AppRoutesPaths } from "./appRouterPaths.js";
 
-
-
-
-
 export function AppRoute() {
     const LoginPage = React.lazy(async () => ({ default: (await import("../Pages/Authentication/Login.jsx")).LoginPage }));
     const ForgottenPage = React.lazy(async () => ({ default: (await import("../Pages/Authentication/ForgottenPassword.jsx")).ForgottenPassword }));
@@ -21,7 +17,6 @@ export function AppRoute() {
     const PatientDetailsPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/PatientParameters.jsx")).PatientParameters }));
     const PharmacyPage = React.lazy(async () => ({ default: (await import("../Pages/Pharmacy/Pharmacy.jsx")).Pharmacy }));
     const ReceptionistPage = React.lazy(async () => ({ default: (await import("../Pages/Receptionist/Receptionist.jsx")).Receptionist }));
-    /*const LaboratoryAssistantPage = React.lazy(async () => ({default: (await import("../Pages/Laboratory/LaboratoryAssistant.jsx")).LaboratoryAssistant}));*/
     const CashierPage = React.lazy(async () => ({ default: (await import("../Pages/Cashier/Cashier.jsx")).Cashier }));
     const ExamsList = React.lazy(async () => ({ default: (await import("../Pages/Cashier/ExamsList.jsx")).ExamsList }));
     const Hospitalisations = React.lazy(async () => ({ default: (await import("../Pages/Cashier/Hospitalisations.jsx")).Hospitalisations }));
@@ -48,15 +43,12 @@ export function AppRoute() {
     const AdminFinancialReportsPage = React.lazy(async () => ({ default: (await import("../Pages/AdminViews/AdminFinancialReports.jsx")).AdminFinancialReports }));
     const AccountantPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Accountant.jsx")).Accountant }));
     const AdminConsultationDetails = React.lazy(async () => ({ default: (await import("../Pages/AdminViews/ConsultationDetails.jsx")).ConsultationDetails }));
-    /*const CurrentExamsLaboratoryPage = React.lazy(async () => ({default: (await import("../Pages/Laboratory/CurrentExams.jsx")).CurrentExams}));
-    const ExamsHistoryLaboratoryPage = React.lazy(async () => ({default: (await import("../Pages/Laboratory/ExamsHistory.jsx")).ExamHistory}));*/
     const AccountDetailsPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/AccountDetailsPage.jsx")).AccountDetailsPage }));
     const AccountList = React.lazy(async () => ({ default: (await import("../Pages/Accountant/AccountList.jsx")).AccountList }));
 
     const DoctorAppointments = React.lazy(async () => ({ default: (await import("../Pages/Doctor/AppointmentList.jsx")).AppointmentList }));
     const DoctorWaitingRoom = React.lazy(async () => ({ default: (await import("../Pages/Doctor/DoctorWaitingRoom.jsx")).DoctorWaitingRoom }));
     const DoctorConsultation = React.lazy(async () => ({ default: (await import("../Pages/Doctor/ConsultationPage.jsx")).ConsultationPage }));
-
 
     const FinancialContributions = React.lazy(async () => ({ default: (await import("../Pages/Accountant/FinancialContribution.jsx")).FinancialContributions, }));
     const FinancialReportsAccountant = React.lazy(async () => ({ default: (await import("../Pages/Accountant/FinancialReports.jsx")).FinancialReports, }));
@@ -71,7 +63,6 @@ export function AppRoute() {
     const LaboratoryExamResulDetails = React.lazy(async () => ({ default: (await import("../Pages/Laboratory/ExamResultDetail.jsx")).ExamResultDetails, }));
     const LaboratoryNotifications = React.lazy(async () => ({ default: (await import("../Pages/Laboratory/Notification.jsx")).Notification, }));
 
-
     const FinancialAccountantHome = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Home/HomePage.jsx")).FinancialAccountantHomePage, }));
     const FinancialAccountantChartOfAccount = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Comptabilité de Base/PlanComptable.jsx")).ChartOfAccounts, }));
     const FinancialAccountantJournalEntries = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Comptabilité de Base/JournalsEntries.jsx")).JournalEntries, }));
@@ -79,12 +70,8 @@ export function AppRoute() {
     const FinancialGrandLivre = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Comptabilité de Base/GrandLivre.jsx")).GrandLivreBalance }));
     const FinancialPayrollJournal = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Payroll & Social Charge/PayrollJournal.jsx")).SocialChargesCalculator }));
     const FinancialCostAnalytic = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Payroll & Social Charge/CostAnalytic.jsx")).HRAnalyticsDashboard }));
-
-
-
-
-
-
+    const FinancialAccountantReceipts = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Comptabilité de Base/ReceiptsPage.jsx")).ReceiptsPage }));
+    const FinancialAccountantRevenueBreakdown = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Comptabilité de Base/RevenueBreakdownPage.jsx")).RevenueBreakdownPage }));
 
     return (
         <React.Suspense fallback={<Loading />}>
@@ -107,7 +94,6 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.financialReport} element={<FinancialReport />} />
                 <Route path={AppRoutesPaths.helpCenter} element={<HelpCenter />} />
                 <Route path={AppRoutesPaths.receptionistPage} element={<ReceptionistPage />} />
-                {/*<Route path={AppRoutesPaths.laboratoryAssistantPage} element={<LaboratoryAssistantPage />} />*/}
                 <Route path={AppRoutesPaths.adminHomePage} element={<AdminHomePage />} />
                 <Route path={AppRoutesPaths.adminServicesPage} element={<AdminServicesPage />} />
                 <Route path={AppRoutesPaths.adminPersonnelPage} element={<AdminPersonnelPage />} />
@@ -128,8 +114,6 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.adminFinancialReportsPage} element={<AdminFinancialReportsPage />} />
                 <Route path={AppRoutesPaths.accountantPage} element={<AccountantPage />} />
                 <Route path={AppRoutesPaths.adminConsultationDetailsPage} element={<AdminConsultationDetails />} />
-                {/*<Route path={AppRoutesPaths.laboratoryHistory} element={<ExamsHistoryLaboratoryPage />} />*/}
-                {/*<Route path={AppRoutesPaths.laboratoryCurrent} element={<CurrentExamsLaboratoryPage />} />*/}
                 <Route path={AppRoutesPaths.financialHistory} element={<FinancialHistory />} />
                 <Route path={AppRoutesPaths.accountDetails} element={<AccountDetailsPage />} />
                 <Route path={AppRoutesPaths.accountList} element={<AccountList />} />
@@ -152,7 +136,6 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.laboratoryExamResultDetails} element={<LaboratoryExamResulDetails />} />
                 <Route path={AppRoutesPaths.laboratoryNotification} element={<LaboratoryNotifications />} />
 
-
                 <Route path={AppRoutesPaths.financialAccountantHome} element={<FinancialAccountantHome />} />
                 <Route path={AppRoutesPaths.financialAccountantChartOfAccount} element={<FinancialAccountantChartOfAccount />} />
                 <Route path={AppRoutesPaths.financialAccountantJournalEntries} element={<FinancialAccountantJournalEntries />} />
@@ -160,12 +143,8 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.financialAccountantAccountingGrandLivre} element={<FinancialGrandLivre />} />
                 <Route path={AppRoutesPaths.financialAccountPayroll} element={<FinancialPayrollJournal />} />
                 <Route path={AppRoutesPaths.financialAccountantCostAnalytic} element={<FinancialCostAnalytic />} />
-
-
-
-
-
-
+                <Route path={AppRoutesPaths.financialAccountantReceipts} element={<FinancialAccountantReceipts />} />
+                <Route path={AppRoutesPaths.financialAccountantRevenueBreakdown} element={<FinancialAccountantRevenueBreakdown />} />
 
             </Routes>
         </React.Suspense>
