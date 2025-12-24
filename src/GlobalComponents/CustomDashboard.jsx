@@ -1,12 +1,12 @@
-import {useEffect, useState} from 'react';
-import {Link, Navigate, useLocation} from "react-router-dom";
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useLocation } from "react-router-dom";
 import PropTypes from "prop-types";
 import { AccessDenied } from "./AccessDenied.jsx";
 import { useAuthentication } from "../Utils/Provider.jsx";
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import {Loading} from "./Loading.jsx";
+import { Loading } from "./Loading.jsx";
 
-export function CustomDashboard({ children, linkList, requiredRole}) {
+export function CustomDashboard({ children, linkList, requiredRole }) {
 
 
     CustomDashboard.propTypes = {
@@ -24,8 +24,7 @@ export function CustomDashboard({ children, linkList, requiredRole}) {
 
 
 
-    function toggleSubMenu  (linkName)
-    {
+    function toggleSubMenu(linkName) {
         setExpandedLinks(prev => ({
             ...prev,
             [linkName]: !prev[linkName]
@@ -33,10 +32,18 @@ export function CustomDashboard({ children, linkList, requiredRole}) {
     }
 
 
-    function renderLink(item, index, isSubLink = false)
-    {
+    function renderLink(item, index, isSubLink = false) {
         const IconComponent = item.icon;
-        const isActive = activeLink.startsWith(item.link);
+
+        // Find the most specific matching link from linkList
+        const matchingLinks = linkList.filter(link =>
+            activeLink === link.link || activeLink.startsWith(link.link + '/')
+        );
+        // Sort by length (longest path = most specific)
+        const mostSpecificMatch = matchingLinks.sort((a, b) => b.link.length - a.link.length)[0];
+        // Current item is active only if it's the most specific match
+        const isActive = mostSpecificMatch?.link === item.link;
+
         const hasSubLinks = item.subLinks && item.subLinks.length > 0;
 
 
@@ -44,18 +51,18 @@ export function CustomDashboard({ children, linkList, requiredRole}) {
         return (
             <div key={index}>
                 {!hasSubLinks ? (
-                        <Link className={`transition-all duration-400 flex p-3 items-center cursor-pointer ${isActive ? "bg-white rounded-l-full mb-2 mt-2" : "hover:bg-white/20 hover:rounded-l-full"} ${isSubLink ? "ml-4" : "ml-5"}`}
-                             to={item.link}
-                        >
-                            {IconComponent && (
-                                <IconComponent
-                                    className={isActive ? "text-black text-xl mr-3" : "text-xl mr-3 text-white"}
-                                />
-                            )}
-                            <p className={isActive ? "text-black font-bold text-md" : "text-md font-bold text-white"}>
-                                {item.name}
-                            </p>
-                        </Link>
+                    <Link className={`transition-all duration-400 flex p-3 items-center cursor-pointer ${isActive ? "bg-white rounded-l-full mb-2 mt-2" : "hover:bg-white/20 hover:rounded-l-full"} ${isSubLink ? "ml-4" : "ml-5"}`}
+                        to={item.link}
+                    >
+                        {IconComponent && (
+                            <IconComponent
+                                className={isActive ? "text-black text-xl mr-3" : "text-xl mr-3 text-white"}
+                            />
+                        )}
+                        <p className={isActive ? "text-black font-bold text-md" : "text-md font-bold text-white"}>
+                            {item.name}
+                        </p>
+                    </Link>
                 ) : (
                     <div
                         className="transition-all duration-400 flex p-3.5 items-center cursor-pointer ml-5 hover:bg-white/20 hover:rounded-l-full"
@@ -70,10 +77,10 @@ export function CustomDashboard({ children, linkList, requiredRole}) {
                             {item.name}
                         </p>
                         {hasSubLinks && (expandedLinks[item.name] ? (
-                                <ChevronUp className={`ml-auto ${isActive ? "text-black" : "text-white"}`}/>
-                            ) : (
-                                <ChevronDown className={`ml-auto ${isActive ? "text-black" : "text-white"}`}/>
-                            )
+                            <ChevronUp className={`ml-auto ${isActive ? "text-black" : "text-white"}`} />
+                        ) : (
+                            <ChevronDown className={`ml-auto ${isActive ? "text-black" : "text-white"}`} />
+                        )
                         )}
                     </div>
                 )
@@ -88,7 +95,7 @@ export function CustomDashboard({ children, linkList, requiredRole}) {
     }
 
 
-   useEffect(() => {
+    useEffect(() => {
         const checkAuth = async () => {
             await new Promise(resolve => setTimeout(resolve, 500));
             setIsLoading(false);
@@ -100,7 +107,7 @@ export function CustomDashboard({ children, linkList, requiredRole}) {
 
 
     if (isLoading) {
-        return <Loading/>
+        return <Loading />
     }
 
     if (!isAuthenticated()) {

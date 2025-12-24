@@ -15,6 +15,8 @@ import { getDossierByPatientId } from '../../services/dossiersApi';
 import { createObservation } from '../../services/observationsApi';
 import { rediriggerPatient, updateSessionStatus } from '../../services/sessionsApi';
 import { getAllServices } from '../../services/servicesApi';
+import { OpenSessionModal } from '../Receptionist/OpenSessionModal';
+import { FaMoneyBillWave } from 'react-icons/fa';
 
 export function PatientManagement() {
     const { state } = useLocation();
@@ -34,6 +36,7 @@ export function PatientManagement() {
     const [loadingDossier, setLoadingDossier] = useState(true);
     const [submittingObs, setSubmittingObs] = useState(false);
     const [submittingRedirect, setSubmittingRedirect] = useState(false);
+    const [openSendToCashierModal, setOpenSendToCashierModal] = useState(false);
 
     const personnelTypes = [
         { value: 'medecin', label: 'Medecin' },
@@ -401,12 +404,35 @@ export function PatientManagement() {
                                         <ArrowRight className="w-5 h-5" />
                                         {submittingRedirect ? 'Redirecting...' : 'Redirect Patient'}
                                     </button>
+
+                                    <div className="mt-4 border-t pt-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setOpenSendToCashierModal(true)}
+                                            className="w-full py-3 px-6 rounded-md flex items-center justify-center gap-2 font-bold transition-all duration-300 bg-blue-500 text-white hover:bg-blue-600"
+                                        >
+                                            <FaMoneyBillWave className="w-5 h-5" />
+                                            Envoyer à la caisse pour paiement
+                                        </button>
+                                    </div>
                                 </form>
                             </div>
                         </div>
                     </div>
                 </div>
             </NurseNavBar>
+            <OpenSessionModal
+                isOpen={openSendToCashierModal}
+                onClose={() => setOpenSendToCashierModal(false)}
+                patient={patient}
+                mode="cashier"
+                isUpdate={true}
+                sessionId={sessionId}
+                onSuccess={() => {
+                    message.success("Patient envoyé à la caisse");
+                    navigate('/nurse/waiting-room');
+                }}
+            />
         </DashBoard>
     );
 }

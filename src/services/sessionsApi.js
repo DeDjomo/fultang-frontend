@@ -138,3 +138,18 @@ export const updateSessionStatus = async (sessionId, statut) => {
         throw error;
     }
 };
+/**
+ * Met une session en attente (Send to Cashier).
+ * 
+ * @param {number} sessionId - ID de la session
+ * @returns {Promise} Session mise a jour
+ */
+export const putSessionEnAttente = async (sessionId) => {
+    try {
+        const response = await axiosInstance.post(`${BASE_URL}/${sessionId}/mettre-en-attente/`);
+        return response.data;
+    } catch (error) {
+        console.error('Error putting session en attente:', error);
+        throw error;
+    }
+};

@@ -17,9 +17,7 @@ export const getAllRendezVous = async () => {
  * @param {number} medecinId - ID du médecin
  */
 export const getRendezVousByMedecin = async (medecinId) => {
-    const response = await axiosInstance.get('/rendez-vous/', {
-        params: { id_medecin: medecinId }
-    });
+    const response = await axiosInstance.get(`/rendez-vous/medecin/${medecinId}/`);
     return response.data;
 };
 

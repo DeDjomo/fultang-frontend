@@ -46,13 +46,14 @@ export function LoginPage() {
 
             const role = response.role?.toLowerCase();
 
-            // Verifier si c'est la premiere connexion (sauf pour admin)
-            if (role !== 'admin' && response.first_login_done === false) {
-                setPendingRole(role);
-                setShowPasswordModal(true);
-                setIsLoading(false);
-                return;
-            }
+            // TEMPORAIREMENT DÉSACTIVÉ: Vérification première connexion
+            // TODO: Réactiver après les tests
+            // if (role !== 'admin' && response.first_login_done === false) {
+            //     setPendingRole(role);
+            //     setShowPasswordModal(true);
+            //     setIsLoading(false);
+            //     return;
+            // }
 
             // Redirection selon le role/poste
             navigateToRole(role);

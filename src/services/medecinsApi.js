@@ -16,6 +16,25 @@ export const getPatientsEnAttente = async (serviceName) => {
 };
 
 /**
+ * Récupère la liste de tous les médecins
+ */
+export const getAllMedecins = async () => {
+    const response = await axiosInstance.get('/personnel/', {
+        params: { poste: 'medecin' }
+    });
+    return response.data;
+};
+
+/**
+ * Crée un nouveau médecin
+ * @param {Object} data - Données du médecin (nom, prenom, email, specialite, etc.)
+ */
+export const createMedecin = async (data) => {
+    const response = await axiosInstance.post('/medecins/', data);
+    return response.data;
+};
+
+/**
  * Sélectionner un patient de la liste d'attente
  * @param {number} sessionId - ID de la session
  */

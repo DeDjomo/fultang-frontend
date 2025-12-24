@@ -87,7 +87,7 @@ export function HospitalizedPatients() {
                             </thead>
                             <tbody>
                                 {filteredPatients.map((patient, index) => (
-                                    <tr key={patient.id} className="bg-gray-100">
+                                    <tr key={`${patient.id}-${index}`} className="bg-gray-100">
                                         <td className="p-4 text-md text-blue-900 rounded-l-lg text-center">{index + 1}</td>
                                         <td className="p-4 text-md text-center font-mono">{patient.matricule}</td>
                                         <td className="p-4 text-md text-center font-bold">

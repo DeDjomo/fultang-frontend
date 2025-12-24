@@ -16,8 +16,7 @@ import {
     prescriptionExamen,
     enregistrerResultatExamen,
     hospitaliserPatient,
-    getChambresDisponibles,
-    redirectToCashier
+    getChambresDisponibles
 } from '../../services/medecinsApi';
 import { getDossierByPatientId } from '../../services/dossiersApi';
 import {
@@ -27,6 +26,7 @@ import {
     getPatientResultatsExamens
 } from '../../services/patientHistoryApi';
 import Loader from '../../GlobalComponents/Loader';
+import { OpenSessionModal } from '../Receptionist/OpenSessionModal';
 
 export function ConsultationPage() {
     const location = useLocation();
@@ -47,6 +47,7 @@ export function ConsultationPage() {
     const [resultatExamen, setResultatExamen] = useState('');
     const [selectedPrescriptionExamen, setSelectedPrescriptionExamen] = useState(null);
     const [selectedChambre, setSelectedChambre] = useState(null);
+    const [openSendToCashierModal, setOpenSendToCashierModal] = useState(false);
 
     // Lists
     const [chambresDisponibles, setChambresDisponibles] = useState([]);
@@ -259,25 +260,8 @@ export function ConsultationPage() {
         });
     };
 
-    const handleRedirectToCashier = async () => {
-        Modal.confirm({
-            title: 'Redirect to Cashier',
-            content: `Are you sure you want to redirect ${patient.prenom} ${patient.nom} to the cashier?`,
-            okText: 'Confirm',
-            cancelText: 'Cancel',
-            onOk: async () => {
-                try {
-                    await redirectToCashier(sessionId);
-                    message.success('Patient successfully redirected to cashier');
-                    setTimeout(() => {
-                        navigate('/doctor/waiting-room');
-                    }, 1500);
-                } catch (error) {
-                    console.error('Error redirecting to cashier:', error);
-                    message.error('Error redirecting patient to cashier');
-                }
-            }
-        });
+    const handleRedirectToCashier = () => {
+        setOpenSendToCashierModal(true);
     };
 
     if (!patient || !sessionId) {
@@ -730,6 +714,18 @@ export function ConsultationPage() {
                     </button>
                 </div>
             </div>
+            <OpenSessionModal
+                isOpen={openSendToCashierModal}
+                onClose={() => setOpenSendToCashierModal(false)}
+                patient={patient}
+                mode="cashier"
+                isUpdate={true}
+                sessionId={sessionId}
+                onSuccess={() => {
+                    message.success("Patient sent to cashier");
+                    navigate('/doctor/waiting-room');
+                }}
+            />
         </CustomDashboard>
     );
 }

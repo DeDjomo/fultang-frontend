@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Modal, message, Select } from 'antd';
 import { FolderOpen, User, Building2 } from 'lucide-react';
-import { createSession } from '../../services/sessionsApi';
+import { createSession, putSessionEnAttente, rediriggerPatient } from '../../services/sessionsApi';
 import { getAllServices } from '../../services/servicesApi';
 import { useAuthentication } from '../../Utils/Provider';
 
@@ -14,7 +14,7 @@ import { useAuthentication } from '../../Utils/Provider';
  * @param {Object} patient - Patient sélectionné
  * @param {function} onSuccess - Callback après création réussie
  */
-export function OpenSessionModal({ isOpen, onClose, patient, onSuccess }) {
+export function OpenSessionModal({ isOpen, onClose, patient, onSuccess, mode = 'standard', isUpdate = false, sessionId = null }) {
     const [services, setServices] = useState([]);
     const [selectedService, setSelectedService] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -49,14 +49,44 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess }) {
 
         setLoading(true);
         try {
-            const requestData = {
-                id_patient: patient.id,
-                id_service: selectedService,
-                id_personnel: userData?.id
-            };
+            if (isUpdate && sessionId) {
+                // Mode redirection (Nurse)
+                // 1. Trouver le nom du service
+                const serviceObj = services.find(s => s.id === selectedService);
+                if (!serviceObj) throw new Error("Service not found");
 
-            await createSession(requestData);
-            message.success('Session ouverte successfully!');
+                // 2. Rediriger
+                await rediriggerPatient(sessionId, {
+                    type: 'service',
+                    valeur: serviceObj.nom_service
+                });
+
+                // 3. Si mode cashier, mettre en attente
+                if (mode === 'cashier') {
+                    await putSessionEnAttente(sessionId);
+                    message.success('Patient redirigé vers la caisse avec succès!');
+                } else {
+                    message.success('Patient redirigé avec succès!');
+                }
+            } else {
+                // Mode création (Receptionist)
+                const requestData = {
+                    id_patient: patient.id,
+                    id_service: selectedService,
+                    id_personnel: userData?.id
+                };
+
+                const response = await createSession(requestData);
+
+                if (mode === 'cashier') {
+                    const newSessionId = response.data.id || response.data.data.id;
+                    await putSessionEnAttente(newSessionId);
+                    message.success('Patient envoyé à la caisse avec succès!');
+                } else {
+                    message.success('Session ouverte avec succès!');
+                }
+            }
+
             setSelectedService(null);
             if (onSuccess) onSuccess();
             onClose();
@@ -89,10 +119,12 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess }) {
                         <FolderOpen className="w-8 h-8 text-white" />
                     </div>
                     <h2 className="text-2xl font-bold text-gray-800">
-                        Ouvrir une session
+                        {mode === 'cashier' ? 'Envoyer à la caisse' : 'Ouvrir une session'}
                     </h2>
                     <p className="text-gray-600 mt-2">
-                        Envoyer le patient vers un service
+                        {mode === 'cashier'
+                            ? 'Sélectionner le service de destination pour le paiement'
+                            : 'Envoyer le patient vers un service'}
                     </p>
                 </div>
 
@@ -162,7 +194,7 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess }) {
                         disabled={loading || !selectedService}
                         className="flex-1 py-3 px-4 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
                     >
-                        {loading ? 'Ouverture...' : 'Ouvrir la session'}
+                        {loading ? 'Traitement...' : (mode === 'cashier' ? 'Envoyer à la caisse' : (isUpdate ? 'Rediriger' : 'Ouvrir la session'))}
                     </button>
                 </div>
             </div>

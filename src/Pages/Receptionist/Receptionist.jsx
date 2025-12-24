@@ -1,10 +1,10 @@
 import { ReceptionistNavBar } from "./ReceptionistNavBar.jsx";
-import { FaArrowLeft, FaArrowRight, FaEdit, FaEye, FaPlus, FaSearch, } from "react-icons/fa";
+import { FaArrowLeft, FaArrowRight, FaEdit, FaEye, FaPlus, FaSearch, FaMoneyBillWave } from "react-icons/fa";
 import { FolderOpen } from 'lucide-react';
 import { Tooltip } from "antd";
 import { DashBoard } from "../../GlobalComponents/DashBoard.jsx";
 import { receptionistNavLink } from "./receptionistNavLink.js";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { AddNewPatientModal } from "./addNewPatientModal.jsx";
 import { SuccessModal } from "../Modals/SuccessModal.jsx";
 import Wait from "../Modals/wait.jsx";
@@ -29,6 +29,7 @@ export function Receptionist() {
     const [selectedPatientDetails, setSelectedPatientDetails] = useState({});
     const [canOpenEditPatientDetailModal, setCanOpenEditPatientDetailModal] = useState(false);
     const [canOpenSessionModal, setCanOpenSessionModal] = useState(false);
+    const [canOpenSendToCashierModal, setCanOpenSendToCashierModal] = useState(false);
     const [patients, setPatients] = useState([]);
     const [nexUrlForRenderPatientList, setNexUrlForRenderPatientList] = useState("");
     const [previousUrlForRenderPatientList, setPreviousUrlForRenderPatientList] = useState("");
@@ -38,6 +39,9 @@ export function Receptionist() {
     const [errorStatus, setErrorStatus] = useState(null);
     const [errorMessage, setErrorMessage] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const tableContainerRef = useRef(null);
+    const [tableHeight, setTableHeight] = useState(0);
 
 
 
@@ -45,6 +49,32 @@ export function Receptionist() {
 
 
 
+
+    // Calculate available space for patients list
+    useLayoutEffect(() => {
+        function calculatePageSize() {
+            // Estimates/Measurements
+            const NAVBAR_HEIGHT = 100; // Approximate
+            const HEADER_SEARCH_HEIGHT = 80;
+            const TABLE_HEADER_HEIGHT = 60;
+            const PAGINATION_HEIGHT = 100;
+            const ROW_HEIGHT = 70; // Comfortable height for rows
+            const BOTTOM_PADDING = 20;
+
+            const occupiedHeight = NAVBAR_HEIGHT + HEADER_SEARCH_HEIGHT + TABLE_HEADER_HEIGHT + PAGINATION_HEIGHT + BOTTOM_PADDING;
+            const availableHeight = window.innerHeight - occupiedHeight;
+
+            // Ensure at least 5 items
+            const calculatedLimit = Math.max(5, Math.floor(availableHeight / ROW_HEIGHT));
+
+            setItemsPerPage(calculatedLimit);
+        }
+
+        calculatePageSize();
+        window.addEventListener('resize', calculatePageSize);
+
+        return () => window.removeEventListener('resize', calculatePageSize);
+    }, []);
 
     function updateActualPageNumber(action) {
         if (action === "next") {
@@ -66,7 +96,7 @@ export function Receptionist() {
         async function fetchPatients() {
             setWaitData(true);
             try {
-                const response = await axiosInstance.get("/patients/");
+                const response = await axiosInstance.get(`/patients/?page_size=${itemsPerPage}`);
                 setWaitData(false);
                 if (response.status === 200) {
                     console.log(response)
@@ -95,8 +125,9 @@ export function Receptionist() {
                 }
             }
         }
+
         fetchPatients();
-    }, []);
+    }, [itemsPerPage]);
 
 
 
@@ -135,7 +166,7 @@ export function Receptionist() {
 
                 {/*Header content with search bar*/}
                 <div className="flex justify-between mb-5">
-                    <p className="font-bold text-xl mt-2 ml-5">Patient List</p>
+                    <p className="font-bold text-xl mt-2 ml-5">Patients List</p>
                     <div className="flex mr-5">
                         <div className="flex w-[300px] h-10 border-2 border-secondary rounded-lg">
                             <FaSearch className="text-xl text-secondary m-2" />
@@ -214,6 +245,16 @@ export function Receptionist() {
                                                                         }}
                                                                         className="flex items-center justify-center w-9 h-9 text-orange-500 text-xl hover:bg-gray-300 hover:rounded-full transition-all duration-300">
                                                                         <FolderOpen className="w-5 h-5" />
+                                                                    </button>
+                                                                </Tooltip>
+                                                                <Tooltip placement={"right"} title={"Envoyer à la caisse"}>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setSelectedPatientDetails(patient);
+                                                                            setCanOpenSendToCashierModal(true);
+                                                                        }}
+                                                                        className="flex items-center justify-center w-9 h-9 text-blue-500 text-xl hover:bg-gray-300 hover:rounded-full transition-all duration-300">
+                                                                        <FaMoneyBillWave className="w-5 h-5" />
                                                                     </button>
                                                                 </Tooltip>
                                                             </div>
@@ -313,6 +354,16 @@ export function Receptionist() {
                         patient={selectedPatientDetails}
                         onSuccess={() => {
                             setSuccessMessage("Session ouverte avec succès!");
+                            setCanOPenSuccessModal(true);
+                        }}
+                    />
+                    <OpenSessionModal
+                        isOpen={canOpenSendToCashierModal}
+                        onClose={() => setCanOpenSendToCashierModal(false)}
+                        patient={selectedPatientDetails}
+                        mode="cashier"
+                        onSuccess={() => {
+                            setSuccessMessage("Patient envoyé à la caisse avec succès!");
                             setCanOPenSuccessModal(true);
                         }}
                     />

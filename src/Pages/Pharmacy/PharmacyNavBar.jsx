@@ -1,34 +1,50 @@
-import React from 'react';
-import { FiSettings, FiRefreshCw } from 'react-icons/fi';
+import { FaCog, FaEnvelope, FaSignOutAlt } from "react-icons/fa";
+import { Tooltip } from "antd";
+import { useAuthentication } from "../../Utils/Provider.jsx";
+import userIcon from "../../assets/userIcon.png";
 
-export function PharmacyNavbar({ username }) {
+export function PharmacyNavBar() {
+  const { logout, userData } = useAuthentication();
+
+  const applyNavLinkBtnStyle = () => {
+    return " w-12 h-10 mt-1 border-2 bg-gray-100 flex justify-center items-center rounded-xl shadow-xl hover:bg-secondary text-secondary text-xl hover:text-white transition-all duration-300";
+  }
+
   return (
-    <div className="flex justify-between items-center px-4 py-3 bg-white border-b ">
-      <h1 className="text-xl font-semibold" style={{ color: '#2F4B8F' }}>Pharmacist</h1>
-      <div className="flex items-center gap-4">
-        <div className="p-2 rounded-lg shadow-sm hover:shadow-md bg-white transition-shadow">
-          <button className="text-gray-500 hover:text-gray-700">
-            <FiSettings className="w-5 h-5 text-blue" />
-          </button>
-        </div>
-        <div className="p-2 rounded-lg shadow-sm hover:shadow-md bg-white transition-shadow">
-          <button className="text-gray-500 hover:text-gray-700">
-            <FiRefreshCw className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="flex items-center gap-2 ml-2">
-          <span className="text-sm text-gray-600">Username.N</span>
-          <div className="w-8 h-8 rounded-full shadow-sm overflow-hidden">
-            <img 
-              src="/doctor.png" 
-              alt="Profile" 
-              className="w-full h-full object-cover"
-            />
+    <>
+      <div className="border-b-2 m-3 border-b-gray-300">
+        <div className="w-full h-[70px] flex justify-between">
+          <h1 className="ml-3 text-4xl text-secondary mt-3.5 font-bold">
+            Pharmacist
+          </h1>
+          <div className="flex gap-3 mt-3.5 mb-4 mr-5">
+            <Tooltip placement={"top"} title={"settings"}>
+              <button className={applyNavLinkBtnStyle()}>
+                <FaCog />
+              </button>
+            </Tooltip>
+
+            <Tooltip placement={"top"} title={"Messages"}>
+              <button className={applyNavLinkBtnStyle()}>
+                <FaEnvelope />
+              </button>
+            </Tooltip>
+            <Tooltip placement={"top"} title={"LogOut"}>
+              <button
+                onClick={() => { logout() }}
+                className={" w-12 h-10 mt-1 border-2 bg-red-400 flex justify-center items-center rounded-xl shadow-xl hover:bg-white text-white text-xl hover:text-red-500 transition-all duration-300"}>
+                <FaSignOutAlt />
+              </button>
+            </Tooltip>
+            <Tooltip placement={"top"} title={"Profile"}>
+              <button className="ml-3 flex">
+                <p className="font-bold text-secondary text-xl mt-2">{"Hello " + (userData?.nom || "Pharmacist") + "!"}</p>
+                <img src={userIcon} alt={"user-icon"} className="w-12 h-12 ml-2 mr-3" />
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>
-    </div>
-  );
+    </>
+  )
 }
-
-export default PharmacyNavbar;

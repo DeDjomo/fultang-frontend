@@ -20,6 +20,9 @@ export function AppRoute() {
     const HelpCenterPage = React.lazy(async () => ({ default: (await import("../Pages/HelpCenter/HelpCenter.jsx")).HelpCenter }));
     const PatientDetailsPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/PatientParameters.jsx")).PatientParameters }));
     const PharmacyPage = React.lazy(async () => ({ default: (await import("../Pages/Pharmacy/Pharmacy.jsx")).Pharmacy }));
+    const PharmacyHistoryPage = React.lazy(async () => ({ default: (await import("../Pages/Pharmacy/PharmacyHistory.jsx")).PharmacyHistory }));
+    const PharmacyReportsPage = React.lazy(async () => ({ default: (await import("../Pages/Pharmacy/PharmacyReports.jsx")).PharmacyReports }));
+    const PharmacyNeedsPage = React.lazy(async () => ({ default: (await import("../Pages/Pharmacy/PharmacyNeeds.jsx")).PharmacyNeeds }));
     const ReceptionistPage = React.lazy(async () => ({ default: (await import("../Pages/Receptionist/Receptionist.jsx")).Receptionist }));
     /*const LaboratoryAssistantPage = React.lazy(async () => ({default: (await import("../Pages/Laboratory/LaboratoryAssistant.jsx")).LaboratoryAssistant}));*/
     const CashierPage = React.lazy(async () => ({ default: (await import("../Pages/Cashier/Cashier.jsx")).Cashier }));
@@ -97,6 +100,9 @@ export function AppRoute() {
                 <Route path="/nurse/patient-management" element={<PatientManagementPage />} />
                 <Route path={AppRoutesPaths.nurseAppointmentsPage} element={<NurseAppointmentsPage />} />
                 <Route path={AppRoutesPaths.pharmacyPage} element={<PharmacyPage />} />
+                <Route path={AppRoutesPaths.pharmacyHistoryPage} element={<PharmacyHistoryPage />} />
+                <Route path={AppRoutesPaths.pharmacyReportsPage} element={<PharmacyReportsPage />} />
+                <Route path={AppRoutesPaths.pharmacyNeedsPage} element={<PharmacyNeedsPage />} />
                 <Route path={AppRoutesPaths.consultationHistoryPage} element={<ConsultationHistoryPage />} />
                 <Route path={AppRoutesPaths.helpCenterPage} element={<HelpCenterPage />} />
                 <Route path={AppRoutesPaths.patientDetailsPage} element={<PatientDetailsPage />} />
