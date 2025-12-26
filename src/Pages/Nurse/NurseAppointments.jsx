@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Modal, message, DatePicker, Tag, Alert } from 'antd';
+import { useState, useEffect, useCallback } from 'react';
+import { DatePicker, Tag, Alert } from 'antd';
 import { FaSearch, FaPlus, FaTrash, FaCheck, FaTimes } from 'react-icons/fa';
 import { XIcon, Calendar } from 'lucide-react';
 import { DashBoard } from "../../GlobalComponents/DashBoard.jsx";
@@ -8,6 +8,9 @@ import { NurseNavBar } from "./NurseNavBar.jsx";
 import { getAllRendezVous, createRendezVous, deleteRendezVous } from '../../services/rendezVousApi';
 import { getAllMedecins } from '../../services/medecinsApi';
 import { searchPatients } from '../../services/patientsApi';
+import { ConfirmationModal } from '../Modals/ConfirmAction.Modal.jsx';
+import { useFeedback } from '../../contexts/FeedbackContext.jsx';
+import { useAutoRefresh, deepEqual } from '../../hooks/usePolling';
 import Loader from "../../GlobalComponents/Loader.jsx";
 import dayjs from 'dayjs';
 
@@ -24,8 +27,11 @@ export function NurseAppointments() {
     const [patientSearchResults, setPatientSearchResults] = useState([]);
     const [patientSearchTerm, setPatientSearchTerm] = useState('');
     const [selectedPatient, setSelectedPatient] = useState(null);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [rdvToDelete, setRdvToDelete] = useState(null);
     const [errors, setErrors] = useState({});
     const [apiError, setApiError] = useState('');
+    const { showSuccess, showError } = useFeedback();
 
     const [formData, setFormData] = useState({
         matricule_patient: '',
@@ -34,23 +40,28 @@ export function NurseAppointments() {
         heure_rendez_vous: null
     });
 
-    useEffect(() => {
-        fetchRendezVous();
-        fetchMedecins();
-    }, []);
-
-    const fetchRendezVous = async () => {
-        setLoading(true);
+    const fetchRendezVous = useCallback(async (isBackground = false) => {
+        if (!isBackground) setLoading(true);
         try {
             const response = await getAllRendezVous();
             const data = response.data || response.results || [];
-            setRendezVous(data);
+
+            setRendezVous(prev => deepEqual(prev, data) ? prev : data);
+
         } catch (error) {
             console.error('Error fetching rendez-vous:', error);
         } finally {
-            setLoading(false);
+            if (!isBackground) setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchRendezVous();
+        fetchMedecins();
+    }, [fetchRendezVous]);
+
+    // Auto-refresh toutes les 5 secondes
+    useAutoRefresh(() => fetchRendezVous(true), 5000, false);
 
     const fetchMedecins = async () => {
         try {
@@ -88,22 +99,20 @@ export function NurseAppointments() {
     };
 
     const handleDelete = (rdv) => {
-        Modal.confirm({
-            title: 'Supprimer le rendez-vous',
-            content: 'Etes-vous sur de vouloir supprimer ce rendez-vous ?',
-            okText: 'Confirmer',
-            cancelText: 'Annuler',
-            okType: 'danger',
-            onOk: async () => {
-                try {
-                    await deleteRendezVous(rdv.id);
-                    message.success('Rendez-vous supprime');
-                    fetchRendezVous();
-                } catch (error) {
-                    message.error('Erreur lors de la suppression');
-                }
-            }
-        });
+        setRdvToDelete(rdv);
+        setShowDeleteModal(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!rdvToDelete) return;
+        try {
+            await deleteRendezVous(rdvToDelete.id);
+            showSuccess('Le rendez-vous a été supprimé avec succès.', 'Rendez-vous supprimé');
+            fetchRendezVous();
+        } catch (error) {
+            showError('Erreur lors de la suppression du rendez-vous.', 'Échec de la suppression');
+        }
+        setRdvToDelete(null);
     };
 
     const validateForm = () => {
@@ -141,7 +150,7 @@ export function NurseAppointments() {
             };
 
             await createRendezVous(dataToSend);
-            message.success('Rendez-vous cree avec succes');
+            showSuccess('Le rendez-vous a été créé avec succès.', 'Rendez-vous créé');
             setShowAddModal(false);
             resetForm();
             fetchRendezVous();
@@ -241,12 +250,7 @@ export function NurseAppointments() {
                                             </td>
                                             <td className="p-4 relative rounded-r-lg">
                                                 <div className="w-full items-center justify-center flex gap-4">
-                                                    <button
-                                                        onClick={() => handleDelete(rdv)}
-                                                        className="flex items-center justify-center w-9 h-9 text-red-500 text-xl hover:bg-gray-300 hover:rounded-full transition-all duration-300"
-                                                        title="Supprimer">
-                                                        <FaTrash />
-                                                    </button>
+                                                    <span className="text-gray-400 text-sm">-</span>
                                                 </div>
                                             </td>
                                         </tr>
@@ -427,6 +431,13 @@ export function NurseAppointments() {
                     </div>
                 )}
             </NurseNavBar>
+            <ConfirmationModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                onConfirm={confirmDelete}
+                title="Supprimer le rendez-vous"
+                message={`Êtes-vous sûr de vouloir supprimer le rendez-vous avec ${rdvToDelete?.patient_nom} ${rdvToDelete?.patient_prenom} ?`}
+            />
         </DashBoard>
     );
 }

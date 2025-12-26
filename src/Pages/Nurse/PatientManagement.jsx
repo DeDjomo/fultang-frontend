@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { message } from 'antd';
 import {
     User, FileText, Activity, Stethoscope, ArrowRight,
     Save, ArrowLeft, Phone, MapPin, Calendar, Droplet,
@@ -10,6 +9,7 @@ import { DashBoard } from "../../GlobalComponents/DashBoard.jsx";
 import { nurseNavLink } from "./nurseNavLink.js";
 import { NurseNavBar } from "./NurseNavBar.jsx";
 import { useAuthentication } from "../../Utils/Provider.jsx";
+import { useFeedback } from '../../contexts/FeedbackContext.jsx';
 import Loader from "../../GlobalComponents/Loader.jsx";
 import { getDossierByPatientId } from '../../services/dossiersApi';
 import { createObservation } from '../../services/observationsApi';
@@ -37,6 +37,7 @@ export function PatientManagement() {
     const [submittingObs, setSubmittingObs] = useState(false);
     const [submittingRedirect, setSubmittingRedirect] = useState(false);
     const [openSendToCashierModal, setOpenSendToCashierModal] = useState(false);
+    const { showSuccess, showError, showWarning } = useFeedback();
 
     const personnelTypes = [
         { value: 'medecin', label: 'Medecin' },
@@ -47,7 +48,7 @@ export function PatientManagement() {
 
     useEffect(() => {
         if (!patient || !sessionId) {
-            message.error('Informations patient manquantes');
+            showError('Informations patient manquantes. Retour à la salle d\'attente.', 'Erreur');
             navigate('/nurse/waiting-room');
             return;
         }
@@ -88,7 +89,7 @@ export function PatientManagement() {
         e.preventDefault();
 
         if (!observation.trim()) {
-            message.warning('Please saisir une observation');
+            showWarning('Veuillez saisir une observation avant d\'enregistrer.', 'Champ requis');
             return;
         }
 
@@ -100,11 +101,11 @@ export function PatientManagement() {
                 id_session: sessionId
             });
 
-            message.success('Observation enregistree avec succes');
+            showSuccess('L\'observation a été enregistrée avec succès.', 'Observation enregistrée');
             setObservation('');
         } catch (error) {
             console.error('Error saving observation:', error);
-            message.error('Error during de l\'enregistrement de l\'observation');
+            showError('Erreur lors de l\'enregistrement de l\'observation. Veuillez réessayer.', 'Échec de l\'enregistrement');
         } finally {
             setSubmittingObs(false);
         }
@@ -114,7 +115,7 @@ export function PatientManagement() {
         e.preventDefault();
 
         if (!redirectValue) {
-            message.warning('Please selectionner une destination');
+            showWarning('Veuillez sélectionner une destination.', 'Champ requis');
             return;
         }
 
@@ -130,14 +131,14 @@ export function PatientManagement() {
                 await updateSessionStatus(sessionId, 'en attente');
             }
 
-            message.success(`Patient redirige vers ${redirectValue} avec succes`);
+            showSuccess(`Le patient a été redirigé vers ${redirectValue} avec succès.`, 'Patient redirigé');
 
             setTimeout(() => {
                 navigate('/nurse/waiting-room');
             }, 1000);
         } catch (error) {
             console.error('Error redirecting patient:', error);
-            message.error('Error during de la redirection du patient');
+            showError('Erreur lors de la redirection du patient. Veuillez réessayer.', 'Échec de la redirection');
         } finally {
             setSubmittingRedirect(false);
         }
@@ -429,7 +430,7 @@ export function PatientManagement() {
                 isUpdate={true}
                 sessionId={sessionId}
                 onSuccess={() => {
-                    message.success("Patient envoyé à la caisse");
+                    showSuccess('Le patient a été envoyé à la caisse avec succès.', 'Patient envoyé');
                     navigate('/nurse/waiting-room');
                 }}
             />

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Modal, message } from 'antd';
+import { Modal } from 'antd';
 import { DollarSign, Plus, X, Send } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { getPatientQuittances, createQuittance, redirectPatientToService } from '../../services/quittancesApi';
 import { getAllServices } from '../../services/servicesApi';
+import { useFeedback } from '../../contexts/FeedbackContext.jsx';
 import Loader from '../../GlobalComponents/Loader';
 
 export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
@@ -19,6 +20,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
     const [loading, setLoading] = useState(false);
     const [showAddForm, setShowAddForm] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const { showSuccess, showError, showWarning } = useFeedback();
 
     // Form state
     const [formData, setFormData] = useState({
@@ -50,7 +52,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
             }
         } catch (error) {
             console.error('Error loading quittances:', error);
-            message.error('Error loading receipts');
+            showError('Erreur lors du chargement des reçus.', 'Échec');
         } finally {
             setLoading(false);
         }
@@ -74,7 +76,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
         e.preventDefault();
 
         if (!formData.numero_quittance || !formData.Montant_paye || !formData.Motif) {
-            message.warning('Please fill all fields');
+            showWarning('Veuillez remplir tous les champs.', 'Champs requis');
             return;
         }
 
@@ -87,7 +89,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
             };
 
             await createQuittance(dataToSend);
-            message.success('Receipt added successfully');
+            showSuccess('Le reçu a été ajouté avec succès.', 'Reçu créé');
             setShowAddForm(false);
             setFormData({
                 numero_quittance: '',
@@ -98,7 +100,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
             loadQuittances();
         } catch (error) {
             console.error('Error creating quittance:', error);
-            message.error(error.response?.data?.detail || 'Error creating receipt');
+            showError(error.response?.data?.detail || 'Erreur lors de la création du reçu.', 'Échec');
         } finally {
             setSubmitting(false);
         }
@@ -106,7 +108,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
 
     const handleRedirectPatient = async () => {
         if (!selectedService) {
-            message.warning('Please select a service');
+            showWarning('Veuillez sélectionner un service.', 'Champ requis');
             return;
         }
 
@@ -114,14 +116,14 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
         try {
             const response = await redirectPatientToService(patient.id, selectedService);
             if (response.success) {
-                message.success(`Patient redirected to ${selectedService}`);
+                showSuccess(`Le patient a été redirigé vers ${selectedService}.`, 'Patient redirigé');
                 setShowRedirectForm(false);
                 setSelectedService('');
                 onClose();
             }
         } catch (error) {
             console.error('Error redirecting patient:', error);
-            message.error('Error redirecting patient');
+            showError('Erreur lors de la redirection du patient.', 'Échec');
         } finally {
             setSubmitting(false);
         }

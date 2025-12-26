@@ -45,3 +45,18 @@ export const deleteRendezVous = async (id) => {
         throw error;
     }
 };
+
+/**
+ * Met a jour un rendez-vous (pour reporter).
+ * @param {number} id - ID du rendez-vous
+ * @param {Object} data - Donnees a mettre a jour {date_rendez_vous, heure_rendez_vous}
+ */
+export const updateRendezVous = async (id, data) => {
+    try {
+        const response = await axiosInstance.patch(`${BASE_URL}/${id}/`, data);
+        return response.data;
+    } catch (error) {
+        console.error('Error updating rendez-vous:', error);
+        throw error;
+    }
+};

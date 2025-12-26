@@ -15,7 +15,9 @@ const BASE_URL = '/personnel';
  */
 export const getAllPersonnel = async (filters = {}) => {
     try {
-        const response = await axiosInstance.get(`${BASE_URL}/`, { params: filters });
+        // Ajouter page_size pour recuperer tous les personnels (bypass pagination)
+        const params = { page_size: 1000, ...filters };
+        const response = await axiosInstance.get(`${BASE_URL}/`, { params });
         return response.data;
     } catch (error) {
         console.error('Error fetching personnel:', error);
@@ -139,3 +141,21 @@ export const changePassword = async (data) => {
         throw error;
     }
 };
+
+/**
+ * Recupere les dependances d'un personnel (objets lies).
+ * Utilise pour afficher un avertissement detaille avant suppression en cascade.
+ * 
+ * @param {number} id - ID du personnel
+ * @returns {Promise} Nombre d'objets lies par type
+ */
+export const getPersonnelDependencies = async (id) => {
+    try {
+        const response = await axiosInstance.get(`${BASE_URL}/${id}/dependencies/`);
+        return response.data;
+    } catch (error) {
+        console.error(`Error fetching dependencies for personnel ${id}:`, error);
+        throw error;
+    }
+};
+

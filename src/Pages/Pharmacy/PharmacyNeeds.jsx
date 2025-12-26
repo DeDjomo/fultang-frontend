@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { ShoppingCart, Search, RefreshCw, Plus, Clock, CheckCircle, XCircle, AlertCircle, User, Calendar, Send, MessageSquare, Trash2, Package } from 'lucide-react';
-import { message, Modal, Input, Button, Tag, Select, InputNumber, Table } from 'antd';
+import { Modal, Input, Button, Tag, Select, InputNumber, Table } from 'antd';
 import { PharmacyNavBar } from './PharmacyNavBar';
 import { CustomDashboard } from '../../GlobalComponents/CustomDashboard';
 import { pharmacyNavLink } from './lib/pharmacyNavLink';
 import { getAllBesoins, createBesoin, createLigneBesoin, getAllMateriels, getLignesBesoin } from '../../services/comptabiliteMatiereApi';
+import { useFeedback } from '../../contexts/FeedbackContext.jsx';
 import Loader from '../../GlobalComponents/Loader';
 import dayjs from 'dayjs';
 import { useAuthentication } from '../../Utils/Provider.jsx';
@@ -30,6 +31,7 @@ export function PharmacyNeeds() {
     });
     const [lignesForm, setLignesForm] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const { showSuccess, showError, showWarning } = useFeedback();
 
     useEffect(() => {
         fetchBesoins();
@@ -56,7 +58,7 @@ export function PharmacyNeeds() {
             setFilteredBesoins(data);
         } catch (error) {
             console.error('Error fetching besoins:', error);
-            message.error('Erreur lors de la récupération des besoins');
+            showError('Erreur lors de la récupération des besoins.', 'Échec du chargement');
             setBesoins([]);
             setFilteredBesoins([]);
         } finally {
@@ -140,21 +142,21 @@ export function PharmacyNeeds() {
 
     const handleCreateBesoin = async () => {
         if (!formData.objet.trim()) {
-            message.warning('Veuillez saisir l\'objet du besoin');
+            showWarning('Veuillez saisir l\'objet du besoin.', 'Champ requis');
             return;
         }
         if (!formData.description.trim()) {
-            message.warning('Veuillez saisir la description du besoin');
+            showWarning('Veuillez saisir la description du besoin.', 'Champ requis');
             return;
         }
         if (lignesForm.length === 0) {
-            message.warning('Veuillez ajouter au moins un matériel');
+            showWarning('Veuillez ajouter au moins un matériel.', 'Matériel requis');
             return;
         }
         // Validate all lignes have materiel_nom
         const invalidLigne = lignesForm.find(l => !l.materiel_nom.trim());
         if (invalidLigne) {
-            message.warning('Veuillez saisir le nom du matériel pour chaque ligne');
+            showWarning('Veuillez saisir le nom du matériel pour chaque ligne.', 'Champ requis');
             return;
         }
 
@@ -180,13 +182,13 @@ export function PharmacyNeeds() {
                 });
             }
 
-            message.success('Besoin créé avec succès');
+            showSuccess('Le besoin a été créé et soumis avec succès.', 'Besoin créé');
             setIsCreateModalOpen(false);
             resetForm();
             fetchBesoins();
         } catch (error) {
             console.error('Error creating besoin:', error);
-            message.error('Erreur lors de la création du besoin');
+            showError('Erreur lors de la création du besoin.', 'Échec');
         } finally {
             setIsSubmitting(false);
         }

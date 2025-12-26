@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Tabs, message, Modal } from 'antd';
+import { Tabs } from 'antd';
 import {
     FileText, Activity, Pill, FlaskConical,
     ClipboardList, Hotel, ArrowLeft, CheckCircle, User, History, DollarSign
@@ -25,8 +25,10 @@ import {
     getPatientPrescriptionsExamens,
     getPatientResultatsExamens
 } from '../../services/patientHistoryApi';
+import { useFeedback } from '../../contexts/FeedbackContext.jsx';
 import Loader from '../../GlobalComponents/Loader';
 import { OpenSessionModal } from '../Receptionist/OpenSessionModal';
+import { ConfirmationModal } from '../Modals/ConfirmAction.Modal.jsx';
 
 export function ConsultationPage() {
     const location = useLocation();
@@ -48,6 +50,8 @@ export function ConsultationPage() {
     const [selectedPrescriptionExamen, setSelectedPrescriptionExamen] = useState(null);
     const [selectedChambre, setSelectedChambre] = useState(null);
     const [openSendToCashierModal, setOpenSendToCashierModal] = useState(false);
+    const [showHospitalizationModal, setShowHospitalizationModal] = useState(false);
+    const { showSuccess, showError, showWarning } = useFeedback();
 
     // Lists
     const [chambresDisponibles, setChambresDisponibles] = useState([]);
@@ -65,7 +69,7 @@ export function ConsultationPage() {
 
     useEffect(() => {
         if (!patient || !sessionId) {
-            message.error('Informations patient manquantes');
+            showError('Informations patient manquantes. Retour à la salle d\'attente.', 'Erreur');
             navigate('/doctor/waiting-room');
             return;
         }
@@ -88,7 +92,7 @@ export function ConsultationPage() {
             }
         } catch (error) {
             console.error('Error loading dossier:', error);
-            message.error('Error during du loading dossier patient');
+            showError('Erreur lors du chargement du dossier patient.', 'Échec du chargement');
         } finally {
             setLoading(false);
         }
@@ -107,7 +111,9 @@ export function ConsultationPage() {
 
     const loadChambresDisponibles = async () => {
         try {
-            const response = await getChambresDisponibles();
+            // Filter rooms by doctor's service if available
+            const serviceId = userData?.service_id || userData?.service?.id || null;
+            const response = await getChambresDisponibles(serviceId);
             if (response.success) {
                 setChambresDisponibles(response.data);
             }
@@ -154,18 +160,18 @@ export function ConsultationPage() {
                 observation: observation,
                 id_session: sessionId
             });
-            message.success('Observation saved successfully');
+            showSuccess('L\'observation a été enregistrée avec succès.', 'Observation enregistrée');
             setObservation('');
             loadObservations(); // Refresh list
         } catch (error) {
             console.error('Error saving observation:', error);
-            message.error('Error during de l\'enregistrement de l\'observation');
+            showError('Erreur lors de l\'enregistrement de l\'observation.', 'Échec');
         }
     };
 
     const handlePrescriptionMedicaments = async () => {
         if (!medicaments.trim()) {
-            message.warning('Please saisir les médicaments à prescrire');
+            showWarning('Veuillez saisir les médicaments à prescrire.', 'Champ requis');
             return;
         }
 
@@ -175,17 +181,17 @@ export function ConsultationPage() {
                 liste_medicaments: medicaments,
                 id_session: sessionId
             });
-            message.success('Prescription de médicaments saved');
+            showSuccess('La prescription de médicaments a été enregistrée.', 'Prescription enregistrée');
             setMedicaments('');
         } catch (error) {
             console.error('Error saving prescription:', error);
-            message.error('Error during de l\'enregistrement de la prescription');
+            showError('Erreur lors de l\'enregistrement de la prescription.', 'Échec');
         }
     };
 
     const handlePrescriptionExamen = async () => {
         if (!nomExamen.trim()) {
-            message.warning('Please saisir le nom de l\'examen');
+            showWarning('Veuillez saisir le nom de l\'examen.', 'Champ requis');
             return;
         }
 
@@ -195,24 +201,24 @@ export function ConsultationPage() {
                 nom_examen: nomExamen,
                 id_session: sessionId
             });
-            message.success('Examen prescrit successfully');
+            showSuccess('L\'examen a été prescrit avec succès.', 'Examen prescrit');
             setNomExamen('');
             if (response.data) {
                 setPrescriptionsExams([...prescriptionsExams, response.data]);
             }
         } catch (error) {
             console.error('Error prescribing exam:', error);
-            message.error('Error during de la prescription de l\'examen');
+            showError('Erreur lors de la prescription de l\'examen.', 'Échec');
         }
     };
 
     const handleEnregistrerResultat = async () => {
         if (!selectedPrescriptionExamen) {
-            message.warning('Please sélectionner une prescription d\'examen');
+            showWarning('Veuillez sélectionner une prescription d\'examen.', 'Champ requis');
             return;
         }
         if (!resultatExamen.trim()) {
-            message.warning('Please saisir le résultat');
+            showWarning('Veuillez saisir le résultat.', 'Champ requis');
             return;
         }
 
@@ -222,42 +228,37 @@ export function ConsultationPage() {
                 resultat: resultatExamen,
                 id_prescription: selectedPrescriptionExamen
             });
-            message.success('Résultat saved successfully');
+            showSuccess('Le résultat a été enregistré avec succès.', 'Résultat enregistré');
             setResultatExamen('');
             setSelectedPrescriptionExamen(null);
         } catch (error) {
             console.error('Error saving result:', error);
-            message.error('Error during de l\'enregistrement du résultat');
+            showError('Erreur lors de l\'enregistrement du résultat.', 'Échec');
         }
     };
 
     const handleHospitaliser = async () => {
         if (!selectedChambre) {
-            message.warning('Please sélectionner une chambre');
+            showWarning('Veuillez sélectionner une chambre.', 'Champ requis');
             return;
         }
+        setShowHospitalizationModal(true);
+    };
 
-        Modal.confirm({
-            title: 'Confirmer l\'hospitalisation',
-            content: `Êtes-vous sûr de vouloir hospitaliser ${patient.prenom} ${patient.nom} ?`,
-            okText: 'Confirmer',
-            cancelText: 'Annuler',
-            onOk: async () => {
-                try {
-                    await hospitaliserPatient({
-                        id_session: sessionId,
-                        id_chambre: selectedChambre,
-                        id_medecin: userData.id
-                    });
-                    message.success('Patient hospitalisé successfully');
-                    setSelectedChambre(null);
-                    loadChambresDisponibles(); // Refresh available rooms
-                } catch (error) {
-                    console.error('Error hospitalizing patient:', error);
-                    message.error('Error during de l\'hospitalisation');
-                }
-            }
-        });
+    const confirmHospitalization = async () => {
+        try {
+            await hospitaliserPatient({
+                id_session: sessionId,
+                id_chambre: selectedChambre,
+                id_medecin: userData.id
+            });
+            showSuccess(`Le patient ${patient.prenom} ${patient.nom} a été hospitalisé avec succès.`, 'Patient hospitalisé');
+            setSelectedChambre(null);
+            loadChambresDisponibles();
+        } catch (error) {
+            console.error('Error hospitalizing patient:', error);
+            showError('Erreur lors de l\'hospitalisation du patient.', 'Échec');
+        }
     };
 
     const handleRedirectToCashier = () => {
@@ -722,9 +723,16 @@ export function ConsultationPage() {
                 isUpdate={true}
                 sessionId={sessionId}
                 onSuccess={() => {
-                    message.success("Patient sent to cashier");
+                    showSuccess('Le patient a été envoyé à la caisse avec succès.', 'Patient envoyé');
                     navigate('/doctor/waiting-room');
                 }}
+            />
+            <ConfirmationModal
+                isOpen={showHospitalizationModal}
+                onClose={() => setShowHospitalizationModal(false)}
+                onConfirm={confirmHospitalization}
+                title="Confirmer l'hospitalisation"
+                message={`Êtes-vous sûr de vouloir hospitaliser ${patient?.prenom} ${patient?.nom} ?`}
             />
         </CustomDashboard>
     );

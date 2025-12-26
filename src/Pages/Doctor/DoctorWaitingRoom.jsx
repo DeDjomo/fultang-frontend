@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, Search, RefreshCw, UserCheck } from 'lucide-react';
-import { message } from 'antd';
 import { DoctorNavBar } from './DoctorComponents/DoctorNavBar';
 import { CustomDashboard } from '../../GlobalComponents/CustomDashboard';
 import { doctorNavLink } from './lib/doctorNavLink';
 import { useAuthentication } from '../../Utils/Provider';
 import { getPatientsEnAttente, selectionnerPatient } from '../../services/medecinsApi';
 import { getPersonnelById } from '../../services/personnelApi';
+import { useFeedback } from '../../contexts/FeedbackContext.jsx';
+import { useAutoRefresh, deepEqual } from '../../hooks/usePolling';
 import Loader from '../../GlobalComponents/Loader';
 
 export function DoctorWaitingRoom() {
@@ -18,6 +19,7 @@ export function DoctorWaitingRoom() {
     const [serviceName, setServiceName] = useState('');
     const { userData } = useAuthentication();
     const navigate = useNavigate();
+    const { showError } = useFeedback();
 
     useEffect(() => {
         const loadServiceAndPatients = async () => {
@@ -45,12 +47,12 @@ export function DoctorWaitingRoom() {
                 if (service) {
                     fetchPatientsEnAttente(service);
                 } else {
-                    message.error("Aucun service affecté. Veuillez contacter l'administrateur.");
+                    showError("Aucun service affecté. Veuillez contacter l'administrateur.", 'Service manquant');
                     console.error("Aucun service trouvé pour le médecin");
                 }
             } catch (error) {
                 console.error("Erreur lors de la récupération du service:", error);
-                message.error("Impossible de récupérer vos informations de service.");
+                showError("Impossible de récupérer vos informations de service.", 'Erreur de chargement');
             }
         };
 
@@ -68,25 +70,39 @@ export function DoctorWaitingRoom() {
                 patient.prenom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 patient.matricule?.toLowerCase().includes(searchTerm.toLowerCase())
             );
-            setFilteredPatients(filtered);
+            if (!deepEqual(filteredPatients, filtered)) {
+                setFilteredPatients(filtered);
+            }
         }
     }, [searchTerm, patients]);
 
-    const fetchPatientsEnAttente = async (service) => {
-        setIsLoading(true);
+    const fetchPatientsEnAttente = useCallback(async (service, isBackground = false) => {
+        if (!service) return;
+        if (!isBackground) setIsLoading(true);
         try {
             const response = await getPatientsEnAttente(service);
             if (response.success) {
-                setPatients(response.data || []);
-                setFilteredPatients(response.data || []);
+                const newData = response.data || [];
+                setPatients(prev => deepEqual(prev, newData) ? prev : newData);
             }
         } catch (error) {
             console.error('Error fetching patients:', error);
-            message.error('Erreur lors de la récupération des patients');
+            // Ne pas afficher d'erreur pendant le polling automatique
         } finally {
-            setIsLoading(false);
+            if (!isBackground) setIsLoading(false);
         }
-    };
+    }, []);
+
+    // Auto-refresh toutes les 5 secondes
+    useAutoRefresh(
+        useCallback(() => {
+            if (serviceName) {
+                fetchPatientsEnAttente(serviceName, true);
+            }
+        }, [serviceName, fetchPatientsEnAttente]),
+        5000,
+        false
+    );
 
     const handleSelectPatient = async (patient) => {
         try {
@@ -100,7 +116,7 @@ export function DoctorWaitingRoom() {
             });
         } catch (error) {
             console.error('Error selecting patient:', error);
-            message.error('Erreur lors de la sélection du patient');
+            showError('Erreur lors de la sélection du patient. Veuillez réessayer.', 'Échec');
         }
     };
 

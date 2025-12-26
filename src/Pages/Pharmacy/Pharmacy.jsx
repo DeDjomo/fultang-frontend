@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ClipboardList, Search, RefreshCw, CheckCircle, Pill, Syringe, Package, User, Calendar, Stethoscope } from 'lucide-react';
-import { message } from 'antd';
 import { PharmacyNavBar } from './PharmacyNavBar';
 import { CustomDashboard } from '../../GlobalComponents/CustomDashboard';
 import { pharmacyNavLink } from './lib/pharmacyNavLink';
 import { getPendingPrescriptions, markPrescriptionAsCompleted } from '../../services/prescriptionsApi';
+import { useFeedback } from '../../contexts/FeedbackContext.jsx';
+import { useAutoRefresh, deepEqual } from '../../hooks/usePolling';
 import Loader from '../../GlobalComponents/Loader';
 
 export function Pharmacy() {
@@ -13,10 +14,29 @@ export function Pharmacy() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [expandedPrescription, setExpandedPrescription] = useState(null);
+  const { showSuccess, showError } = useFeedback();
+
+  const fetchPendingPrescriptions = useCallback(async (isBackground = false) => {
+    if (!isBackground) setIsLoading(true);
+    try {
+      const response = await getPendingPrescriptions();
+      if (response.success) {
+        const newData = response.data || [];
+        setPrescriptions(prev => deepEqual(prev, newData) ? prev : newData);
+      }
+    } catch (error) {
+      console.error('Error fetching prescriptions:', error);
+    } finally {
+      if (!isBackground) setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchPendingPrescriptions();
-  }, []);
+  }, [fetchPendingPrescriptions]);
+
+  // Auto-refresh toutes les 5 secondes
+  useAutoRefresh(() => fetchPendingPrescriptions(true), 5000, false);
 
   useEffect(() => {
     if (searchTerm.trim() === '') {
@@ -31,30 +51,14 @@ export function Pharmacy() {
     }
   }, [searchTerm, prescriptions]);
 
-  const fetchPendingPrescriptions = async () => {
-    setIsLoading(true);
-    try {
-      const response = await getPendingPrescriptions();
-      if (response.success) {
-        setPrescriptions(response.data || []);
-        setFilteredPrescriptions(response.data || []);
-      }
-    } catch (error) {
-      console.error('Error fetching prescriptions:', error);
-      message.error('Erreur lors de la récupération des prescriptions');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleMarkAsCompleted = async (prescriptionId) => {
     try {
       await markPrescriptionAsCompleted(prescriptionId);
-      message.success('Prescription marquée comme effectuée');
+      showSuccess('La prescription a été marquée comme délivrée.', 'Prescription délivrée');
       fetchPendingPrescriptions();
     } catch (error) {
       console.error('Error marking prescription as completed:', error);
-      message.error('Erreur lors de la mise à jour de la prescription');
+      showError('Erreur lors de la mise à jour de la prescription.', 'Échec');
     }
   };
 

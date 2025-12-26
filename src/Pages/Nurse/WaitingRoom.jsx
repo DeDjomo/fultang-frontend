@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { message, Tag, Tooltip, Alert } from 'antd';
+import { useState, useEffect, useCallback } from 'react';
+import { Tag, Tooltip, Alert } from 'antd';
 import { FaSearch, FaUserCheck } from 'react-icons/fa';
 import { Users } from 'lucide-react';
 import { DashBoard } from "../../GlobalComponents/DashBoard.jsx";
@@ -9,6 +9,8 @@ import { getPatientsEnAttente, selectionnerPatient } from '../../services/sessio
 import { getPersonnelById } from '../../services/personnelApi';
 import { useAuthentication } from "../../Utils/Provider.jsx";
 import { useNavigate } from 'react-router-dom';
+import { useFeedback } from '../../contexts/FeedbackContext.jsx';
+import { useAutoRefresh, deepEqual } from '../../hooks/usePolling';
 import Loader from "../../GlobalComponents/Loader.jsx";
 import ServerErrorPage from "../../GlobalComponents/ServerError.jsx";
 
@@ -25,6 +27,7 @@ export function WaitingRoom() {
     const [errorStatus, setErrorStatus] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
     const [serviceName, setServiceName] = useState('');
+    const { showSuccess, showError } = useFeedback();
 
     useEffect(() => {
         const loadServiceAndPatients = async () => {
@@ -66,31 +69,45 @@ export function WaitingRoom() {
         }
     }, [userData]);
 
-    const fetchPatientsEnAttente = async (serviceToUse) => {
+    const fetchPatientsEnAttente = useCallback(async (serviceToUse, isBackground = false) => {
         const service = serviceToUse || serviceName || userData?.service;
         if (!service) return;
 
-        setLoading(true);
+        if (!isBackground) setLoading(true);
         try {
             const response = await getPatientsEnAttente(service, 'infirmier');
-            // API retourne { success: true, count: N, data: [...] }
             const data = response.data || response.results || response || [];
-            setPatients(Array.isArray(data) ? data : []);
+
+            setPatients(prev => {
+                const newData = Array.isArray(data) ? data : [];
+                return deepEqual(prev, newData) ? prev : newData;
+            });
+
             setErrorStatus(null);
             setErrorMessage('');
         } catch (error) {
             console.error('Error fetching patients en attente:', error);
-            setErrorMessage('Erreur lors du chargement des patients en attente');
-            setErrorStatus(error.response?.status || 500);
+            // Ne pas afficher d'erreur pendant le polling automatique
         } finally {
-            setLoading(false);
+            if (!isBackground) setLoading(false);
         }
-    };
+    }, [serviceName, userData?.service]);
+
+    // Auto-refresh toutes les 5 secondes
+    useAutoRefresh(
+        useCallback(() => {
+            if (serviceName) {
+                fetchPatientsEnAttente(serviceName, true);
+            }
+        }, [serviceName, fetchPatientsEnAttente]),
+        5000,
+        false
+    );
 
     const handleSelectPatient = async (patient) => {
         try {
             await selectionnerPatient(patient.id_session);
-            message.success('Patient selectionne avec succes');
+            showSuccess(`Patient ${patient.nom} ${patient.prenom} sélectionné(e) avec succès.`, 'Patient sélectionné');
             navigate('/nurse/patient-management', {
                 state: {
                     patient: patient,
@@ -100,7 +117,7 @@ export function WaitingRoom() {
             });
         } catch (error) {
             console.error('Error selecting patient:', error);
-            message.error('Erreur lors de la selection du patient');
+            showError('Erreur lors de la sélection du patient. Veuillez réessayer.', 'Échec de la sélection');
         }
     };
 
