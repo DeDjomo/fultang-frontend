@@ -81,7 +81,26 @@ export const AppRoutesPaths = {
     financialAccountantBudgets: "/accountant-financial/budgets",
     financialAccountantReports: "/accountant-financial/reports",
     financialAccountPayroll: "/accountant-financial/payroll-journal",
-    financialAccountantCostAnalytic: "/accountant-financial/cost-analytic"
+    financialAccountantCostAnalytic: "/accountant-financial/cost-analytic",
 
+    // ComptaMatiere (Comptable Matière) routes
+    comptaMatiereDashboard: "/compta-matiere/dashboard",
+    comptaMatiereEmitNeed: "/compta-matiere/emit-need",
+    comptaMatiereRegisterDelivery: "/compta-matiere/register-delivery",
+    comptaMatiereRegisterOutput: "/compta-matiere/register-output",
+    comptaMatiereReports: "/compta-matiere/reports",
+    comptaMatiereMaterialList: "/compta-matiere/material-list",
+    comptaMatiereOutputList: "/compta-matiere/output-list",
+
+    // Director routes
+    directorDashboard: "/director/dashboard",
+    directorReports: "/director/reports",
+
+    // Pharmacist routes
+    pharmacistDashboard: "/pharmacist/dashboard",
+    pharmacistEmitNeed: "/pharmacist/emit-need",
+    pharmacistDailySales: "/pharmacist/daily-sales",
+    pharmacistInventory: "/pharmacist/inventory",
+    pharmacistReports: "/pharmacist/reports"
 
 }

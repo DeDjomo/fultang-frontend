@@ -83,7 +83,25 @@ export function AppRoute() {
     const FinancialPayrollJournal = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Payroll & Social Charge/PayrollJournal.jsx")).SocialChargesCalculator }));
     const FinancialCostAnalytic = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Payroll & Social Charge/CostAnalytic.jsx")).HRAnalyticsDashboard }));
 
+    // ComptaMatiere (Comptable Matière) components
+    const ComptaMatiereDashboard = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/Accountant.jsx")).Accountant }));
+    const ComptaMatiereEmitNeed = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/EmitNeed.jsx")).EmitNeed }));
+    const ComptaMatiereRegisterDelivery = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/RegisterDelivery.jsx")).RegisterDelivery }));
+    const ComptaMatiereRegisterOutput = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/RegisterOutput.jsx")).RegisterOutput }));
+    const ComptaMatiereReports = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/AccountantReports.jsx")).AccountantReports }));
+    const ComptaMatiereMaterialList = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/MaterialList.jsx")).MaterialList }));
+    const ComptaMatiereOutputList = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/OutputList.jsx")).OutputList }));
 
+    // Director components
+    const DirectorDashboard = React.lazy(async () => ({ default: (await import("../Pages/Director/Director.jsx")).Director }));
+    const DirectorReports = React.lazy(async () => ({ default: (await import("../Pages/Director/DirectorReports.jsx")).DirectorReports }));
+
+    // Pharmacist components
+    const PharmacistDashboard = React.lazy(async () => ({ default: (await import("../Pages/Pharmacist/PharmacistHome.jsx")).PharmacistHome }));
+    const PharmacistEmitNeed = React.lazy(async () => ({ default: (await import("../Pages/Pharmacist/PharmacistEmitNeed.jsx")).PharmacistEmitNeed }));
+    const PharmacistDailySales = React.lazy(async () => ({ default: (await import("../Pages/Pharmacist/PharmacistDailySales.jsx")).PharmacistDailySales }));
+    const PharmacistInventory = React.lazy(async () => ({ default: (await import("../Pages/Pharmacist/PharmacistInventory.jsx")).PharmacistInventory }));
+    const PharmacistReports = React.lazy(async () => ({ default: (await import("../Pages/Pharmacist/PharmacistReports.jsx")).PharmacistReports }));
 
 
 
@@ -167,11 +185,25 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.financialAccountPayroll} element={<FinancialPayrollJournal />} />
                 <Route path={AppRoutesPaths.financialAccountantCostAnalytic} element={<FinancialCostAnalytic />} />
 
+                {/* ComptaMatiere (Comptable Matière) Routes */}
+                <Route path={AppRoutesPaths.comptaMatiereDashboard} element={<ComptaMatiereDashboard />} />
+                <Route path={AppRoutesPaths.comptaMatiereEmitNeed} element={<ComptaMatiereEmitNeed />} />
+                <Route path={AppRoutesPaths.comptaMatiereRegisterDelivery} element={<ComptaMatiereRegisterDelivery />} />
+                <Route path={AppRoutesPaths.comptaMatiereRegisterOutput} element={<ComptaMatiereRegisterOutput />} />
+                <Route path={AppRoutesPaths.comptaMatiereReports} element={<ComptaMatiereReports />} />
+                <Route path={AppRoutesPaths.comptaMatiereMaterialList} element={<ComptaMatiereMaterialList />} />
+                <Route path={AppRoutesPaths.comptaMatiereOutputList} element={<ComptaMatiereOutputList />} />
 
+                {/* Director Routes */}
+                <Route path={AppRoutesPaths.directorDashboard} element={<DirectorDashboard />} />
+                <Route path={AppRoutesPaths.directorReports} element={<DirectorReports />} />
 
-
-
-
+                {/* Pharmacist Routes */}
+                <Route path={AppRoutesPaths.pharmacistDashboard} element={<PharmacistDashboard />} />
+                <Route path={AppRoutesPaths.pharmacistEmitNeed} element={<PharmacistEmitNeed />} />
+                <Route path={AppRoutesPaths.pharmacistDailySales} element={<PharmacistDailySales />} />
+                <Route path={AppRoutesPaths.pharmacistInventory} element={<PharmacistInventory />} />
+                <Route path={AppRoutesPaths.pharmacistReports} element={<PharmacistReports />} />
 
             </Routes>
         </React.Suspense>

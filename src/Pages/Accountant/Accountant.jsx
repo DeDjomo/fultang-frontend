@@ -1,4 +1,4 @@
-import { AccountantDashBoard } from "./Components/AccountantDashboard";
+import { AccountantDashBoard } from "./Components/AccountanDashboard";
 import { AccountantNavLink } from "./AccountantNavLink";
 import { AccountantNavBar } from "./Components/AccountantNavBar";
 import {
