@@ -45,7 +45,7 @@ export function Cashier() {
   };
 
   return (
-    <DashBoard linkList={cashierNavLink} /* requiredRole={"Cashier"} */>
+    <DashBoard linkList={cashierNavLink} requiredRole={"Cashier"} >
       <CashierNavBar />
       <div className="flex flex-col">
         <div className="ml-5 mr-5 h-[150px] bg-gradient-to-t from-primary-start to-primary-end flex rounded-lg justify-between">

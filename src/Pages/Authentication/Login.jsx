@@ -94,7 +94,7 @@ export function LoginPage() {
                 navigate(appRouterPaths.pharmacyPage);
                 break;
             case 'comptable':
-                navigate(appRouterPaths.accountantPage);
+                navigate(appRouterPaths.accountantHome);
                 break;
             case 'directeur':
                 navigate(appRouterPaths.adminHomePage);

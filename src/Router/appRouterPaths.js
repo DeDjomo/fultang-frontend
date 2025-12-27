@@ -44,13 +44,10 @@ export const AppRoutesPaths = {
     adminExamsListPage: "/admin/exams-list",
     adminHospitalRoomPage: "/admin/room-list",
     adminFinancialReportsPage: "/admin/financial-report",
-    accountantPage: "/accountant/dashboard",
     adminConsultationDetailsPage: "/admin/consultation-list/details",
     laboratoryHistory: "/laboratory/exams-history",
     laboratoryCurrent: "/laboratory/current-exams",
     financialHistory: "/cashier/financial-history",
-    accountDetails: "/accountant/account-details/:accountId",
-    accountList: "/accountant/account-list",
     doctorPatientList: "/doctor/patients",
     doctorConsultationList: "/doctor/consultation-list",
     doctorConsultationDetailsPage: "/doctor/consultation-list/details/:id",
@@ -59,10 +56,7 @@ export const AppRoutesPaths = {
     doctorConsultationHistoryDetails: "/doctor/consultation-history/details/:id",
     doctorExamList: "/doctor/exams-list",
     doctorPatientMedicalFolderPage: "/doctor/patients/medical-folder/:id",
-    financialContributions: "/accountant/financial-contributions",
-    financialReportsAccountant: "/accountant/financial-reports",
     PharmacyMedication: "/pharmacyMedication",
-    createFactureAccountant: "/accountant/create-facture",
 
     laboratoryPatientList: "/laboratory-assistant/patient-list",
     laboratoryExamenList: "/laboratory-assistant/exams-list",
@@ -71,17 +65,12 @@ export const AppRoutesPaths = {
     laboratoryExamResultDetails: "/laboratory-assistant/exams-history/details/:id",
     laboratoryNotification: "/laboratory-assistant/notifications",
 
-    financialAccountantHome: "/accountant-financial/home",
-    financialAccountantChartOfAccount: "/accountant-financial/chart-account",
-    financialAccountantJournalEntries: "/accountant-financial/journat-entries",
-    financialAccountantAccountingJournals: "/accountant-financial/accounting-journals",
-    financialAccountantAccountingGrandLivre: "/accountant-financial/accounting-grand-livre",
-    financialAccountantInvoices: "/accountant-financial/invoices",
-    financialAccountantPayments: "/accountant-financial/payments",
-    financialAccountantBudgets: "/accountant-financial/budgets",
-    financialAccountantReports: "/accountant-financial/reports",
-    financialAccountPayroll: "/accountant-financial/payroll-journal",
-    financialAccountantCostAnalytic: "/accountant-financial/cost-analytic"
-
-
+    // Accountant Module (New)
+    accountantHome: "/accountant/home",
+    accountantQuittancesAValider: "/accountant/quittances/a-valider",
+    accountantQuittancesValidees: "/accountant/quittances/validees",
+    accountantPlanComptable: "/accountant/plan-comptable",
+    accountantVentilation: "/accountant/ventilation",
+    accountantRapports: "/accountant/rapports",
 }
+
