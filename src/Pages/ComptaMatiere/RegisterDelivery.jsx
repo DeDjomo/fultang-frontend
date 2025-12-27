@@ -1,68 +1,19 @@
-import { ComptaMatiereDashBoard } from "./Components/ComptaMatiereDashboard";
-import { ComptaMatiereNavLink } from "./ComptaMatiereNavLink";
-import { ComptaMatiereNavBar } from "./Components/ComptaMatiereNavBar";
-import { useState, useEffect } from "react";
-import { FaPlus, FaTrash, FaSave, FaTruck, FaExclamationTriangle, FaCheckCircle, FaSpinner } from "react-icons/fa";
+import { AccountantDashBoard } from "./Components/AccountantDashboard";
+import { AccountantNavLink } from "./AccountantNavLink";
+import { AccountantNavBar } from "./Components/AccountantNavBar";
+import { useState } from "react";
+import { FaPlus, FaTrash, FaSave, FaTruck, FaExclamationTriangle, FaCheckCircle } from "react-icons/fa";
 import PropTypes from "prop-types";
-import {
-    getAllMaterielsMedicaux,
-    getAllMaterielsDurables,
-    createLivraison,
-    createLigneLivraison,
-    createMaterielMedical,
-    createMaterielDurable,
-    updateMaterielMedical,
-    updateMaterielDurable
-} from "../../services/comptabiliteMatiereApi";
 
 export function RegisterDelivery() {
-    // Base de matériels existants
-    const [materialsDatabase, setMaterialsDatabase] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
-
-    // Charger les données au montage
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-
-                const [medicaux, durables] = await Promise.all([
-                    getAllMaterielsMedicaux(),
-                    getAllMaterielsDurables()
-                ]);
-
-                const medList = (medicaux.results || medicaux).map(m => ({
-                    id: m.idMateriel || m.id,
-                    code: m.code || `MED-${m.idMateriel}`,
-                    name: m.nom_Materiel || m.name,
-                    category: "Matériel Médical",
-                    quantity: m.quantite_stock || 0
-                }));
-
-                const durList = (durables.results || durables).map(m => ({
-                    id: m.idMateriel || m.id,
-                    code: m.code || `DUR-${m.idMateriel}`,
-                    name: m.nom_Materiel || m.name,
-                    category: "Matériel Durable",
-                    quantity: m.quantite_stock || 1
-                }));
-
-                setMaterialsDatabase([...medList, ...durList]);
-            } catch (err) {
-                console.error("Erreur lors du chargement des matériels:", err);
-                setMaterialsDatabase([
-                    { id: 1, code: "MED-001", name: "Gants médicaux", category: "Matériel Médical", quantity: 150 },
-                    { id: 2, code: "MED-002", name: "Seringues 5ml", category: "Matériel Médical", quantity: 200 },
-                    { id: 3, code: "DUR-001", name: "Stéthoscope", category: "Matériel Durable", quantity: 5 },
-                ]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
-    }, []);
+    // Base de matériels existants (simulée - à remplacer par API)
+    const [materialsDatabase, setMaterialsDatabase] = useState([
+        { code: "MED-001", name: "Gants médicaux", category: "Matériel Médical", quantity: 150 },
+        { code: "MED-002", name: "Seringues 5ml", category: "Matériel Médical", quantity: 200 },
+        { code: "MED-003", name: "Compresses stériles", category: "Matériel Médical", quantity: 30 },
+        { code: "DUR-001", name: "Stéthoscope", category: "Matériel Durable", quantity: 5 },
+        { code: "DUR-002", name: "Thermomètre digital", category: "Matériel Durable", quantity: 8 },
+    ]);
 
     const [deliveryItems, setDeliveryItems] = useState([
         {
@@ -70,7 +21,6 @@ export function RegisterDelivery() {
             isNewMaterial: false,
             material: "",
             materialCode: "",
-            materialId: null,
             type: "Matériel Médical",
             quantityOrdered: "",
             quantityReceived: "",
@@ -210,7 +160,7 @@ export function RegisterDelivery() {
         return null;
     }
 
-    async function handleSubmit(e) {
+    function handleSubmit(e) {
         e.preventDefault();
         setFormError("");
 
@@ -220,142 +170,118 @@ export function RegisterDelivery() {
             return;
         }
 
-        try {
-            setSubmitting(true);
+        // Traitement de chaque article
+        const processedItems = deliveryItems.map(item => {
+            if (item.isNewMaterial) {
+                // Créer le nouveau matériel dans la base
+                const newMaterial = {
+                    code: item.materialCode,
+                    name: item.material,
+                    category: item.type,
+                    quantity: parseInt(item.quantityReceived),
+                    description: item.description,
+                    emplacement: item.emplacement,
+                    prix_achat: parseFloat(item.unitPrice),
+                    // Champs spécifiques selon le type
+                    ...(item.type === "Matériel Médical" ? {
+                        prix_vente: parseFloat(item.prixVente),
+                        unite: item.unite,
+                        seuil_alerte: parseInt(item.seuilAlerte) || 10
+                    } : {
+                        localisation: item.localisation,
+                        numero_serie: item.numeroSerie,
+                        date_acquisition: deliveryInfo.deliveryDate,
+                        duree_garantie: parseInt(item.dureeGarantie) || 0,
+                        etat: 'bon'
+                    })
+                };
 
-            // Créer la livraison principale via l'API
-            const livraisonData = {
-                nom_fournisseur: deliveryInfo.supplier,
-                bon_livraison_numero: deliveryInfo.deliveryNoteNumber,
-                date_livraison: deliveryInfo.deliveryDate,
-                date_reception: deliveryInfo.receptionDate,
-                contact_fournisseur: deliveryInfo.supplierContact,
-                montant_total: calculateTotal()
-            };
+                // Ajouter à la base locale (simulé)
+                setMaterialsDatabase(prev => [...prev, {
+                    code: newMaterial.code,
+                    name: newMaterial.name,
+                    category: newMaterial.category,
+                    quantity: newMaterial.quantity
+                }]);
 
-            const createdLivraison = await createLivraison(livraisonData);
-
-            // Traitement de chaque article
-            for (const item of deliveryItems) {
-                let materielId = item.materialId;
-
-                if (item.isNewMaterial) {
-                    // Créer le nouveau matériel via l'API
-                    if (item.type === "Matériel Médical") {
-                        const newMedical = await createMaterielMedical({
-                            code: item.materialCode,
-                            nom_Materiel: item.material,
-                            quantite_stock: parseInt(item.quantityReceived),
-                            description: item.description,
-                            emplacement: item.emplacement,
-                            prix_achat_unitaire: parseFloat(item.unitPrice),
-                            prix_vente_unitaire: parseFloat(item.prixVente),
-                            unite_mesure: item.unite,
-                            seuil_alerte: parseInt(item.seuilAlerte) || 10
-                        });
-                        materielId = newMedical.idMateriel || newMedical.id;
-                    } else {
-                        const newDurable = await createMaterielDurable({
-                            code: item.materialCode,
-                            nom_Materiel: item.material,
-                            quantite_stock: parseInt(item.quantityReceived),
-                            description: item.description,
-                            localisation: item.localisation,
-                            prix_achat_unitaire: parseFloat(item.unitPrice),
-                            numero_serie: item.numeroSerie,
-                            date_acquisition: deliveryInfo.deliveryDate,
-                            duree_garantie: parseInt(item.dureeGarantie) || 0,
-                            etat: 'BON'
-                        });
-                        materielId = newDurable.idMateriel || newDurable.id;
-                    }
-
-                    // Ajouter à la base locale
-                    setMaterialsDatabase(prev => [...prev, {
-                        id: materielId,
-                        code: item.materialCode,
-                        name: item.material,
-                        category: item.type,
-                        quantity: parseInt(item.quantityReceived)
-                    }]);
-                } else {
-                    // Incrémenter la quantité du matériel existant via l'API
-                    const existingMaterial = materialsDatabase.find(m => m.code === item.materialCode);
-                    if (existingMaterial) {
-                        const newQuantity = existingMaterial.quantity + parseInt(item.quantityReceived);
-
-                        if (item.type === "Matériel Médical") {
-                            await updateMaterielMedical(existingMaterial.id, { quantite_stock: newQuantity });
-                        } else {
-                            await updateMaterielDurable(existingMaterial.id, { quantite_stock: newQuantity });
-                        }
-
-                        setMaterialsDatabase(prev => prev.map(m =>
-                            m.code === item.materialCode
-                                ? { ...m, quantity: newQuantity }
-                                : m
-                        ));
-                    }
-                }
-
-                // Créer la ligne de livraison
-                await createLigneLivraison({
-                    livraison: createdLivraison.idLivraison || createdLivraison.id,
-                    materiel: materielId,
-                    quantite_commandee: parseInt(item.quantityOrdered) || parseInt(item.quantityReceived),
-                    quantite_recue: parseInt(item.quantityReceived),
-                    prix_unitaire: parseFloat(item.unitPrice),
-                    justification_ecart: item.justification
-                });
+                console.log("Nouveau matériel créé:", newMaterial);
+                return { ...item, materialCode: newMaterial.code };
+            } else {
+                // Incrémenter la quantité du matériel existant
+                const quantityToAdd = parseInt(item.quantityReceived);
+                setMaterialsDatabase(prev => prev.map(m =>
+                    m.code === item.materialCode
+                        ? { ...m, quantity: m.quantity + quantityToAdd }
+                        : m
+                ));
+                console.log(`Stock de ${item.materialCode} incrémenté de ${quantityToAdd}`);
+                return item;
             }
+        });
 
-            alert(`Livraison enregistrée avec succès !\n\nMontant total: ${calculateTotal().toLocaleString('fr-FR')} FCFA\n\n${deliveryItems.filter(i => i.isNewMaterial).length} nouveau(x) matériel(s) créé(s)\n${deliveryItems.filter(i => !i.isNewMaterial).length} matériel(s) existant(s) mis à jour`);
+        // Créer l'objet livraison
+        const deliveryData = {
+            ...deliveryInfo,
+            calculatedAmount: calculateTotal(),
+            items: processedItems.map(item => ({
+                materialCode: item.materialCode,
+                material: item.material,
+                type: item.type,
+                quantityOrdered: item.quantityOrdered,
+                quantityReceived: item.quantityReceived,
+                unitPrice: item.unitPrice,
+                justification: item.justification,
+                isNewMaterial: item.isNewMaterial
+            }))
+        };
 
-            // Réinitialiser le formulaire
-            setDeliveryInfo({
-                supplier: "",
-                deliveryNoteNumber: "",
-                deliveryDate: new Date().toISOString().split('T')[0],
-                receptionDate: new Date().toISOString().split('T')[0],
-                supplierContact: "",
-                amount: ""
-            });
-            setDeliveryItems([{
-                id: Date.now(),
-                isNewMaterial: false,
-                material: "",
-                materialCode: "",
-                materialId: null,
-                type: "Matériel Médical",
-                quantityOrdered: "",
-                quantityReceived: "",
-                unitPrice: "",
-                justification: "",
-                prixVente: "",
-                unite: "boîte",
-                datePeremption: "",
-                lot: "",
-                seuilAlerte: "10",
-                localisation: "",
-                numeroSerie: "",
-                dureeGarantie: "",
-                description: "",
-                emplacement: ""
-            }]);
-        } catch (err) {
-            console.error("Erreur lors de l'enregistrement de la livraison:", err);
-            setFormError("Erreur lors de l'enregistrement de la livraison. Veuillez réessayer.");
-        } finally {
-            setSubmitting(false);
-        }
+        console.log("Livraison enregistrée:", deliveryData);
+
+        // Sauvegarder dans localStorage
+        const savedDeliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+        savedDeliveries.unshift(deliveryData);
+        localStorage.setItem('deliveries', JSON.stringify(savedDeliveries));
+
+        alert(`Livraison enregistrée avec succès !\n\nMontant total: ${calculateTotal().toLocaleString('fr-FR')} FCFA\n\n${deliveryItems.filter(i => i.isNewMaterial).length} nouveau(x) matériel(s) créé(s)\n${deliveryItems.filter(i => !i.isNewMaterial).length} matériel(s) existant(s) mis à jour`);
+
+        // Réinitialiser le formulaire
+        setDeliveryInfo({
+            supplier: "",
+            deliveryNoteNumber: "",
+            deliveryDate: new Date().toISOString().split('T')[0],
+            receptionDate: new Date().toISOString().split('T')[0],
+            supplierContact: "",
+            amount: ""
+        });
+        setDeliveryItems([{
+            id: Date.now(),
+            isNewMaterial: false,
+            material: "",
+            materialCode: "",
+            type: "Matériel Médical",
+            quantityOrdered: "",
+            quantityReceived: "",
+            unitPrice: "",
+            justification: "",
+            prixVente: "",
+            unite: "boîte",
+            datePeremption: "",
+            lot: "",
+            seuilAlerte: "10",
+            localisation: "",
+            numeroSerie: "",
+            dureeGarantie: "",
+            description: "",
+            emplacement: ""
+        }]);
     }
 
     return (
-        <ComptaMatiereDashBoard
-            linkList={ComptaMatiereNavLink}
-            requiredRole={"Accountant"}
+        <AccountantDashBoard
+            linkList={AccountantNavLink}
+            requiredRole={"ComptaMatiere"}
         >
-            <ComptaMatiereNavBar />
+            <AccountantNavBar />
             <div className="p-6 space-y-6">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
@@ -517,7 +443,7 @@ export function RegisterDelivery() {
                     </div>
                 </form>
             </div>
-        </ComptaMatiereDashBoard>
+        </AccountantDashBoard>
     );
 }
 

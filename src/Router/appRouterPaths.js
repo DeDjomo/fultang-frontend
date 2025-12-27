@@ -9,10 +9,7 @@ export const AppRoutesPaths = {
     welcomePage: "/",
     loginPage: "/login",
     forgottenPasswordPage: "/forgotten-password",
-    pharmacyPage: "/pharmacy",
-    pharmacyHistoryPage: "/pharmacy/history",
-    pharmacyReportsPage: "/pharmacy/reports",
-    pharmacyNeedsPage: "/pharmacy/needs",
+
     doctorPage: "/doctor/waiting-room",
     laboratoryAssistantPage: "/laboratory-assistant/home",
     receptionistPage: "/receptionist/patients",
@@ -61,7 +58,7 @@ export const AppRoutesPaths = {
     doctorPatientMedicalFolderPage: "/doctor/patients/medical-folder/:id",
     financialContributions: "/accountant/financial-contributions",
     financialReportsAccountant: "/accountant/financial-reports",
-    PharmacyMedication: "/pharmacyMedication",
+
     createFactureAccountant: "/accountant/create-facture",
 
     laboratoryPatientList: "/laboratory-assistant/patient-list",
@@ -98,6 +95,7 @@ export const AppRoutesPaths = {
 
     // Pharmacist routes
     pharmacistDashboard: "/pharmacist/dashboard",
+    pharmacistMedicationList: "/pharmacist/medication-list",
     pharmacistEmitNeed: "/pharmacist/emit-need",
     pharmacistDailySales: "/pharmacist/daily-sales",
     pharmacistInventory: "/pharmacist/inventory",

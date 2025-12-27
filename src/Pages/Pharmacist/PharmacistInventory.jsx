@@ -12,131 +12,177 @@ import {
     FaEye,
     FaHistory,
     FaArrowRight,
-    FaPrint
+    FaPrint,
+    FaSpinner,
+    FaExclamationTriangle,
+    FaSyncAlt
 } from "react-icons/fa";
 import jsPDF from "jspdf";
+import {
+    materielMedicalApi,
+    archiveInventaireApi,
+    ligneArchiveApi
+} from "../../services/comptabiliteMatiereApi";
 
 export function PharmacistInventory() {
     const navigate = useNavigate();
 
-    // État actuel des médicaments (simulé - normalement depuis l'API)
-    const [medications, setMedications] = useState([
-        { code: "MED-001", name: "Paracétamol 500mg", quantiteActuelle: 150, nouvelleQuantite: "", prixVente: 250 },
-        { code: "MED-002", name: "Ibuprofène 400mg", quantiteActuelle: 80, nouvelleQuantite: "", prixVente: 350 },
-        { code: "MED-003", name: "Amoxicilline 500mg", quantiteActuelle: 25, nouvelleQuantite: "", prixVente: 800 },
-        { code: "MED-004", name: "Vitamine C 1000mg", quantiteActuelle: 200, nouvelleQuantite: "", prixVente: 150 },
-        { code: "MED-005", name: "Oméprazole 20mg", quantiteActuelle: 15, nouvelleQuantite: "", prixVente: 500 },
-        { code: "MED-006", name: "Doliprane 1000mg", quantiteActuelle: 100, nouvelleQuantite: "", prixVente: 300 },
-        { code: "MED-007", name: "Aspirine 100mg", quantiteActuelle: 45, nouvelleQuantite: "", prixVente: 200 },
-        { code: "MED-008", name: "Métronidazole 250mg", quantiteActuelle: 60, nouvelleQuantite: "", prixVente: 450 },
-    ]);
+    // États de chargement et erreur
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [saving, setSaving] = useState(false);
 
-    // Liste des archives
+    // État actuel des médicaments (depuis l'API)
+    const [medications, setMedications] = useState([]);
+
+    // Liste des archives (depuis l'API)
     const [archives, setArchives] = useState([]);
+
+    // Archive en cours
+    const [currentArchive, setCurrentArchive] = useState(null);
 
     // Mode actuel
     const [mode, setMode] = useState("list"); // "list" | "inventory" | "report"
 
     // Archive sélectionnée pour consultation
     const [selectedArchive, setSelectedArchive] = useState(null);
+    const [selectedArchiveLines, setSelectedArchiveLines] = useState([]);
     const [showArchiveModal, setShowArchiveModal] = useState(false);
 
     // Message de succès
     const [successMessage, setSuccessMessage] = useState("");
 
-    // Charger les archives depuis localStorage
+    // Charger les données depuis l'API
     useEffect(() => {
-        const storedArchives = JSON.parse(localStorage.getItem('pharmacist_archives') || '[]');
-        setArchives(storedArchives);
+        loadData();
     }, []);
 
-    function generateArchiveId() {
-        const year = new Date().getFullYear();
-        const month = String(new Date().getMonth() + 1).padStart(2, '0');
-        const day = String(new Date().getDate()).padStart(2, '0');
-        const randomNum = Math.floor(Math.random() * 100);
-        return `ARC-${year}${month}${day}-${String(randomNum).padStart(2, '0')}`;
+    async function loadData() {
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Charger les matériels médicaux
+            const materielsData = await materielMedicalApi.getAll();
+            const medicationsFormatted = (materielsData.results || materielsData).map(m => ({
+                id: m.idMateriel || m.materiel_ptr_id,
+                code: m.code_materiel,
+                name: m.nom_Materiel,
+                quantiteActuelle: m.quantite_stock,
+                nouvelleQuantite: "",
+                prixVente: parseFloat(m.prix_vente_unitaire) || 0,
+                categorie: m.categorie,
+                unite: m.unite_mesure
+            }));
+            setMedications(medicationsFormatted);
+
+            // Charger les archives d'inventaire
+            const archivesData = await archiveInventaireApi.getAll();
+            const archivesList = archivesData.results || archivesData;
+            setArchives(archivesList);
+
+            // Vérifier s'il y a un inventaire en cours
+            const inProgress = archivesList.find(a => a.statut === "EN_COURS");
+            if (inProgress) {
+                setCurrentArchive(inProgress);
+                // Charger les lignes de l'archive en cours
+                await loadArchiveLines(inProgress);
+                setMode("inventory");
+            }
+
+        } catch (err) {
+            console.error("Erreur lors du chargement des données:", err);
+            setError("Impossible de charger les données. Vérifiez que le backend est en cours d'exécution.");
+        } finally {
+            setLoading(false);
+        }
     }
 
-    // Calculer si un inventaire est en cours
-    const hasInProgress = archives.length > 0 && archives[0].statut === "en_cours";
+    async function loadArchiveLines(archive) {
+        try {
+            const linesData = await ligneArchiveApi.getByArchive(archive.id_archive);
+            const lines = linesData.results || linesData;
 
-    function createNewInventory() {
-        // Créer une archive de l'état actuel (ancien stock)
-        const archive = {
-            id: generateArchiveId(),
-            dateCreation: new Date().toISOString(),
-            ancienStock: medications.map(m => ({
-                code: m.code,
-                name: m.name,
-                quantite: m.quantiteActuelle,
-                prixVente: m.prixVente
-            })),
-            nouveauStock: null,
-            differences: null,
-            responsable: "PHARM-001",
-            statut: "en_cours",
-            draftQuantities: {} // Pour sauvegarder l'avancement
-        };
-
-        // Sauvegarder l'archive
-        const updatedArchives = [archive, ...archives];
-        setArchives(updatedArchives);
-        localStorage.setItem('pharmacist_archives', JSON.stringify(updatedArchives));
-
-        // Réinitialiser les nouvelles quantités
-        setMedications(medications.map(m => ({ ...m, nouvelleQuantite: "" })));
-
-        // Passer en mode inventaire
-        setMode("inventory");
-        setSuccessMessage(`Archive ${archive.id} créée. Veuillez maintenant saisir les nouvelles quantités.`);
-        setTimeout(() => setSuccessMessage(""), 5000);
+            // Mettre à jour les médicaments avec les données de l'archive
+            setMedications(prev => prev.map(med => {
+                const line = lines.find(l => l.code_materiel === med.code);
+                if (line) {
+                    return {
+                        ...med,
+                        quantiteActuelle: line.quantite_ancien_stock,
+                        nouvelleQuantite: line.quantite_nouveau_stock !== null ? String(line.quantite_nouveau_stock) : "",
+                        lineId: line.id_ligne_archive
+                    };
+                }
+                return med;
+            }));
+        } catch (err) {
+            console.error("Erreur lors du chargement des lignes:", err);
+        }
     }
 
-    function resumeInventory() {
-        if (!hasInProgress) return;
-        const currentArchive = archives[0];
-        const draft = currentArchive.draftQuantities || {};
+    async function startInventory() {
+        try {
+            setSaving(true);
+            setError(null);
 
-        setMedications(medications.map(m => ({
-            ...m,
-            nouvelleQuantite: draft[m.code] !== undefined ? draft[m.code] : ""
-        })));
+            // Générer le code d'archive
+            const now = new Date();
+            const code = `ARC-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
 
-        setMode("inventory");
-        setSuccessMessage(`Reprise de l'inventaire ${currentArchive.id}.`);
-        setTimeout(() => setSuccessMessage(""), 5000);
-    }
+            // Récupérer l'ID du personnel connecté (utiliser 1 par défaut pour le test)
+            const personnelId = parseInt(localStorage.getItem("personnel_id") || "1");
 
-    function handleStartInventory() {
-        if (hasInProgress) {
-            resumeInventory();
-        } else {
-            createNewInventory();
+            // Créer l'archive dans le backend
+            const archiveData = {
+                code_archive: code,
+                responsable: personnelId,
+                statut: "EN_COURS",
+                observations: `Inventaire démarré le ${now.toLocaleDateString('fr-FR')}`
+            };
+
+            const newArchive = await archiveInventaireApi.create(archiveData);
+            setCurrentArchive(newArchive);
+
+            // Créer les lignes d'archive pour chaque médicament
+            for (const med of medications) {
+                await ligneArchiveApi.create({
+                    id_archive: newArchive.id_archive,
+                    id_materiel: med.id,
+                    code_materiel: med.code,
+                    nom_materiel: med.name,
+                    prix_vente: med.prixVente,
+                    quantite_ancien_stock: med.quantiteActuelle
+                });
+            }
+
+            // Recharger les archives
+            const archivesData = await archiveInventaireApi.getAll();
+            setArchives(archivesData.results || archivesData);
+
+            // Réinitialiser les nouvelles quantités
+            setMedications(medications.map(m => ({ ...m, nouvelleQuantite: "" })));
+
+            // Passer en mode inventaire
+            setMode("inventory");
+            setSuccessMessage(`Archive ${code} créée. Veuillez maintenant saisir les nouvelles quantités.`);
+            setTimeout(() => setSuccessMessage(""), 5000);
+
+        } catch (err) {
+            console.error("Erreur lors de la création de l'archive:", err);
+            setError("Impossible de démarrer l'inventaire. Veuillez réessayer.");
+        } finally {
+            setSaving(false);
         }
     }
 
     function updateQuantity(code, value) {
-        // Mettre à jour l'état local
-        const updatedMeds = medications.map(m =>
+        setMedications(medications.map(m =>
             m.code === code ? { ...m, nouvelleQuantite: value } : m
-        );
-        setMedications(updatedMeds);
-
-        // Sauvegarder dans le brouillon de l'archive en cours
-        if (archives.length > 0 && archives[0].statut === "en_cours") {
-            const currentArchive = archives[0];
-            const newDraft = { ...(currentArchive.draftQuantities || {}), [code]: value };
-
-            const updatedArchive = { ...currentArchive, draftQuantities: newDraft };
-            const updatedArchives = [updatedArchive, ...archives.slice(1)];
-
-            setArchives(updatedArchives);
-            localStorage.setItem('pharmacist_archives', JSON.stringify(updatedArchives));
-        }
+        ));
     }
 
-    function saveInventory() {
+    async function saveInventory() {
         // Vérifier que toutes les quantités sont remplies
         const hasEmpty = medications.some(m => m.nouvelleQuantite === "");
         if (hasEmpty) {
@@ -144,79 +190,97 @@ export function PharmacistInventory() {
             return;
         }
 
-        // Calculer les différences et créer le nouveau stock
-        const nouveauStock = medications.map(m => ({
-            code: m.code,
-            name: m.name,
-            quantite: parseInt(m.nouvelleQuantite),
-            prixVente: m.prixVente
-        }));
+        try {
+            setSaving(true);
+            setError(null);
 
-        const differences = medications.map(m => ({
-            code: m.code,
-            name: m.name,
-            ancienneQuantite: m.quantiteActuelle,
-            nouvelleQuantite: parseInt(m.nouvelleQuantite),
-            difference: parseInt(m.nouvelleQuantite) - m.quantiteActuelle
-        }));
+            // Récupérer les lignes de l'archive en cours
+            const linesData = await ligneArchiveApi.getByArchive(currentArchive.id_archive);
+            const lines = linesData.results || linesData;
 
-        // Mettre à jour l'archive en cours avec les 3 colonnes
-        const latestArchive = archives[0];
-        if (latestArchive && latestArchive.statut === "en_cours") {
-            const updatedArchive = {
-                ...latestArchive,
-                statut: "termine",
-                dateTermine: new Date().toISOString(),
-                nouveauStock: nouveauStock,
-                differences: differences
-            };
-            const updatedArchives = [updatedArchive, ...archives.slice(1)];
-            setArchives(updatedArchives);
-            localStorage.setItem('pharmacist_archives', JSON.stringify(updatedArchives));
+            // Mettre à jour chaque ligne avec la nouvelle quantité
+            for (const med of medications) {
+                const line = lines.find(l => l.code_materiel === med.code);
+                if (line) {
+                    const nouveauStock = parseInt(med.nouvelleQuantite);
+                    const difference = nouveauStock - line.quantite_ancien_stock;
+                    let statutDiff = "CONFORME";
+                    if (difference > 0) statutDiff = "EXCEDENT";
+                    else if (difference < 0) statutDiff = "DEFICIT";
+
+                    await ligneArchiveApi.patch(line.id_ligne_archive, {
+                        quantite_nouveau_stock: nouveauStock,
+                        difference: difference,
+                        statut_difference: statutDiff
+                    });
+
+                    // Mettre à jour le stock du matériel
+                    await materielMedicalApi.patch(med.id, {
+                        quantite_stock: nouveauStock
+                    });
+                }
+            }
+
+            // Terminer l'archive
+            await archiveInventaireApi.patch(currentArchive.id_archive, {
+                statut: "TERMINE",
+                date_termine: new Date().toISOString()
+            });
+
+            // Recharger les données
+            await loadData();
+
+            // Passer en mode rapport
+            setMode("report");
+            setCurrentArchive(null);
+            setSuccessMessage("Inventaire enregistré ! Vous pouvez maintenant rédiger votre rapport.");
+            setTimeout(() => setSuccessMessage(""), 5000);
+
+        } catch (err) {
+            console.error("Erreur lors de la sauvegarde:", err);
+            setError("Impossible de sauvegarder l'inventaire. Veuillez réessayer.");
+        } finally {
+            setSaving(false);
         }
-
-        // Mettre à jour les quantités des médicaments
-        const updatedMedications = medications.map(m => ({
-            ...m,
-            quantiteActuelle: parseInt(m.nouvelleQuantite),
-            nouvelleQuantite: ""
-        }));
-        setMedications(updatedMedications);
-
-        // Passer en mode rapport
-        setMode("report");
-        setSuccessMessage("Inventaire enregistré ! Vous pouvez maintenant rédiger votre rapport.");
-        setTimeout(() => setSuccessMessage(""), 5000);
     }
 
     function goToReports() {
         // Préparer les données du rapport d'inventaire pour la page des rapports
-        const latestArchive = archives[0];
+        const latestArchive = archives.find(a => a.statut === "TERMINE");
 
         if (latestArchive) {
-            // Sauvegarder les données de l'inventaire pour le rapport
             const inventoryReportData = {
-                archiveId: latestArchive.id,
-                dateInventaire: latestArchive.dateTermine || new Date().toISOString(),
+                archiveId: latestArchive.code_archive,
+                dateInventaire: latestArchive.date_termine || new Date().toISOString(),
                 etatActuelStock: medications.map(m => ({
                     code: m.code,
                     name: m.name,
                     quantite: m.quantiteActuelle,
                     prixVente: m.prixVente
                 })),
-                archive: latestArchive
+                archiveDbId: latestArchive.id_archive
             };
 
             localStorage.setItem('pending_inventory_report', JSON.stringify(inventoryReportData));
         }
 
-        // Rediriger vers la page des rapports
         navigate("/pharmacist/reports");
     }
 
-    function viewArchive(archive) {
-        setSelectedArchive(archive);
-        setShowArchiveModal(true);
+    async function viewArchive(archive) {
+        try {
+            setLoading(true);
+            const linesData = await ligneArchiveApi.getByArchive(archive.id_archive);
+            const lines = linesData.results || linesData;
+            setSelectedArchiveLines(lines);
+            setSelectedArchive(archive);
+            setShowArchiveModal(true);
+        } catch (err) {
+            console.error("Erreur lors du chargement de l'archive:", err);
+            setError("Impossible de charger les détails de l'archive.");
+        } finally {
+            setLoading(false);
+        }
     }
 
     // Fonction pour exporter l'ancien stock en PDF
@@ -225,7 +289,6 @@ export function PharmacistInventory() {
         const pageWidth = doc.internal.pageSize.getWidth();
         const margin = 20;
 
-        // En-tête
         doc.setFontSize(18);
         doc.setTextColor(26, 115, 163);
         doc.text("FULTANG CLINIC - PHARMACIE", pageWidth / 2, 20, { align: "center" });
@@ -241,12 +304,11 @@ export function PharmacistInventory() {
         doc.setFontSize(10);
         doc.setTextColor(0);
 
-        doc.text(`Archive: ${archive.id}`, margin, yPos);
-        doc.text(`Date: ${new Date(archive.dateCreation).toLocaleDateString('fr-FR')}`, pageWidth - margin, yPos, { align: "right" });
+        doc.text(`Archive: ${archive.code_archive}`, margin, yPos);
+        doc.text(`Date: ${new Date(archive.date_creation).toLocaleDateString('fr-FR')}`, pageWidth - margin, yPos, { align: "right" });
 
         yPos += 15;
 
-        // En-tête du tableau
         doc.setFillColor(26, 115, 163);
         doc.rect(margin, yPos - 5, pageWidth - 2 * margin, 8, 'F');
         doc.setTextColor(255);
@@ -260,7 +322,7 @@ export function PharmacistInventory() {
         doc.setFont(undefined, 'normal');
         doc.setTextColor(0);
 
-        archive.ancienStock.forEach((med, index) => {
+        selectedArchiveLines.forEach((line, index) => {
             if (yPos > 270) {
                 doc.addPage();
                 yPos = 20;
@@ -271,27 +333,26 @@ export function PharmacistInventory() {
                 doc.rect(margin, yPos - 5, pageWidth - 2 * margin, 8, 'F');
             }
 
-            doc.text(med.code, margin + 5, yPos);
-            doc.text(med.name.substring(0, 30), margin + 35, yPos);
-            doc.text(String(med.quantite), margin + 120, yPos);
-            doc.text(`${med.prixVente} F`, margin + 150, yPos);
+            doc.text(line.code_materiel || "", margin + 5, yPos);
+            doc.text((line.nom_materiel || "").substring(0, 30), margin + 35, yPos);
+            doc.text(String(line.quantite_ancien_stock || 0), margin + 120, yPos);
+            doc.text(`${line.prix_vente || 0} F`, margin + 150, yPos);
 
             yPos += 8;
         });
 
-        // Pied de page
         const pageHeight = doc.internal.pageSize.getHeight();
         doc.setFontSize(9);
         doc.setTextColor(100);
         doc.text(`Document généré le ${new Date().toLocaleDateString('fr-FR')}`, margin, pageHeight - 15);
         doc.text("Fultang Clinic - Pharmacie", pageWidth - margin, pageHeight - 15, { align: "right" });
 
-        doc.save(`ancien_stock_${archive.id}.pdf`);
+        doc.save(`ancien_stock_${archive.code_archive}.pdf`);
     }
 
     // Fonction pour exporter le nouveau stock en PDF
     function exportNouveauStockToPDF(archive) {
-        if (!archive.nouveauStock) {
+        if (archive.statut !== "TERMINE") {
             alert("Le nouveau stock n'est pas encore disponible pour cette archive.");
             return;
         }
@@ -300,7 +361,6 @@ export function PharmacistInventory() {
         const pageWidth = doc.internal.pageSize.getWidth();
         const margin = 20;
 
-        // En-tête
         doc.setFontSize(18);
         doc.setTextColor(26, 115, 163);
         doc.text("FULTANG CLINIC - PHARMACIE", pageWidth / 2, 20, { align: "center" });
@@ -316,12 +376,11 @@ export function PharmacistInventory() {
         doc.setFontSize(10);
         doc.setTextColor(0);
 
-        doc.text(`Archive: ${archive.id}`, margin, yPos);
-        doc.text(`Date: ${new Date(archive.dateTermine).toLocaleDateString('fr-FR')}`, pageWidth - margin, yPos, { align: "right" });
+        doc.text(`Archive: ${archive.code_archive}`, margin, yPos);
+        doc.text(`Date: ${new Date(archive.date_termine).toLocaleDateString('fr-FR')}`, pageWidth - margin, yPos, { align: "right" });
 
         yPos += 15;
 
-        // En-tête du tableau
         doc.setFillColor(39, 174, 96);
         doc.rect(margin, yPos - 5, pageWidth - 2 * margin, 8, 'F');
         doc.setTextColor(255);
@@ -335,7 +394,7 @@ export function PharmacistInventory() {
         doc.setFont(undefined, 'normal');
         doc.setTextColor(0);
 
-        archive.nouveauStock.forEach((med, index) => {
+        selectedArchiveLines.forEach((line, index) => {
             if (yPos > 270) {
                 doc.addPage();
                 yPos = 20;
@@ -346,27 +405,26 @@ export function PharmacistInventory() {
                 doc.rect(margin, yPos - 5, pageWidth - 2 * margin, 8, 'F');
             }
 
-            doc.text(med.code, margin + 5, yPos);
-            doc.text(med.name.substring(0, 30), margin + 35, yPos);
-            doc.text(String(med.quantite), margin + 120, yPos);
-            doc.text(`${med.prixVente} F`, margin + 150, yPos);
+            doc.text(line.code_materiel || "", margin + 5, yPos);
+            doc.text((line.nom_materiel || "").substring(0, 30), margin + 35, yPos);
+            doc.text(String(line.quantite_nouveau_stock || 0), margin + 120, yPos);
+            doc.text(`${line.prix_vente || 0} F`, margin + 150, yPos);
 
             yPos += 8;
         });
 
-        // Pied de page
         const pageHeight = doc.internal.pageSize.getHeight();
         doc.setFontSize(9);
         doc.setTextColor(100);
         doc.text(`Document généré le ${new Date().toLocaleDateString('fr-FR')}`, margin, pageHeight - 15);
         doc.text("Fultang Clinic - Pharmacie", pageWidth - margin, pageHeight - 15, { align: "right" });
 
-        doc.save(`nouveau_stock_${archive.id}.pdf`);
+        doc.save(`nouveau_stock_${archive.code_archive}.pdf`);
     }
 
     // Fonction pour exporter les différences en PDF
     function exportDifferencesToPDF(archive) {
-        if (!archive.differences) {
+        if (archive.statut !== "TERMINE") {
             alert("Les différences ne sont pas encore disponibles pour cette archive.");
             return;
         }
@@ -375,7 +433,6 @@ export function PharmacistInventory() {
         const pageWidth = doc.internal.pageSize.getWidth();
         const margin = 15;
 
-        // En-tête
         doc.setFontSize(18);
         doc.setTextColor(26, 115, 163);
         doc.text("FULTANG CLINIC - PHARMACIE", pageWidth / 2, 20, { align: "center" });
@@ -391,12 +448,11 @@ export function PharmacistInventory() {
         doc.setFontSize(10);
         doc.setTextColor(0);
 
-        doc.text(`Archive: ${archive.id}`, margin, yPos);
-        doc.text(`Date: ${new Date(archive.dateTermine).toLocaleDateString('fr-FR')}`, pageWidth - margin, yPos, { align: "right" });
+        doc.text(`Archive: ${archive.code_archive}`, margin, yPos);
+        doc.text(`Date: ${new Date(archive.date_termine).toLocaleDateString('fr-FR')}`, pageWidth - margin, yPos, { align: "right" });
 
         yPos += 15;
 
-        // En-tête du tableau
         doc.setFillColor(230, 126, 34);
         doc.rect(margin, yPos - 5, pageWidth - 2 * margin, 8, 'F');
         doc.setTextColor(255);
@@ -412,7 +468,7 @@ export function PharmacistInventory() {
         doc.setFont(undefined, 'normal');
         doc.setTextColor(0);
 
-        archive.differences.forEach((item, index) => {
+        selectedArchiveLines.forEach((line, index) => {
             if (yPos > 270) {
                 doc.addPage();
                 yPos = 20;
@@ -423,19 +479,19 @@ export function PharmacistInventory() {
                 doc.rect(margin, yPos - 5, pageWidth - 2 * margin, 8, 'F');
             }
 
-            doc.text(item.code, margin + 3, yPos);
-            doc.text(item.name.substring(0, 25), margin + 25, yPos);
-            doc.text(String(item.ancienneQuantite), margin + 95, yPos);
-            doc.text(String(item.nouvelleQuantite), margin + 120, yPos);
+            doc.text(line.code_materiel || "", margin + 3, yPos);
+            doc.text((line.nom_materiel || "").substring(0, 25), margin + 25, yPos);
+            doc.text(String(line.quantite_ancien_stock || 0), margin + 95, yPos);
+            doc.text(String(line.quantite_nouveau_stock || 0), margin + 120, yPos);
 
-            // Couleur selon la différence
-            if (item.difference > 0) {
+            const diff = line.difference || 0;
+            if (diff > 0) {
                 doc.setTextColor(39, 174, 96);
-                doc.text(`+${item.difference}`, margin + 150, yPos);
+                doc.text(`+${diff}`, margin + 150, yPos);
                 doc.text("Excédent", margin + 165, yPos);
-            } else if (item.difference < 0) {
+            } else if (diff < 0) {
                 doc.setTextColor(231, 76, 60);
-                doc.text(String(item.difference), margin + 150, yPos);
+                doc.text(String(diff), margin + 150, yPos);
                 doc.text("Déficit", margin + 165, yPos);
             } else {
                 doc.setTextColor(127, 140, 141);
@@ -449,9 +505,9 @@ export function PharmacistInventory() {
 
         // Résumé
         yPos += 10;
-        const excedents = archive.differences.filter(d => d.difference > 0).length;
-        const deficits = archive.differences.filter(d => d.difference < 0).length;
-        const conformes = archive.differences.filter(d => d.difference === 0).length;
+        const excedents = selectedArchiveLines.filter(l => (l.difference || 0) > 0).length;
+        const deficits = selectedArchiveLines.filter(l => (l.difference || 0) < 0).length;
+        const conformes = selectedArchiveLines.filter(l => (l.difference || 0) === 0).length;
 
         doc.setFillColor(240, 240, 240);
         doc.rect(margin, yPos, pageWidth - 2 * margin, 25, 'F');
@@ -466,23 +522,21 @@ export function PharmacistInventory() {
         doc.setTextColor(127, 140, 141);
         doc.text(`Conformes: ${conformes}`, margin + 115, yPos);
 
-        // Pied de page
         const pageHeight = doc.internal.pageSize.getHeight();
         doc.setFontSize(9);
         doc.setTextColor(100);
         doc.text(`Document généré le ${new Date().toLocaleDateString('fr-FR')}`, margin, pageHeight - 15);
         doc.text("Fultang Clinic - Pharmacie", pageWidth - margin, pageHeight - 15, { align: "right" });
 
-        doc.save(`differences_${archive.id}.pdf`);
+        doc.save(`differences_${archive.code_archive}.pdf`);
     }
 
-    // Fonction pour exporter l'archive complète (les 3 colonnes)
+    // Fonction pour exporter l'archive complète
     function exportFullArchiveToPDF(archive) {
         const doc = new jsPDF('landscape');
         const pageWidth = doc.internal.pageSize.getWidth();
         const margin = 15;
 
-        // En-tête
         doc.setFontSize(18);
         doc.setTextColor(26, 115, 163);
         doc.text("FULTANG CLINIC - PHARMACIE", pageWidth / 2, 15, { align: "center" });
@@ -498,16 +552,15 @@ export function PharmacistInventory() {
         doc.setFontSize(10);
         doc.setTextColor(0);
 
-        doc.text(`Référence Archive: ${archive.id}`, margin, yPos);
-        doc.text(`Date début: ${new Date(archive.dateCreation).toLocaleDateString('fr-FR')}`, margin + 80, yPos);
-        if (archive.dateTermine) {
-            doc.text(`Date fin: ${new Date(archive.dateTermine).toLocaleDateString('fr-FR')}`, margin + 160, yPos);
+        doc.text(`Référence Archive: ${archive.code_archive}`, margin, yPos);
+        doc.text(`Date début: ${new Date(archive.date_creation).toLocaleDateString('fr-FR')}`, margin + 80, yPos);
+        if (archive.date_termine) {
+            doc.text(`Date fin: ${new Date(archive.date_termine).toLocaleDateString('fr-FR')}`, margin + 160, yPos);
         }
-        doc.text(`Statut: ${archive.statut === 'termine' ? 'Terminé' : 'En cours'}`, pageWidth - margin, yPos, { align: "right" });
+        doc.text(`Statut: ${archive.statut === 'TERMINE' ? 'Terminé' : 'En cours'}`, pageWidth - margin, yPos, { align: "right" });
 
         yPos += 12;
 
-        // En-tête du tableau complet
         doc.setFillColor(26, 115, 163);
         doc.rect(margin, yPos - 5, pageWidth - 2 * margin, 10, 'F');
         doc.setTextColor(255);
@@ -525,15 +578,7 @@ export function PharmacistInventory() {
         doc.setTextColor(0);
         doc.setFontSize(9);
 
-        const items = archive.differences || archive.ancienStock.map(m => ({
-            code: m.code,
-            name: m.name,
-            ancienneQuantite: m.quantite,
-            nouvelleQuantite: '-',
-            difference: '-'
-        }));
-
-        items.forEach((item, index) => {
+        selectedArchiveLines.forEach((line, index) => {
             if (yPos > 180) {
                 doc.addPage();
                 yPos = 20;
@@ -545,20 +590,20 @@ export function PharmacistInventory() {
             }
 
             doc.setTextColor(0);
-            doc.text(item.code, margin + 3, yPos);
-            doc.text(item.name.substring(0, 28), margin + 28, yPos);
-            doc.text(String(item.ancienneQuantite || (archive.ancienStock.find(a => a.code === item.code)?.quantite || '-')), margin + 105, yPos);
-            doc.text(String(item.nouvelleQuantite || '-'), margin + 150, yPos);
+            doc.text(line.code_materiel || "", margin + 3, yPos);
+            doc.text((line.nom_materiel || "").substring(0, 28), margin + 28, yPos);
+            doc.text(String(line.quantite_ancien_stock || 0), margin + 105, yPos);
+            doc.text(line.quantite_nouveau_stock !== null ? String(line.quantite_nouveau_stock) : '-', margin + 150, yPos);
 
-            // Différence avec couleur
-            if (typeof item.difference === 'number') {
-                if (item.difference > 0) {
+            const diff = line.difference;
+            if (diff !== null && diff !== undefined) {
+                if (diff > 0) {
                     doc.setTextColor(39, 174, 96);
-                    doc.text(`+${item.difference}`, margin + 190, yPos);
+                    doc.text(`+${diff}`, margin + 190, yPos);
                     doc.text("Excédent", margin + 220, yPos);
-                } else if (item.difference < 0) {
+                } else if (diff < 0) {
                     doc.setTextColor(231, 76, 60);
-                    doc.text(String(item.difference), margin + 190, yPos);
+                    doc.text(String(diff), margin + 190, yPos);
                     doc.text("Déficit", margin + 220, yPos);
                 } else {
                     doc.setTextColor(127, 140, 141);
@@ -574,14 +619,28 @@ export function PharmacistInventory() {
             yPos += 8;
         });
 
-        // Pied de page
         const pageHeight = doc.internal.pageSize.getHeight();
         doc.setFontSize(9);
         doc.setTextColor(100);
         doc.text(`Document généré le ${new Date().toLocaleDateString('fr-FR')}`, margin, pageHeight - 10);
         doc.text("Fultang Clinic - Pharmacie", pageWidth - margin, pageHeight - 10, { align: "right" });
 
-        doc.save(`archive_complete_${archive.id}.pdf`);
+        doc.save(`archive_complete_${archive.code_archive}.pdf`);
+    }
+
+    // Affichage du loader
+    if (loading && mode === "list") {
+        return (
+            <PharmacistDashBoard linkList={PharmacistNavLink} requiredRole={"Pharmacist"}>
+                <PharmacistNavBar />
+                <div className="flex items-center justify-center h-96">
+                    <div className="text-center">
+                        <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
+                        <p className="text-gray-600">Chargement des données...</p>
+                    </div>
+                </div>
+            </PharmacistDashBoard>
+        );
     }
 
     return (
@@ -603,19 +662,33 @@ export function PharmacistInventory() {
                             </p>
                         </div>
                     </div>
-                    {mode === "list" && (
+                    <div className="flex gap-3">
                         <button
-                            onClick={handleStartInventory}
-                            className={`flex items-center gap-2 px-6 py-3 text-white rounded-lg hover:opacity-90 transition-all font-semibold ${hasInProgress
-                                    ? "bg-gradient-to-r from-orange-500 to-red-500"
-                                    : "bg-gradient-to-r from-primary-start to-primary-end"
-                                }`}
+                            onClick={loadData}
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+                            disabled={loading}
                         >
-                            <FaArchive />
-                            {hasInProgress ? "Reprendre l'inventaire en cours" : "Démarrer un inventaire"}
+                            <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
                         </button>
-                    )}
+                        {mode === "list" && (
+                            <button
+                                onClick={startInventory}
+                                disabled={saving || archives.some(a => a.statut === "EN_COURS")}
+                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all font-semibold disabled:opacity-50"
+                            >
+                                {saving ? <FaSpinner className="animate-spin" /> : <FaArchive />}
+                                Démarrer un inventaire
+                            </button>
+                        )}
+                    </div>
                 </div>
+
+                {error && (
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
+                        <FaExclamationTriangle />
+                        {error}
+                    </div>
+                )}
 
                 {successMessage && (
                     <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
@@ -629,26 +702,28 @@ export function PharmacistInventory() {
                     <div className="bg-white rounded-lg shadow-lg p-6">
                         <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                             <FaHistory className="text-blue-500" />
-                            Historique des Archives
+                            Historique des Archives ({archives.length})
                         </h2>
 
                         {archives.length > 0 ? (
                             <div className="space-y-3 max-h-[500px] overflow-y-auto">
                                 {archives.map(archive => (
-                                    <div key={archive.id} className="flex justify-between items-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                    <div key={archive.id_archive} className="flex justify-between items-center p-4 bg-gray-50 rounded-lg border border-gray-200">
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <span className="font-bold text-gray-800">{archive.id}</span>
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${archive.statut === "termine"
+                                                <span className="font-bold text-gray-800">{archive.code_archive}</span>
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${archive.statut === "TERMINE"
                                                     ? "bg-green-100 text-green-800"
-                                                    : "bg-yellow-100 text-yellow-800"
+                                                    : archive.statut === "ANNULE"
+                                                        ? "bg-red-100 text-red-800"
+                                                        : "bg-yellow-100 text-yellow-800"
                                                     }`}>
-                                                    {archive.statut === "termine" ? "Terminé" : "En cours"}
+                                                    {archive.statut === "TERMINE" ? "Terminé" : archive.statut === "ANNULE" ? "Annulé" : "En cours"}
                                                 </span>
                                             </div>
                                             <p className="text-sm text-gray-600">
-                                                Créé le {new Date(archive.dateCreation).toLocaleDateString('fr-FR')} •
-                                                {archive.ancienStock?.length || 0} médicaments archivés
+                                                Créé le {new Date(archive.date_creation).toLocaleDateString('fr-FR')}
+                                                {archive.date_termine && ` • Terminé le ${new Date(archive.date_termine).toLocaleDateString('fr-FR')}`}
                                             </p>
                                         </div>
                                         <div className="flex gap-2">
@@ -657,12 +732,6 @@ export function PharmacistInventory() {
                                                 className="flex items-center gap-1 px-3 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-all"
                                             >
                                                 <FaEye /> Voir
-                                            </button>
-                                            <button
-                                                onClick={() => exportFullArchiveToPDF(archive)}
-                                                className="flex items-center gap-1 px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all"
-                                            >
-                                                <FaFilePdf /> PDF Complet
                                             </button>
                                         </div>
                                     </div>
@@ -685,16 +754,21 @@ export function PharmacistInventory() {
                             <h2 className="text-xl font-bold text-gray-800">Saisie des Nouvelles Quantités</h2>
                             <div className="flex gap-3">
                                 <button
-                                    onClick={() => setMode("list")}
+                                    onClick={() => {
+                                        setMode("list");
+                                        setCurrentArchive(null);
+                                    }}
                                     className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
                                 >
                                     Annuler
                                 </button>
                                 <button
                                     onClick={saveInventory}
-                                    className="flex items-center gap-2 px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all"
+                                    disabled={saving}
+                                    className="flex items-center gap-2 px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all disabled:opacity-50"
                                 >
-                                    <FaSave /> Valider l&apos;inventaire
+                                    {saving ? <FaSpinner className="animate-spin" /> : <FaSave />}
+                                    Valider l&apos;inventaire
                                 </button>
                             </div>
                         </div>
@@ -757,11 +831,10 @@ export function PharmacistInventory() {
                             Rapport d&apos;Inventaire
                         </h2>
 
-                        {/* État actuel du stock après inventaire */}
                         <div className="bg-gray-50 p-4 rounded-lg">
                             <h3 className="font-semibold text-gray-700 mb-3">État actuel du stock après inventaire:</h3>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {medications.map(med => (
+                                {medications.slice(0, 8).map(med => (
                                     <div key={med.code} className="bg-white p-3 rounded-lg border shadow-sm">
                                         <p className="font-medium truncate text-sm text-gray-700">{med.name}</p>
                                         <p className="text-2xl font-bold text-primary-start">{med.quantiteActuelle}</p>
@@ -771,7 +844,6 @@ export function PharmacistInventory() {
                             </div>
                         </div>
 
-                        {/* Bouton unique pour rédiger le rapport */}
                         <div className="flex justify-center pt-4">
                             <button
                                 onClick={goToReports}
@@ -784,20 +856,29 @@ export function PharmacistInventory() {
                         <p className="text-center text-sm text-gray-500">
                             Le rapport sera accompagné de l&apos;état actuel du stock et de l&apos;archive créée lors de cet inventaire.
                         </p>
+
+                        <div className="flex justify-center">
+                            <button
+                                onClick={() => setMode("list")}
+                                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                            >
+                                ← Retour à la liste
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
 
-            {/* Modal de détails d'archive avec les 3 colonnes */}
+            {/* Modal de détails d'archive */}
             {showArchiveModal && selectedArchive && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
                             <div>
-                                <h2 className="text-xl font-bold text-gray-800">Archive {selectedArchive.id}</h2>
+                                <h2 className="text-xl font-bold text-gray-800">Archive {selectedArchive.code_archive}</h2>
                                 <p className="text-sm text-gray-500">
-                                    Créée le {new Date(selectedArchive.dateCreation).toLocaleDateString('fr-FR')}
-                                    {selectedArchive.dateTermine && ` • Terminée le ${new Date(selectedArchive.dateTermine).toLocaleDateString('fr-FR')}`}
+                                    Créée le {new Date(selectedArchive.date_creation).toLocaleDateString('fr-FR')}
+                                    {selectedArchive.date_termine && ` • Terminée le ${new Date(selectedArchive.date_termine).toLocaleDateString('fr-FR')}`}
                                 </p>
                             </div>
                             <button
@@ -808,7 +889,6 @@ export function PharmacistInventory() {
                             </button>
                         </div>
 
-                        {/* Tableau avec les 3 colonnes */}
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead className="bg-gradient-to-r from-primary-start to-primary-end text-white">
@@ -821,37 +901,32 @@ export function PharmacistInventory() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {selectedArchive.ancienStock.map((med, idx) => {
-                                        const nouveauItem = selectedArchive.nouveauStock?.find(n => n.code === med.code);
-                                        const diffItem = selectedArchive.differences?.find(d => d.code === med.code);
-
-                                        return (
-                                            <tr key={med.code} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
-                                                <td className="p-3 font-mono">{med.code}</td>
-                                                <td className="p-3">{med.name}</td>
-                                                <td className="p-3 text-center font-bold text-blue-600">{med.quantite}</td>
-                                                <td className="p-3 text-center font-bold text-green-600">
-                                                    {nouveauItem ? nouveauItem.quantite : '-'}
-                                                </td>
-                                                <td className="p-3 text-center font-bold">
-                                                    {diffItem ? (
-                                                        <span className={
-                                                            diffItem.difference > 0 ? 'text-green-600' :
-                                                                diffItem.difference < 0 ? 'text-red-600' :
-                                                                    'text-gray-500'
-                                                        }>
-                                                            {diffItem.difference > 0 ? '+' : ''}{diffItem.difference}
-                                                        </span>
-                                                    ) : '-'}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                    {selectedArchiveLines.map((line, idx) => (
+                                        <tr key={line.id_ligne_archive} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
+                                            <td className="p-3 font-mono">{line.code_materiel}</td>
+                                            <td className="p-3">{line.nom_materiel}</td>
+                                            <td className="p-3 text-center font-bold text-blue-600">{line.quantite_ancien_stock}</td>
+                                            <td className="p-3 text-center font-bold text-green-600">
+                                                {line.quantite_nouveau_stock !== null ? line.quantite_nouveau_stock : '-'}
+                                            </td>
+                                            <td className="p-3 text-center font-bold">
+                                                {line.difference !== null ? (
+                                                    <span className={
+                                                        line.difference > 0 ? 'text-green-600' :
+                                                            line.difference < 0 ? 'text-red-600' :
+                                                                'text-gray-500'
+                                                    }>
+                                                        {line.difference > 0 ? '+' : ''}{line.difference}
+                                                    </span>
+                                                ) : '-'}
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
 
-                        {/* Boutons d'impression individuels */}
+                        {/* Boutons d'impression */}
                         <div className="mt-6 p-4 bg-gray-50 rounded-lg">
                             <h4 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
                                 <FaPrint /> Imprimer individuellement:
@@ -865,14 +940,14 @@ export function PharmacistInventory() {
                                 </button>
                                 <button
                                     onClick={() => exportNouveauStockToPDF(selectedArchive)}
-                                    disabled={!selectedArchive.nouveauStock}
+                                    disabled={selectedArchive.statut !== "TERMINE"}
                                     className="flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <FaFilePdf /> Nouveau Stock
                                 </button>
                                 <button
                                     onClick={() => exportDifferencesToPDF(selectedArchive)}
-                                    disabled={!selectedArchive.differences}
+                                    disabled={selectedArchive.statut !== "TERMINE"}
                                     className="flex items-center justify-center gap-2 px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <FaFilePdf /> Différences

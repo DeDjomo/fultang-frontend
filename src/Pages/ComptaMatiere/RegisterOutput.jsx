@@ -1,20 +1,23 @@
-import { ComptaMatiereDashBoard } from "./Components/ComptaMatiereDashboard";
-import { ComptaMatiereNavLink } from "./ComptaMatiereNavLink";
-import { ComptaMatiereNavBar } from "./Components/ComptaMatiereNavBar";
+import { AccountantDashBoard } from "./Components/AccountantDashboard";
+import { AccountantNavLink } from "./AccountantNavLink";
+import { AccountantNavBar } from "./Components/AccountantNavBar";
 import { useState, useEffect } from "react";
-import { FaPlus, FaTrash, FaSave, FaBoxOpen, FaCheckCircle, FaSpinner } from "react-icons/fa";
+import { FaPlus, FaTrash, FaSave, FaBoxOpen, FaCheckCircle, FaSpinner, FaSyncAlt } from "react-icons/fa";
 import PropTypes from "prop-types";
-import { getAllMaterielsMedicaux, getAllMaterielsDurables, createSortie, createLigneSortie, getAllSorties } from "../../services/comptabiliteMatiereApi";
+import { materielMedicalApi, materielDurableApi, sortieApi, ligneSortieApi } from "../../services/comptabiliteMatiereApi";
 
 export function RegisterOutput() {
-    // Liste des matériels existants
-    const [materialsDatabase, setMaterialsDatabase] = useState([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState(null);
+    const [successMessage, setSuccessMessage] = useState("");
+
+    // Liste des matériels depuis l'API
+    const [materialsDatabase, setMaterialsDatabase] = useState([]);
 
     // Articles en sortie
     const [outputItems, setOutputItems] = useState([
-        { id: 1, nomMateriel: "", codeMateriel: "", typeMateriel: "", quantite: "", materielId: null }
+        { id: 1, nomMateriel: "", codeMateriel: "", typeMateriel: "", materialId: null, quantite: "", stockDisponible: 0 }
     ]);
 
     // Informations de sortie
@@ -23,7 +26,7 @@ export function RegisterOutput() {
         serviceMedical: "",
         dateSortie: new Date().toISOString().split('T')[0],
         dateEnregistrement: new Date().toISOString().split('T')[0],
-        motifSortie: "defectueux"
+        motifSortie: "DEFECTUEUX"
     });
 
     // État pour les suggestions
@@ -32,68 +35,54 @@ export function RegisterOutput() {
 
     // Charger les données au montage
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-
-                // Récupérer les matériels et les sorties existantes
-                const [medicaux, durables, sortiesData] = await Promise.all([
-                    getAllMaterielsMedicaux(),
-                    getAllMaterielsDurables(),
-                    getAllSorties()
-                ]);
-
-                // Transformer les matériels
-                const medList = (medicaux.results || medicaux).map(m => ({
-                    id: m.idMateriel || m.id,
-                    code: m.code || `MED-${m.idMateriel}`,
-                    name: m.nom_Materiel || m.name,
-                    category: "Matériel Médical",
-                    quantity: m.quantite_stock || 0
-                }));
-
-                const durList = (durables.results || durables).map(m => ({
-                    id: m.idMateriel || m.id,
-                    code: m.code || `DUR-${m.idMateriel}`,
-                    name: m.nom_Materiel || m.name,
-                    category: "Matériel Durable",
-                    quantity: m.quantite_stock || 1
-                }));
-
-                setMaterialsDatabase([...medList, ...durList]);
-
-                // Générer le numéro de sortie
-                const sorties = sortiesData.results || sortiesData || [];
-                const year = new Date().getFullYear();
-                const nextNumber = sorties.length + 1;
-                setOutputInfo(prev => ({
-                    ...prev,
-                    numeroSortie: `SOR-${year}-${String(nextNumber).padStart(3, '0')}`
-                }));
-            } catch (err) {
-                console.error("Erreur lors du chargement des matériels:", err);
-                // Fallback to mock data
-                setMaterialsDatabase([
-                    { id: 1, code: "MED-001", name: "Gants médicaux", category: "Matériel Médical", quantity: 150 },
-                    { id: 2, code: "MED-002", name: "Seringues 5ml", category: "Matériel Médical", quantity: 200 },
-                    { id: 3, code: "DUR-001", name: "Stéthoscope", category: "Matériel Durable", quantity: 5 },
-                ]);
-                setOutputInfo(prev => ({
-                    ...prev,
-                    numeroSortie: `SOR-${new Date().getFullYear()}-001`
-                }));
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
+        loadData();
     }, []);
 
-    // Générer le numéro de sortie unique
-    function generateOutputNumber() {
-        const year = new Date().getFullYear();
-        return `SOR-${year}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
+    async function loadData() {
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Charger les matériels médicaux
+            const medicauxData = await materielMedicalApi.getAll();
+            const medicaux = (medicauxData.results || medicauxData).map(m => ({
+                id: m.idMateriel || m.materiel_ptr_id,
+                code: m.code_materiel,
+                name: m.nom_Materiel,
+                category: "MEDICAL",
+                categoryDisplay: "Matériel Médical",
+                quantity: m.quantite_stock,
+                prixVente: parseFloat(m.prix_vente_unitaire) || 0
+            }));
+
+            // Charger les matériels durables
+            const durablesData = await materielDurableApi.getAll();
+            const durables = (durablesData.results || durablesData).map(m => ({
+                id: m.idMateriel || m.materiel_ptr_id,
+                code: m.code_materiel,
+                name: m.nom_Materiel,
+                category: "DURABLE",
+                categoryDisplay: "Matériel Durable",
+                quantity: m.quantite_stock,
+                prixVente: null
+            }));
+
+            setMaterialsDatabase([...medicaux, ...durables]);
+
+            // Générer le numéro de sortie
+            const sortiesData = await sortieApi.getAll();
+            const sorties = sortiesData.results || sortiesData;
+            const year = new Date().getFullYear();
+            const count = sorties.filter(s => s.numero_sortie?.includes(`SOR-${year}`)).length + 1;
+            const newNumber = `SOR-${year}-${String(count).padStart(3, '0')}`;
+            setOutputInfo(prev => ({ ...prev, numeroSortie: newNumber }));
+
+        } catch (err) {
+            console.error("Erreur lors du chargement:", err);
+            setError("Impossible de charger les données. Vérifiez que le backend est en cours d'exécution.");
+        } finally {
+            setLoading(false);
+        }
     }
 
     function addOutputItem() {
@@ -102,7 +91,9 @@ export function RegisterOutput() {
             nomMateriel: "",
             codeMateriel: "",
             typeMateriel: "",
-            quantite: ""
+            materialId: null,
+            quantite: "",
+            stockDisponible: 0
         };
         setOutputItems([...outputItems, newItem]);
     }
@@ -145,7 +136,8 @@ export function RegisterOutput() {
                 nomMateriel: material.name,
                 codeMateriel: material.code,
                 typeMateriel: material.category,
-                materielId: material.id
+                materialId: material.id,
+                stockDisponible: material.quantity
             } : item
         ));
         setActiveSuggestions(prev => ({
@@ -158,23 +150,20 @@ export function RegisterOutput() {
         e.preventDefault();
         setFormError("");
 
-        // Validation des articles
+        // Validation
+        if (!outputInfo.serviceMedical) {
+            setFormError("Veuillez sélectionner un service médical.");
+            return;
+        }
+
         for (const item of outputItems) {
-            if (!item.nomMateriel || !item.codeMateriel || !item.quantite) {
+            if (!item.nomMateriel || !item.codeMateriel || !item.quantite || !item.materialId) {
                 setFormError("Veuillez remplir tous les champs pour chaque article.");
                 return;
             }
 
-            // Vérifier la cohérence code/nom
-            const material = materialsDatabase.find(m => m.code === item.codeMateriel);
-            if (!material || material.name !== item.nomMateriel) {
-                setFormError(`Le code ${item.codeMateriel} ne correspond pas au matériel "${item.nomMateriel}".`);
-                return;
-            }
-
-            // Vérifier la quantité disponible
-            if (parseInt(item.quantite) > material.quantity) {
-                setFormError(`Quantité insuffisante pour "${item.nomMateriel}". Stock: ${material.quantity}, Demandé: ${item.quantite}`);
+            if (parseInt(item.quantite) > item.stockDisponible) {
+                setFormError(`Quantité insuffisante pour "${item.nomMateriel}". Stock: ${item.stockDisponible}, Demandé: ${item.quantite}`);
                 return;
             }
         }
@@ -182,39 +171,58 @@ export function RegisterOutput() {
         try {
             setSubmitting(true);
 
-            // Créer la sortie via l'API
+            // Créer la sortie
+            const personnelId = parseInt(localStorage.getItem("personnel_id") || "1");
             const sortieData = {
-                numero_sortie: outputInfo.numeroSortie || generateOutputNumber(),
-                service_responsable: outputInfo.serviceMedical,
+                numero_sortie: outputInfo.numeroSortie,
                 date_sortie: outputInfo.dateSortie,
-                motif_sortie: outputInfo.motifSortie.toUpperCase()
+                motif_sortie: outputInfo.motifSortie,
+                service_medical: outputInfo.serviceMedical,
+                idPersonnel: personnelId
             };
 
-            const createdSortie = await createSortie(sortieData);
+            const createdSortie = await sortieApi.create(sortieData);
 
             // Créer les lignes de sortie
             for (const item of outputItems) {
-                const material = materialsDatabase.find(m => m.code === item.codeMateriel);
-                await createLigneSortie({
-                    sortie: createdSortie.idSortie || createdSortie.id,
-                    materiel: material?.id || item.materielId,
-                    quantite: parseInt(item.quantite)
-                });
+                const ligneData = {
+                    id_sortie: createdSortie.idSortie,
+                    id_materiel: item.materialId,
+                    type_materiel: item.typeMateriel,
+                    quantite: parseInt(item.quantite),
+                    prix_unitaire: item.typeMateriel === "MEDICAL" ?
+                        materialsDatabase.find(m => m.id === item.materialId)?.prixVente : null
+                };
+                await ligneSortieApi.create(ligneData);
+
+                // Mettre à jour le stock
+                const material = materialsDatabase.find(m => m.id === item.materialId);
+                if (material) {
+                    const newStock = material.quantity - parseInt(item.quantite);
+                    if (item.typeMateriel === "MEDICAL") {
+                        await materielMedicalApi.patch(item.materialId, { quantite_stock: newStock });
+                    } else {
+                        await materielDurableApi.patch(item.materialId, { quantite_stock: newStock });
+                    }
+                }
             }
 
-            alert("Sortie enregistrée avec succès !\nN° " + sortieData.numero_sortie);
+            setSuccessMessage(`Sortie enregistrée avec succès ! N° ${outputInfo.numeroSortie}`);
+            setTimeout(() => setSuccessMessage(""), 5000);
 
             // Réinitialiser le formulaire
-            setOutputInfo({
-                numeroSortie: generateOutputNumber(),
+            await loadData();
+            setOutputItems([
+                { id: Date.now(), nomMateriel: "", codeMateriel: "", typeMateriel: "", materialId: null, quantite: "", stockDisponible: 0 }
+            ]);
+            setOutputInfo(prev => ({
+                ...prev,
                 serviceMedical: "",
                 dateSortie: new Date().toISOString().split('T')[0],
                 dateEnregistrement: new Date().toISOString().split('T')[0],
-                motifSortie: "defectueux"
-            });
-            setOutputItems([
-                { id: Date.now(), nomMateriel: "", codeMateriel: "", typeMateriel: "", quantite: "", materielId: null }
-            ]);
+                motifSortie: "DEFECTUEUX"
+            }));
+
         } catch (err) {
             console.error("Erreur lors de l'enregistrement:", err);
             setFormError("Erreur lors de l'enregistrement de la sortie. Veuillez réessayer.");
@@ -223,19 +231,52 @@ export function RegisterOutput() {
         }
     }
 
+    if (loading) {
+        return (
+            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"ComptaMatiere"}>
+                <AccountantNavBar />
+                <div className="flex items-center justify-center h-96">
+                    <div className="text-center">
+                        <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
+                        <p className="text-gray-600">Chargement des données...</p>
+                    </div>
+                </div>
+            </AccountantDashBoard>
+        );
+    }
+
     return (
-        <ComptaMatiereDashBoard
-            linkList={ComptaMatiereNavLink}
-            requiredRole={"Accountant"}
+        <AccountantDashBoard
+            linkList={AccountantNavLink}
+            requiredRole={"ComptaMatiere"}
         >
-            <ComptaMatiereNavBar />
+            <AccountantNavBar />
             <div className="p-6 space-y-6">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <FaBoxOpen className="text-4xl text-primary-start" />
                         <h1 className="text-3xl font-bold text-gray-800">Enregistrer une Sortie</h1>
                     </div>
+                    <button
+                        onClick={loadData}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+                    >
+                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
+                    </button>
                 </div>
+
+                {error && (
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                        {error}
+                    </div>
+                )}
+
+                {successMessage && (
+                    <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
+                        <FaCheckCircle /> {successMessage}
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Informations de sortie */}
@@ -255,7 +296,7 @@ export function RegisterOutput() {
                                 </label>
                                 <input
                                     type="text"
-                                    value={outputInfo.numeroSortie || generateOutputNumber()}
+                                    value={outputInfo.numeroSortie}
                                     className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 font-mono font-bold"
                                     readOnly
                                 />
@@ -321,11 +362,11 @@ export function RegisterOutput() {
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
                                     required
                                 >
-                                    <option value="defectueux">Défectueux</option>
-                                    <option value="perime">Périmé</option>
-                                    <option value="vente">Vente</option>
-                                    <option value="transfert">Transfert</option>
-                                    <option value="utilisation">Utilisation interne</option>
+                                    <option value="DEFECTUEUX">Défectueux</option>
+                                    <option value="PERIME">Périmé</option>
+                                    <option value="VENTE">Vente</option>
+                                    <option value="UTILISATION_SERVICE">Utilisation interne</option>
+                                    <option value="PERTE">Perte</option>
                                 </select>
                             </div>
                         </div>
@@ -372,16 +413,10 @@ export function RegisterOutput() {
                         <button
                             type="button"
                             onClick={() => {
-                                setOutputInfo({
-                                    numeroSortie: generateOutputNumber(),
-                                    serviceMedical: "",
-                                    dateSortie: new Date().toISOString().split('T')[0],
-                                    dateEnregistrement: new Date().toISOString().split('T')[0],
-                                    motifSortie: "defectueux"
-                                });
                                 setOutputItems([
-                                    { id: Date.now(), nomMateriel: "", codeMateriel: "", typeMateriel: "", quantite: "" }
+                                    { id: Date.now(), nomMateriel: "", codeMateriel: "", typeMateriel: "", materialId: null, quantite: "", stockDisponible: 0 }
                                 ]);
+                                setFormError("");
                             }}
                             className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all duration-300"
                         >
@@ -389,14 +424,16 @@ export function RegisterOutput() {
                         </button>
                         <button
                             type="submit"
-                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all duration-300"
+                            disabled={submitting}
+                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all duration-300 disabled:opacity-50"
                         >
-                            <FaSave /> Enregistrer la sortie
+                            {submitting ? <FaSpinner className="animate-spin" /> : <FaSave />}
+                            Enregistrer la sortie
                         </button>
                     </div>
                 </form>
             </div>
-        </ComptaMatiereDashBoard>
+        </AccountantDashBoard>
     );
 }
 
@@ -434,7 +471,7 @@ function OutputItemRow({ item, suggestions, onUpdate, onNameChange, onSelectMate
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                             {suggestions.map((material) => (
                                 <div
-                                    key={material.code}
+                                    key={material.id}
                                     onClick={() => onSelectMaterial(item.id, material)}
                                     className="p-2 hover:bg-primary-end/10 cursor-pointer border-b border-gray-100 last:border-b-0"
                                 >
@@ -468,7 +505,7 @@ function OutputItemRow({ item, suggestions, onUpdate, onNameChange, onSelectMate
                     </label>
                     <input
                         type="text"
-                        value={item.typeMateriel}
+                        value={item.typeMateriel === "MEDICAL" ? "Matériel Médical" : item.typeMateriel === "DURABLE" ? "Matériel Durable" : ""}
                         className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100"
                         placeholder="Auto"
                         readOnly
@@ -477,7 +514,7 @@ function OutputItemRow({ item, suggestions, onUpdate, onNameChange, onSelectMate
 
                 <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Quantité *
+                        Quantité * {item.stockDisponible > 0 && <span className="text-xs text-gray-500">(Stock: {item.stockDisponible})</span>}
                     </label>
                     <input
                         type="number"
@@ -486,6 +523,7 @@ function OutputItemRow({ item, suggestions, onUpdate, onNameChange, onSelectMate
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end"
                         placeholder="0"
                         min="1"
+                        max={item.stockDisponible || undefined}
                         required
                     />
                 </div>

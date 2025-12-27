@@ -5,114 +5,87 @@ import { useState, useEffect } from "react";
 import {
     FaHome,
     FaClipboardList,
-    FaExclamationTriangle,
     FaCheckCircle,
     FaClock,
     FaTimesCircle,
     FaEye,
-    FaSpinner
+    FaSpinner,
+    FaSyncAlt
 } from "react-icons/fa";
 import PropTypes from "prop-types";
-import { getDirectorDashboardStats, modifierStatutBesoin, ajouterCommentaireBesoin } from "../../services/comptabiliteMatiereApi";
+import { besoinApi, ligneBesoinApi } from "../../services/comptabiliteMatiereApi";
 
 export function Director() {
-    // États pour les données
-    const [besoins, setBesoins] = useState([]);
-    const [stats, setStats] = useState({
-        enAttente: 0,
-        approuves: 0,
-        rejetes: 0,
-        total: 0
-    });
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [actionLoading, setActionLoading] = useState(false);
+    const [successMessage, setSuccessMessage] = useState("");
+
+    // Besoins depuis l'API
+    const [besoins, setBesoins] = useState([]);
+    const [lignesBesoins, setLignesBesoins] = useState({});
 
     // Modal de détails
     const [selectedBesoin, setSelectedBesoin] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
-    const [commentaire, setCommentaire] = useState("");
 
-    // Charger les données au montage
+    // Charger les données depuis l'API
     useEffect(() => {
-        fetchData();
+        loadData();
     }, []);
 
-    const fetchData = async () => {
+    async function loadData() {
         try {
             setLoading(true);
-            const data = await getDirectorDashboardStats();
+            setError(null);
 
-            // Transformer les besoins pour l'affichage
-            const besoinsFormatted = data.besoins.map(b => ({
-                id: b.idBesoin || b.id,
-                description: b.motif || "Besoin",
-                service: b.service_demandeur || "Service",
-                demandeur: b.personnel_emetteur_nom || "Demandeur",
-                priorite: b.priorite === 'URGENT' ? 'urgente' : b.priorite === 'NORMAL' ? 'normale' : 'basse',
-                statut: b.statut === 'NON_TRAITE' ? 'en_attente' : b.statut === 'TRAITE' ? 'approuve' : b.statut === 'REJETE' ? 'rejete' : 'en_cours',
-                quantite: b.lignes?.length || 1,
-                dateDemande: b.date_creation_besoin?.split('T')[0] || new Date().toISOString().split('T')[0],
-                rawData: b
+            const besoinsData = await besoinApi.getAll();
+            const besoinsList = (besoinsData.results || besoinsData).map(b => ({
+                id: b.idBesoin,
+                code: b.code_besoin || `BES-${b.idBesoin}`,
+                motif: b.motif,
+                demandeurId: b.idPersonnel_emetteur,
+                demandeur: `Personnel #${b.idPersonnel_emetteur}`,
+                priorite: mapPriorite(b.priorite || "NORMAL"),
+                statut: mapStatut(b.statut),
+                dateDemande: b.date_creation_besoin?.split('T')[0] || '-',
+                commentaire: b.commentaire_directeur || ""
             }));
+            setBesoins(besoinsList);
 
-            setBesoins(besoinsFormatted);
-            setStats({
-                enAttente: data.enAttente + data.enCours,
-                approuves: data.approuves,
-                rejetes: data.rejetes,
-                total: data.total
-            });
         } catch (err) {
-            console.error("Erreur lors du chargement des données:", err);
-            // Fallback to mock data
-            setBesoins([
-                { id: "BES-2024-001", description: "Commande de 500 gants médicaux", service: "Service Médical", demandeur: "M. Dupont Michel", priorite: "urgente", statut: "en_attente", quantite: 500, dateDemande: "2024-12-22" },
-                { id: "BES-2024-002", description: "Besoin de 3 stéthoscopes", service: "Service Cardiologie", demandeur: "Dr. Fotso Marie", priorite: "haute", statut: "en_attente", quantite: 3, dateDemande: "2024-12-21" },
-            ]);
-            setStats({ enAttente: 2, approuves: 0, rejetes: 0, total: 2 });
+            console.error("Erreur lors du chargement des besoins:", err);
+            setError("Impossible de charger les besoins. Vérifiez que le backend est en cours d'exécution.");
         } finally {
             setLoading(false);
         }
-    };
+    }
 
-    // Approuver un besoin
-    const handleApprove = async (besoinId) => {
-        try {
-            setActionLoading(true);
-            await modifierStatutBesoin(besoinId, 'TRAITE');
-            if (commentaire) {
-                await ajouterCommentaireBesoin(besoinId, commentaire);
-            }
-            setShowDetailModal(false);
-            setCommentaire("");
-            await fetchData(); // Recharger les données
-            alert("Besoin approuvé avec succès !");
-        } catch (err) {
-            console.error("Erreur lors de l'approbation:", err);
-            alert("Erreur lors de l'approbation du besoin");
-        } finally {
-            setActionLoading(false);
-        }
-    };
+    function mapPriorite(priorite) {
+        const map = {
+            'HIGH': 'urgente',
+            'NORMAL': 'normale',
+            'LOW': 'basse'
+        };
+        return map[priorite] || 'normale';
+    }
 
-    // Rejeter un besoin
-    const handleReject = async (besoinId) => {
-        try {
-            setActionLoading(true);
-            await modifierStatutBesoin(besoinId, 'REJETE');
-            if (commentaire) {
-                await ajouterCommentaireBesoin(besoinId, commentaire);
-            }
-            setShowDetailModal(false);
-            setCommentaire("");
-            await fetchData(); // Recharger les données
-            alert("Besoin rejeté !");
-        } catch (err) {
-            console.error("Erreur lors du rejet:", err);
-            alert("Erreur lors du rejet du besoin");
-        } finally {
-            setActionLoading(false);
-        }
+    function mapStatut(statut) {
+        const map = {
+            'NON_TRAITE': 'en_attente',
+            'EN_COURS': 'en_attente',
+            'TRAITE': 'approuve',
+            'REJETE': 'rejete'
+        };
+        return map[statut] || 'en_attente';
+    }
+
+    // Statistiques
+    const stats = {
+        enAttente: besoins.filter(b => b.statut === "en_attente").length,
+        approuves: besoins.filter(b => b.statut === "approuve").length,
+        rejetes: besoins.filter(b => b.statut === "rejete").length,
+        total: besoins.length
     };
 
     function getPrioriteBadge(priorite) {
@@ -144,9 +117,72 @@ export function Director() {
         );
     }
 
-    function viewBesoinDetails(besoin) {
+    async function viewBesoinDetails(besoin) {
         setSelectedBesoin(besoin);
         setShowDetailModal(true);
+
+        // Charger les lignes de besoin si pas encore chargées
+        if (!lignesBesoins[besoin.id]) {
+            try {
+                const lignes = await ligneBesoinApi.getByBesoin(besoin.id);
+                const lignesList = (lignes.results || lignes).map(l => ({
+                    id: l.idLigneBesoin,
+                    materiel: l.materiel_nom,
+                    quantite: l.quantite_demandee,
+                    priorite: l.priorite,
+                    description: l.description_justification
+                }));
+                setLignesBesoins(prev => ({ ...prev, [besoin.id]: lignesList }));
+            } catch (err) {
+                console.error("Erreur lors du chargement des lignes:", err);
+            }
+        }
+    }
+
+    async function handleApprove(besoin) {
+        try {
+            setActionLoading(true);
+            await besoinApi.update(besoin.id, { statut: "TRAITE" });
+            setSuccessMessage(`Besoin ${besoin.code} approuvé avec succès !`);
+            setTimeout(() => setSuccessMessage(""), 3000);
+            setShowDetailModal(false);
+            await loadData();
+        } catch (err) {
+            console.error("Erreur lors de l'approbation:", err);
+            setError("Impossible d'approuver le besoin.");
+        } finally {
+            setActionLoading(false);
+        }
+    }
+
+    async function handleReject(besoin) {
+        try {
+            setActionLoading(true);
+            await besoinApi.update(besoin.id, { statut: "REJETE" });
+            setSuccessMessage(`Besoin ${besoin.code} rejeté.`);
+            setTimeout(() => setSuccessMessage(""), 3000);
+            setShowDetailModal(false);
+            await loadData();
+        } catch (err) {
+            console.error("Erreur lors du rejet:", err);
+            setError("Impossible de rejeter le besoin.");
+        } finally {
+            setActionLoading(false);
+        }
+    }
+
+    if (loading) {
+        return (
+            <DirectorDashBoard linkList={DirectorNavLink} requiredRole={"Director"}>
+                <DirectorNavBar />
+                <div className="flex items-center justify-center h-96">
+                    <div className="text-center">
+                        <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
+                        <p className="text-gray-600">Chargement des besoins...</p>
+                    </div>
+                </div>
+            </DirectorDashBoard>
+        );
     }
 
     return (
@@ -161,10 +197,29 @@ export function Director() {
                         <FaHome className="text-4xl text-primary-start" />
                         <div>
                             <h1 className="text-3xl font-bold text-gray-800">Tableau de Bord</h1>
-                            <p className="text-gray-500">Bienvenue, Dr. Kamdem Jean</p>
+                            <p className="text-gray-500">Gestion des besoins en matériel</p>
                         </div>
                     </div>
+                    <button
+                        onClick={loadData}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+                    >
+                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
+                    </button>
                 </div>
+
+                {error && (
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                        {error}
+                    </div>
+                )}
+
+                {successMessage && (
+                    <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
+                        <FaCheckCircle /> {successMessage}
+                    </div>
+                )}
 
                 {/* Statistiques */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -208,65 +263,72 @@ export function Director() {
                         </div>
                     </div>
 
-                    <div className="max-h-[500px] overflow-y-auto">
-                        <table className="w-full">
-                            <thead className="bg-gradient-to-r from-primary-start to-primary-end text-white sticky top-0">
-                                <tr>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold">Référence</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold">Description</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold">Service</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold">Priorité</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold">Statut</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold">Date</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                                {besoins.map((besoin, index) => (
-                                    <tr
-                                        key={besoin.id}
-                                        className={`hover:bg-primary-end/10 transition-all ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
-                                    >
-                                        <td className="px-4 py-3 font-mono font-semibold text-gray-800">
-                                            {besoin.id}
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-700 max-w-xs truncate">
-                                            {besoin.description}
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-600">
-                                            {besoin.service}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {getPrioriteBadge(besoin.priorite)}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex justify-center">
-                                                {getStatutBadge(besoin.statut)}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-center text-sm text-gray-500">
-                                            {besoin.dateDemande}
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <button
-                                                onClick={() => viewBesoinDetails(besoin)}
-                                                className="px-3 py-1 bg-primary-start text-white rounded-lg hover:opacity-80 transition-all text-sm flex items-center gap-1 mx-auto"
-                                            >
-                                                <FaEye /> Voir
-                                            </button>
-                                        </td>
+                    {besoins.length > 0 ? (
+                        <div className="max-h-[500px] overflow-y-auto">
+                            <table className="w-full">
+                                <thead className="bg-gradient-to-r from-primary-start to-primary-end text-white sticky top-0">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold">Référence</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold">Motif</th>
+                                        <th className="px-4 py-3 text-left text-sm font-semibold">Demandeur</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold">Priorité</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold">Statut</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold">Date</th>
+                                        <th className="px-4 py-3 text-center text-sm font-semibold">Action</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {besoins.map((besoin, index) => (
+                                        <tr
+                                            key={besoin.id}
+                                            className={`hover:bg-primary-end/10 transition-all ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
+                                        >
+                                            <td className="px-4 py-3 font-mono font-semibold text-gray-800">
+                                                {besoin.code}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-700 max-w-xs truncate">
+                                                {besoin.motif}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-600">
+                                                {besoin.demandeur}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                {getPrioriteBadge(besoin.priorite)}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex justify-center">
+                                                    {getStatutBadge(besoin.statut)}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-center text-sm text-gray-500">
+                                                {besoin.dateDemande}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <button
+                                                    onClick={() => viewBesoinDetails(besoin)}
+                                                    className="px-3 py-1 bg-primary-start text-white rounded-lg hover:opacity-80 transition-all text-sm flex items-center gap-1 mx-auto"
+                                                >
+                                                    <FaEye /> Voir
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="text-center py-12 text-gray-500">
+                            <FaClipboardList className="mx-auto text-5xl text-gray-300 mb-4" />
+                            <p>Aucun besoin enregistré</p>
+                        </div>
+                    )}
                 </div>
             </div>
 
             {/* Modal de détails */}
             {showDetailModal && selectedBesoin && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg mx-4">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-bold text-gray-800">Détails du Besoin</h2>
                             <button
@@ -278,31 +340,26 @@ export function Director() {
                         </div>
 
                         <div className="space-y-4">
-                            <div className="bg-gray-50 p-3 rounded-lg">
-                                <p className="text-sm text-gray-500">Référence</p>
-                                <p className="font-bold text-gray-800 font-mono">{selectedBesoin.id}</p>
-                            </div>
-
-                            <div className="bg-gray-50 p-3 rounded-lg">
-                                <p className="text-sm text-gray-500">Description</p>
-                                <p className="font-semibold text-gray-800">{selectedBesoin.description}</p>
-                            </div>
-
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gray-50 p-3 rounded-lg">
-                                    <p className="text-sm text-gray-500">Service demandeur</p>
-                                    <p className="font-semibold text-gray-800">{selectedBesoin.service}</p>
+                                    <p className="text-sm text-gray-500">Référence</p>
+                                    <p className="font-bold text-gray-800 font-mono">{selectedBesoin.code}</p>
                                 </div>
                                 <div className="bg-gray-50 p-3 rounded-lg">
-                                    <p className="text-sm text-gray-500">Demandeur</p>
-                                    <p className="font-semibold text-gray-800">{selectedBesoin.demandeur}</p>
+                                    <p className="text-sm text-gray-500">Date de demande</p>
+                                    <p className="font-semibold text-gray-800">{selectedBesoin.dateDemande}</p>
                                 </div>
+                            </div>
+
+                            <div className="bg-gray-50 p-3 rounded-lg">
+                                <p className="text-sm text-gray-500">Motif</p>
+                                <p className="font-semibold text-gray-800">{selectedBesoin.motif}</p>
                             </div>
 
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="bg-gray-50 p-3 rounded-lg">
-                                    <p className="text-sm text-gray-500">Quantité</p>
-                                    <p className="font-bold text-2xl text-primary-start">{selectedBesoin.quantite}</p>
+                                    <p className="text-sm text-gray-500">Demandeur</p>
+                                    <p className="font-semibold text-gray-800">{selectedBesoin.demandeur}</p>
                                 </div>
                                 <div className="bg-gray-50 p-3 rounded-lg">
                                     <p className="text-sm text-gray-500">Priorité</p>
@@ -314,41 +371,45 @@ export function Director() {
                                 </div>
                             </div>
 
-                            <div className="bg-gray-50 p-3 rounded-lg">
-                                <p className="text-sm text-gray-500">Date de demande</p>
-                                <p className="font-semibold text-gray-800">{selectedBesoin.dateDemande}</p>
-                            </div>
+                            {/* Lignes de besoin */}
+                            {lignesBesoins[selectedBesoin.id] && lignesBesoins[selectedBesoin.id].length > 0 && (
+                                <div className="bg-gray-50 p-4 rounded-lg">
+                                    <p className="text-sm text-gray-500 mb-3 font-semibold">Articles demandés :</p>
+                                    <div className="space-y-2">
+                                        {lignesBesoins[selectedBesoin.id].map((ligne, idx) => (
+                                            <div key={idx} className="bg-white p-3 rounded border flex justify-between items-center">
+                                                <div>
+                                                    <p className="font-medium">{ligne.materiel}</p>
+                                                    {ligne.description && (
+                                                        <p className="text-xs text-gray-500">{ligne.description}</p>
+                                                    )}
+                                                </div>
+                                                <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">
+                                                    x{ligne.quantite}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {selectedBesoin.statut === "en_attente" && (
-                                <div className="space-y-3 pt-4">
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                            Commentaire (optionnel)
-                                        </label>
-                                        <textarea
-                                            value={commentaire}
-                                            onChange={(e) => setCommentaire(e.target.value)}
-                                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
-                                            placeholder="Ajouter un commentaire..."
-                                            rows="2"
-                                        />
-                                    </div>
-                                    <div className="flex gap-3">
-                                        <button
-                                            onClick={() => handleApprove(selectedBesoin.id)}
-                                            disabled={actionLoading}
-                                            className="flex-1 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                        >
-                                            {actionLoading ? <FaSpinner className="animate-spin" /> : "✓"} Approuver
-                                        </button>
-                                        <button
-                                            onClick={() => handleReject(selectedBesoin.id)}
-                                            disabled={actionLoading}
-                                            className="flex-1 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                        >
-                                            {actionLoading ? <FaSpinner className="animate-spin" /> : "✕"} Rejeter
-                                        </button>
-                                    </div>
+                                <div className="flex gap-3 pt-4">
+                                    <button
+                                        onClick={() => handleApprove(selectedBesoin)}
+                                        disabled={actionLoading}
+                                        className="flex-1 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all font-semibold disabled:opacity-50"
+                                    >
+                                        {actionLoading ? <FaSpinner className="animate-spin inline mr-2" /> : null}
+                                        ✓ Approuver
+                                    </button>
+                                    <button
+                                        onClick={() => handleReject(selectedBesoin)}
+                                        disabled={actionLoading}
+                                        className="flex-1 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all font-semibold disabled:opacity-50"
+                                    >
+                                        ✕ Rejeter
+                                    </button>
                                 </div>
                             )}
 

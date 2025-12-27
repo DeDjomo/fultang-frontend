@@ -1,6 +1,7 @@
-import { ComptaMatiereDashBoard } from "./Components/ComptaMatiereDashboard";
-import { ComptaMatiereNavLink } from "./ComptaMatiereNavLink";
-import { ComptaMatiereNavBar } from "./Components/ComptaMatiereNavBar";
+import { AccountantDashBoard } from "./Components/AccountantDashboard";
+import { AccountantNavLink } from "./AccountantNavLink";
+import { AccountantNavBar } from "./Components/AccountantNavBar";
+import { useState, useEffect, useRef } from "react";
 import {
   FaBoxes,
   FaTruck,
@@ -13,22 +14,27 @@ import {
   FaCheckCircle,
   FaExclamationTriangle,
   FaSpinner,
+  FaSyncAlt
 } from "react-icons/fa";
 import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
-import { useState, useRef, useEffect } from "react";
-import { getDashboardStats, getAllBesoins } from "../../services/comptabiliteMatiereApi";
+import {
+  materielMedicalApi,
+  materielDurableApi,
+  sortieApi,
+  livraisonApi,
+  besoinApi,
+  ligneBesoinApi
+} from "../../services/comptabiliteMatiereApi";
 
 export function Accountant() {
   const navigate = useNavigate();
   const besoinsRef = useRef(null);
 
-  // Fonction pour scroller vers la section des besoins
-  const scrollToBesoins = () => {
-    besoinsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // États pour les données
+  // Statistiques depuis l'API
   const [stats, setStats] = useState({
     totalMaterial: 0,
     totalMedical: 0,
@@ -38,63 +44,111 @@ export function Accountant() {
     totalDurable: 0,
   });
 
+  // Liste des besoins en cours depuis l'API
   const [besoinsEnCours, setBesoinsEnCours] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  // Charger les données au montage
+  // Charger les données
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Récupérer les stats et les besoins en parallèle
-        const [statsData, besoinsData] = await Promise.all([
-          getDashboardStats(),
-          getAllBesoins()
-        ]);
-
-        setStats(statsData);
-
-        // Transformer les besoins pour l'affichage
-        const besoins = besoinsData.results || besoinsData;
-        const besoinsFormatted = besoins
-          .filter(b => b.statut === 'NON_TRAITE' || b.statut === 'EN_COURS')
-          .map(b => ({
-            id: b.idBesoin || b.id,
-            departement: b.service_demandeur || "Service",
-            description: b.motif || "Besoin",
-            quantite: b.lignes?.length || 1,
-            priorite: b.priorite === 'URGENT' ? 'haute' : b.priorite === 'NORMAL' ? 'moyenne' : 'basse',
-            dateEmission: b.date_creation_besoin?.split('T')[0] || new Date().toISOString().split('T')[0],
-            statut: b.statut === 'NON_TRAITE' ? 'en_attente' : 'en_cours',
-          }));
-
-        setBesoinsEnCours(besoinsFormatted);
-      } catch (err) {
-        console.error("Erreur lors du chargement des données:", err);
-        setError("Impossible de charger les données. Veuillez réessayer.");
-        // Fallback to mock data if API fails
-        setStats({
-          totalMaterial: 156,
-          totalMedical: 89,
-          totalOutputs: 128,
-          pendingNeeds: 23,
-          totalDeliveries: 45,
-          totalDurable: 67,
-        });
-        setBesoinsEnCours([
-          { id: 1, departement: "Service Cardiologie", description: "Moniteurs cardiaques portables", quantite: 5, priorite: "haute", dateEmission: "2024-12-20", statut: "en_attente" },
-          { id: 2, departement: "Pharmacie", description: "Seringues stériles 10ml", quantite: 500, priorite: "moyenne", dateEmission: "2024-12-19", statut: "en_cours" },
-        ]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    loadData();
   }, []);
+
+  async function loadData() {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Charger les matériels médicaux
+      const medicauxData = await materielMedicalApi.getAll();
+      const medicaux = medicauxData.results || medicauxData;
+
+      // Charger les matériels durables
+      const durablesData = await materielDurableApi.getAll();
+      const durables = durablesData.results || durablesData;
+
+      // Charger les sorties
+      const sortiesData = await sortieApi.getAll();
+      const sorties = sortiesData.results || sortiesData;
+
+      // Charger les livraisons
+      const livraisonsData = await livraisonApi.getAll();
+      const livraisons = livraisonsData.results || livraisonsData;
+
+      // Charger les besoins
+      const besoinsData = await besoinApi.getAll();
+      const besoins = besoinsData.results || besoinsData;
+
+      // Calculer les statistiques
+      setStats({
+        totalMaterial: medicaux.length + durables.length,
+        totalMedical: medicaux.length,
+        totalOutputs: sorties.length,
+        pendingNeeds: besoins.filter(b => b.statut === 'NON_TRAITE' || b.statut === 'EN_COURS').length,
+        totalDeliveries: livraisons.length,
+        totalDurable: durables.length,
+      });
+
+      // Récupérer les besoins en cours avec leurs lignes
+      const besoinsNonTraites = besoins.filter(b => b.statut === 'NON_TRAITE' || b.statut === 'EN_COURS');
+      const besoinsFormates = await Promise.all(
+        besoinsNonTraites.slice(0, 10).map(async (b) => {
+          let lignes = [];
+          try {
+            const lignesData = await ligneBesoinApi.getByBesoin(b.idBesoin);
+            lignes = lignesData.results || lignesData;
+          } catch {
+            // Ignorer les erreurs de chargement des lignes
+          }
+
+          const quantiteTotal = lignes.reduce((sum, l) => sum + (l.quantite_demandee || 0), 0);
+          const description = lignes.length > 0
+            ? lignes.map(l => l.materiel_nom).join(', ')
+            : b.motif;
+
+          return {
+            id: b.idBesoin,
+            code: b.code_besoin || `BES-${b.idBesoin}`,
+            departement: `Personnel #${b.idPersonnel_emetteur}`,
+            description: description || b.motif || 'Non spécifié',
+            quantite: quantiteTotal || lignes.length || 1,
+            priorite: mapPriorite(b.priorite),
+            dateEmission: b.date_creation_besoin?.split('T')[0] || '-',
+            statut: mapStatut(b.statut),
+          };
+        })
+      );
+
+      setBesoinsEnCours(besoinsFormates);
+
+    } catch (err) {
+      console.error("Erreur lors du chargement:", err);
+      setError("Impossible de charger les données. Vérifiez que le backend est en cours d'exécution.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function mapPriorite(priorite) {
+    const map = {
+      'HIGH': 'haute',
+      'NORMAL': 'moyenne',
+      'LOW': 'basse'
+    };
+    return map[priorite] || 'moyenne';
+  }
+
+  function mapStatut(statut) {
+    const map = {
+      'NON_TRAITE': 'en_attente',
+      'EN_COURS': 'en_cours',
+      'TRAITE': 'traite',
+      'REJETE': 'traite'
+    };
+    return map[statut] || 'en_attente';
+  }
+
+  const scrollToBesoins = () => {
+    besoinsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const quickActions = [
     {
@@ -127,16 +181,43 @@ export function Accountant() {
     },
   ];
 
+  if (loading) {
+    return (
+      <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"ComptaMatiere"}>
+        <AccountantNavBar />
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
+            <p className="text-gray-600">Chargement des données...</p>
+          </div>
+        </div>
+      </AccountantDashBoard>
+    );
+  }
+
   return (
-    <ComptaMatiereDashBoard
-      linkList={ComptaMatiereNavLink}
-      requiredRole={"Accountant"}
+    <AccountantDashBoard
+      linkList={AccountantNavLink}
+      requiredRole={"ComptaMatiere"}
     >
-      <ComptaMatiereNavBar />
+      <AccountantNavBar />
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-800">Tableau de Bord - Comptable Matière</h1>
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+          >
+            <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
+          </button>
         </div>
+
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+            {error}
+          </div>
+        )}
 
         {/* Statistiques principales */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -215,41 +296,48 @@ export function Accountant() {
               {besoinsEnCours.length} besoins
             </span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">ID</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Département</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Description</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Quantité</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Priorité</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Date</th>
-                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Statut</th>
-                </tr>
-              </thead>
-              <tbody>
-                {besoinsEnCours.map((besoin) => (
-                  <tr key={besoin.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-sm text-gray-800 font-medium">#{besoin.id}</td>
-                    <td className="px-4 py-3 text-sm text-gray-800">{besoin.departement}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{besoin.description}</td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-800 font-semibold">{besoin.quantite}</td>
-                    <td className="px-4 py-3 text-center">
-                      <PrioriteBadge priorite={besoin.priorite} />
-                    </td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-500">{besoin.dateEmission}</td>
-                    <td className="px-4 py-3 text-center">
-                      <StatutBadge statut={besoin.statut} />
-                    </td>
+          {besoinsEnCours.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">ID</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Émetteur</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Description</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Quantité</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Priorité</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Date</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Statut</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {besoinsEnCours.map((besoin) => (
+                    <tr key={besoin.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 text-sm text-gray-800 font-medium font-mono">{besoin.code}</td>
+                      <td className="px-4 py-3 text-sm text-gray-800">{besoin.departement}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{besoin.description}</td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-800 font-semibold">{besoin.quantite}</td>
+                      <td className="px-4 py-3 text-center">
+                        <PrioriteBadge priorite={besoin.priorite} />
+                      </td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-500">{besoin.dateEmission}</td>
+                      <td className="px-4 py-3 text-center">
+                        <StatutBadge statut={besoin.statut} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <FaClipboardList className="mx-auto text-4xl text-gray-300 mb-3" />
+              <p>Aucun besoin en attente</p>
+            </div>
+          )}
         </div>
       </div>
-    </ComptaMatiereDashBoard>
+    </AccountantDashBoard>
   );
 }
 

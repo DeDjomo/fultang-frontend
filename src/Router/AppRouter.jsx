@@ -19,10 +19,7 @@ export function AppRoute() {
     const ConsultationHistoryPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/ConsultationHistory.jsx")).ConsultationHistory }));
     const HelpCenterPage = React.lazy(async () => ({ default: (await import("../Pages/HelpCenter/HelpCenter.jsx")).HelpCenter }));
     const PatientDetailsPage = React.lazy(async () => ({ default: (await import("../Pages/Nurse/PatientParameters.jsx")).PatientParameters }));
-    const PharmacyPage = React.lazy(async () => ({ default: (await import("../Pages/Pharmacy/Pharmacy.jsx")).Pharmacy }));
-    const PharmacyHistoryPage = React.lazy(async () => ({ default: (await import("../Pages/Pharmacy/PharmacyHistory.jsx")).PharmacyHistory }));
-    const PharmacyReportsPage = React.lazy(async () => ({ default: (await import("../Pages/Pharmacy/PharmacyReports.jsx")).PharmacyReports }));
-    const PharmacyNeedsPage = React.lazy(async () => ({ default: (await import("../Pages/Pharmacy/PharmacyNeeds.jsx")).PharmacyNeeds }));
+
     const ReceptionistPage = React.lazy(async () => ({ default: (await import("../Pages/Receptionist/Receptionist.jsx")).Receptionist }));
     /*const LaboratoryAssistantPage = React.lazy(async () => ({default: (await import("../Pages/Laboratory/LaboratoryAssistant.jsx")).LaboratoryAssistant}));*/
     const CashierPage = React.lazy(async () => ({ default: (await import("../Pages/Cashier/Cashier.jsx")).Cashier }));
@@ -63,7 +60,7 @@ export function AppRoute() {
 
     const FinancialContributions = React.lazy(async () => ({ default: (await import("../Pages/Accountant/FinancialContribution.jsx")).FinancialContributions, }));
     const FinancialReportsAccountant = React.lazy(async () => ({ default: (await import("../Pages/Accountant/FinancialReports.jsx")).FinancialReports, }));
-    const PharmacyMedication = React.lazy(async () => ({ default: (await import("../Pages/Pharmacy/PharmacyMedication.jsx")).PharmacyMedication, }));
+
     const CreateFactureAccountant = React.lazy(async () => ({ default: (await import("../Pages/Accountant/CreateFacture.jsx")).CreateFacturePage, }));
 
     const LaboratoryHomePage = React.lazy(async () => ({ default: (await import("../Pages/Laboratory/LaboratoryHomePage.jsx")).LaboratoryHomePage, }));
@@ -98,6 +95,7 @@ export function AppRoute() {
 
     // Pharmacist components
     const PharmacistDashboard = React.lazy(async () => ({ default: (await import("../Pages/Pharmacist/PharmacistHome.jsx")).PharmacistHome }));
+    const PharmacistMedicationList = React.lazy(async () => ({ default: (await import("../Pages/Pharmacist/PharmacistMedicationList.jsx")).PharmacistMedicationList }));
     const PharmacistEmitNeed = React.lazy(async () => ({ default: (await import("../Pages/Pharmacist/PharmacistEmitNeed.jsx")).PharmacistEmitNeed }));
     const PharmacistDailySales = React.lazy(async () => ({ default: (await import("../Pages/Pharmacist/PharmacistDailySales.jsx")).PharmacistDailySales }));
     const PharmacistInventory = React.lazy(async () => ({ default: (await import("../Pages/Pharmacist/PharmacistInventory.jsx")).PharmacistInventory }));
@@ -117,10 +115,7 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.nurseWaitingRoomPage} element={<NurseWaitingRoomPage />} />
                 <Route path="/nurse/patient-management" element={<PatientManagementPage />} />
                 <Route path={AppRoutesPaths.nurseAppointmentsPage} element={<NurseAppointmentsPage />} />
-                <Route path={AppRoutesPaths.pharmacyPage} element={<PharmacyPage />} />
-                <Route path={AppRoutesPaths.pharmacyHistoryPage} element={<PharmacyHistoryPage />} />
-                <Route path={AppRoutesPaths.pharmacyReportsPage} element={<PharmacyReportsPage />} />
-                <Route path={AppRoutesPaths.pharmacyNeedsPage} element={<PharmacyNeedsPage />} />
+
                 <Route path={AppRoutesPaths.consultationHistoryPage} element={<ConsultationHistoryPage />} />
                 <Route path={AppRoutesPaths.helpCenterPage} element={<HelpCenterPage />} />
                 <Route path={AppRoutesPaths.patientDetailsPage} element={<PatientDetailsPage />} />
@@ -165,7 +160,7 @@ export function AppRoute() {
 
                 <Route path={AppRoutesPaths.financialContributions} element={<FinancialContributions />} />
                 <Route path={AppRoutesPaths.financialReportsAccountant} element={<FinancialReportsAccountant />} />
-                <Route path={AppRoutesPaths.PharmacyMedication} element={<PharmacyMedication />} />
+
                 <Route path={AppRoutesPaths.createFactureAccountant} element={<CreateFactureAccountant />} />
 
                 <Route path={AppRoutesPaths.laboratoryAssistantPage} element={<LaboratoryHomePage />} />
@@ -200,6 +195,7 @@ export function AppRoute() {
 
                 {/* Pharmacist Routes */}
                 <Route path={AppRoutesPaths.pharmacistDashboard} element={<PharmacistDashboard />} />
+                <Route path={AppRoutesPaths.pharmacistMedicationList} element={<PharmacistMedicationList />} />
                 <Route path={AppRoutesPaths.pharmacistEmitNeed} element={<PharmacistEmitNeed />} />
                 <Route path={AppRoutesPaths.pharmacistDailySales} element={<PharmacistDailySales />} />
                 <Route path={AppRoutesPaths.pharmacistInventory} element={<PharmacistInventory />} />

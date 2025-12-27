@@ -1,7 +1,7 @@
 import { DirectorDashBoard } from "./Components/DirectorDashboard";
 import { DirectorNavLink } from "./DirectorNavLink";
 import { DirectorNavBar } from "./Components/DirectorNavBar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     FaFileAlt,
     FaPaperPlane,
@@ -10,134 +10,143 @@ import {
     FaTimes,
     FaInbox,
     FaEnvelope,
-    FaUser
+    FaUser,
+    FaSpinner,
+    FaSyncAlt,
+    FaCheckCircle
 } from "react-icons/fa";
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
+import { rapportApi } from "../../services/comptabiliteMatiereApi";
 
 export function DirectorReports() {
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState(null);
+    const [successMessage, setSuccessMessage] = useState("");
+
     // État pour le formulaire de nouveau rapport
     const [reportForm, setReportForm] = useState({
         objet: "",
-        concerne: "",
+        destinataire: "",
         corps: ""
     });
 
-    // Liste du personnel de l'hôpital (mockée)
-    const personnelList = [
-        { id: "ADMIN-001", name: "M. Nkongo Paul", role: "Administrateur" },
-        { id: "MED-001", name: "Dr. Fotso Marie", role: "Médecin Chef" },
-        { id: "PHARM-001", name: "Mme. Tchuente Claire", role: "Pharmacienne" },
-        { id: "LAB-001", name: "M. Biya Charles", role: "Chef Laboratoire" },
-        { id: "COMPT-001", name: "M. Dupont Michel", role: "Comptable Matière" },
-        { id: "FIN-001", name: "Mme. Lefebvre Anne", role: "Comptable Financier" },
-        { id: "RH-001", name: "M. Martin Pierre", role: "Ressources Humaines" },
-    ];
+    // ID du directeur connecté
+    const currentUserId = parseInt(localStorage.getItem("personnel_id") || "1");
+    const currentUserName = localStorage.getItem("user_name") || "Directeur";
 
-    // ID du directeur connecté (simulé)
-    const currentUserId = "DIR-001";
-    const currentUserName = "Dr. Kamdem Jean";
-
-    // Rapports envoyés par le directeur
-    const [sentReports, setSentReports] = useState([
-        {
-            id: "RPT-2024-010",
-            objet: "Validation",
-            concerne: "COMPT-001",
-            concerneName: "M. Dupont Michel",
-            corps: "Suite à votre rapport sur le stock de gants médicaux, je vous autorise à passer une commande urgente de 500 unités. Veuillez contacter le fournisseur habituel et me transmettre le bon de commande pour validation.",
-            dateEnvoi: "2024-12-21",
-            expediteur: currentUserId
-        },
-        {
-            id: "RPT-2024-011",
-            objet: "Directive",
-            concerne: "ADMIN-001",
-            concerneName: "M. Nkongo Paul",
-            corps: "Veuillez organiser une réunion du comité de gestion pour le 28 décembre 2024. L'ordre du jour portera sur le bilan annuel et les prévisions budgétaires 2025.",
-            dateEnvoi: "2024-12-20",
-            expediteur: currentUserId
-        }
-    ]);
-
-    // Rapports reçus par le directeur
-    const [receivedReports, setReceivedReports] = useState([
-        {
-            id: "RPT-2024-001",
-            objet: "Stock",
-            concerne: currentUserId,
-            concerneName: currentUserName,
-            corps: "Suite à l'inventaire effectué ce jour, je vous informe que le stock de gants médicaux est critique. Il reste seulement 50 unités alors que la consommation mensuelle moyenne est de 200 unités. Je recommande une commande urgente.",
-            dateEnvoi: "2024-12-20",
-            expediteur: "COMPT-001",
-            expediteurName: "M. Dupont Michel",
-            isRead: true
-        },
-        {
-            id: "RPT-2024-012",
-            objet: "Budget",
-            concerne: currentUserId,
-            concerneName: currentUserName,
-            corps: "Je vous transmets le rapport financier du mois de décembre. Les dépenses sont en hausse de 15% par rapport au mois précédent, principalement dues aux achats de matériel médical.",
-            dateEnvoi: "2024-12-22",
-            expediteur: "FIN-001",
-            expediteurName: "Mme. Lefebvre Anne",
-            isRead: false
-        },
-        {
-            id: "RPT-2024-013",
-            objet: "Urgence",
-            concerne: currentUserId,
-            concerneName: currentUserName,
-            corps: "Nous avons besoin urgemment de 3 nouveaux stéthoscopes pour le service cardiologie. Les équipements actuels présentent des défauts et ne permettent plus un diagnostic précis.",
-            dateEnvoi: "2024-12-23",
-            expediteur: "MED-001",
-            expediteurName: "Dr. Fotso Marie",
-            isRead: false
-        }
-    ]);
+    // Rapports depuis l'API
+    const [sentReports, setSentReports] = useState([]);
+    const [receivedReports, setReceivedReports] = useState([]);
 
     // État pour le modal de détails
     const [selectedReport, setSelectedReport] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
 
-    function generateReportId() {
-        const year = new Date().getFullYear();
-        const allReports = [...sentReports, ...receivedReports];
-        const existingThisYear = allReports.filter(r => r.id.includes(`RPT-${year}`));
-        const nextNumber = existingThisYear.length + 1;
-        return `RPT-${year}-${String(nextNumber).padStart(3, '0')}`;
+    // Charger les données
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    async function loadData() {
+        try {
+            setLoading(true);
+            setError(null);
+
+            const rapportsData = await rapportApi.getAll();
+            const rapports = rapportsData.results || rapportsData;
+
+            // Filtrer les rapports envoyés par le directeur
+            const sent = rapports.filter(r => r.expediteur === currentUserId);
+            setSentReports(sent.map(formatReport));
+
+            // Filtrer les rapports reçus par le directeur
+            const received = rapports.filter(r => r.destinataire === currentUserId);
+            setReceivedReports(received.map(r => ({ ...formatReport(r), isRead: r.est_lu })));
+
+        } catch (err) {
+            console.error("Erreur lors du chargement des rapports:", err);
+            setError("Impossible de charger les rapports. Vérifiez que le backend est en cours d'exécution.");
+        } finally {
+            setLoading(false);
+        }
     }
 
-    function handleSubmitReport(e) {
+    function formatReport(r) {
+        return {
+            id: r.code_rapport || `RPT-${r.idRapport}`,
+            idRapport: r.idRapport,
+            objet: r.objet,
+            corps: r.corps,
+            dateEnvoi: r.date_creation?.split('T')[0] || new Date().toISOString().split('T')[0],
+            expediteur: r.expediteur,
+            expediteurName: `Personnel #${r.expediteur}`,
+            destinataire: r.destinataire,
+            destinataireName: `Personnel #${r.destinataire}`,
+            type: r.type_rapport,
+            concerneName: `Personnel #${r.destinataire}`,
+            concerne: r.destinataire
+        };
+    }
+
+    async function handleSubmitReport(e) {
         e.preventDefault();
 
-        const concernedPerson = personnelList.find(p => p.id === reportForm.concerne);
+        if (!reportForm.destinataire) {
+            setError("Veuillez saisir l'ID du destinataire.");
+            return;
+        }
 
-        const newReport = {
-            id: generateReportId(),
-            objet: reportForm.objet,
-            concerne: reportForm.concerne,
-            concerneName: concernedPerson ? concernedPerson.name : "",
-            corps: reportForm.corps,
-            dateEnvoi: new Date().toISOString().split('T')[0],
-            expediteur: currentUserId
-        };
+        try {
+            setSubmitting(true);
+            setError(null);
 
-        setSentReports([newReport, ...sentReports]);
-        setReportForm({ objet: "", concerne: "", corps: "" });
-        alert("Rapport envoyé avec succès !");
+            const now = new Date();
+            const year = now.getFullYear();
+            const existingCount = sentReports.length + receivedReports.length;
+            const codeRapport = `RPT-${year}-${String(existingCount + 1).padStart(3, '0')}`;
+
+            const newReportData = {
+                code_rapport: codeRapport,
+                objet: reportForm.objet,
+                corps: reportForm.corps,
+                type_rapport: "GENERAL",
+                expediteur: currentUserId,
+                destinataire: parseInt(reportForm.destinataire),
+                date_creation: now.toISOString().split('T')[0],
+                est_lu: false
+            };
+
+            await rapportApi.create(newReportData);
+
+            setSuccessMessage("Rapport envoyé avec succès !");
+            setTimeout(() => setSuccessMessage(""), 3000);
+            setReportForm({ objet: "", destinataire: "", corps: "" });
+            await loadData();
+
+        } catch (err) {
+            console.error("Erreur lors de l'envoi:", err);
+            setError("Erreur lors de l'envoi du rapport. Veuillez réessayer.");
+        } finally {
+            setSubmitting(false);
+        }
     }
 
-    function viewReportDetails(report, isReceived = false) {
+    async function viewReportDetails(report, isReceived = false) {
         setSelectedReport({ ...report, isReceived });
         setShowDetailModal(true);
 
         // Si c'est un rapport reçu et non lu, le marquer comme lu
-        if (isReceived && !report.isRead) {
-            setReceivedReports(receivedReports.map(r =>
-                r.id === report.id ? { ...r, isRead: true } : r
-            ));
+        if (isReceived && !report.isRead && report.idRapport) {
+            try {
+                await rapportApi.patch(report.idRapport, { est_lu: true });
+                setReceivedReports(prev => prev.map(r =>
+                    r.id === report.id ? { ...r, isRead: true } : r
+                ));
+            } catch (err) {
+                console.error("Erreur lors du marquage:", err);
+            }
         }
     }
 
@@ -147,7 +156,6 @@ export function DirectorReports() {
         const margin = 20;
         const maxWidth = pageWidth - 2 * margin;
 
-        // En-tête
         doc.setFontSize(18);
         doc.setTextColor(26, 115, 163);
         doc.text("FULTANG CLINIC", pageWidth / 2, 20, { align: "center" });
@@ -156,12 +164,10 @@ export function DirectorReports() {
         doc.setTextColor(80, 194, 185);
         doc.text("Rapport Officiel", pageWidth / 2, 28, { align: "center" });
 
-        // Ligne de séparation
         doc.setDrawColor(80, 194, 185);
         doc.setLineWidth(0.5);
         doc.line(margin, 35, pageWidth - margin, 35);
 
-        // Informations du rapport
         doc.setFontSize(10);
         doc.setTextColor(0);
 
@@ -186,22 +192,20 @@ export function DirectorReports() {
 
         yPos += 12;
         doc.setFont(undefined, 'bold');
-        doc.text("Expéditeur (ID):", margin, yPos);
+        doc.text("Expéditeur:", margin, yPos);
         doc.setFont(undefined, 'normal');
-        doc.text(isReceived ? report.expediteur : currentUserId, margin + 40, yPos);
+        doc.text(isReceived ? report.expediteurName : currentUserName, margin + 40, yPos);
 
         yPos += 8;
         doc.setFont(undefined, 'bold');
-        doc.text("Destinataire (ID):", margin, yPos);
+        doc.text("Destinataire:", margin, yPos);
         doc.setFont(undefined, 'normal');
-        doc.text(report.concerne, margin + 45, yPos);
+        doc.text(report.concerneName || report.destinataireName, margin + 45, yPos);
 
-        // Ligne de séparation
         yPos += 10;
         doc.setDrawColor(200);
         doc.line(margin, yPos, pageWidth - margin, yPos);
 
-        // Corps du rapport
         yPos += 15;
         doc.setFont(undefined, 'bold');
         doc.setFontSize(12);
@@ -211,21 +215,18 @@ export function DirectorReports() {
         doc.setFont(undefined, 'normal');
         doc.setFontSize(11);
 
-        // Diviser le texte en lignes pour le wrapper
         const lines = doc.splitTextToSize(report.corps, maxWidth);
         doc.text(lines, margin, yPos);
 
-        // Pied de page
         const pageHeight = doc.internal.pageSize.getHeight();
         doc.setDrawColor(80, 194, 185);
         doc.line(margin, pageHeight - 25, pageWidth - margin, pageHeight - 25);
 
         doc.setFontSize(9);
         doc.setTextColor(100);
-        doc.text(`Document généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, margin, pageHeight - 18);
+        doc.text(`Document généré le ${new Date().toLocaleDateString('fr-FR')}`, margin, pageHeight - 18);
         doc.text("Fultang Clinic - Direction", pageWidth - margin, pageHeight - 18, { align: "right" });
 
-        // Télécharger
         doc.save(`rapport_${report.id}.pdf`);
     }
 
@@ -234,7 +235,6 @@ export function DirectorReports() {
         const pageWidth = doc.internal.pageSize.getWidth();
         const margin = 14;
 
-        // Titre
         doc.setFontSize(16);
         doc.setTextColor(26, 115, 163);
         doc.text("Liste des Rapports Envoyés", pageWidth / 2, 20, { align: "center" });
@@ -310,6 +310,20 @@ export function DirectorReports() {
         doc.save(`rapports_recus_${new Date().toISOString().split('T')[0]}.pdf`);
     }
 
+    if (loading) {
+        return (
+            <DirectorDashBoard linkList={DirectorNavLink} requiredRole={"Director"}>
+                <DirectorNavBar />
+                <div className="flex items-center justify-center h-96">
+                    <div className="text-center">
+                        <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
+                        <p className="text-gray-600">Chargement des rapports...</p>
+                    </div>
+                </div>
+            </DirectorDashBoard>
+        );
+    }
+
     return (
         <DirectorDashBoard
             linkList={DirectorNavLink}
@@ -322,7 +336,26 @@ export function DirectorReports() {
                         <FaFileAlt className="text-4xl text-primary-start" />
                         <h1 className="text-3xl font-bold text-gray-800">Gestion des Rapports</h1>
                     </div>
+                    <button
+                        onClick={loadData}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+                    >
+                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
+                    </button>
                 </div>
+
+                {error && (
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                        {error}
+                    </div>
+                )}
+
+                {successMessage && (
+                    <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
+                        <FaCheckCircle /> {successMessage}
+                    </div>
+                )}
 
                 {/* Formulaire de saisie d'un rapport */}
                 <div className="bg-white rounded-lg shadow-lg p-6">
@@ -349,21 +382,18 @@ export function DirectorReports() {
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Concerné *
+                                    ID Destinataire *
                                 </label>
-                                <select
-                                    value={reportForm.concerne}
-                                    onChange={(e) => setReportForm({ ...reportForm, concerne: e.target.value })}
+                                <input
+                                    type="number"
+                                    value={reportForm.destinataire}
+                                    onChange={(e) => setReportForm({ ...reportForm, destinataire: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
+                                    placeholder="Saisir l'ID du destinataire (ex: 1, 2, 3...)"
                                     required
-                                >
-                                    <option value="">Sélectionner un destinataire</option>
-                                    {personnelList.map(person => (
-                                        <option key={person.id} value={person.id}>
-                                            {person.name} - {person.role}
-                                        </option>
-                                    ))}
-                                </select>
+                                    min="1"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">ID du personnel destinataire</p>
                             </div>
                         </div>
                         <div>
@@ -382,9 +412,11 @@ export function DirectorReports() {
                         <div className="flex justify-end">
                             <button
                                 type="submit"
-                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all"
+                                disabled={submitting}
+                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
                             >
-                                <FaPaperPlane /> Envoyer
+                                {submitting ? <FaSpinner className="animate-spin" /> : <FaPaperPlane />}
+                                Envoyer
                             </button>
                         </div>
                     </form>
@@ -397,11 +429,12 @@ export function DirectorReports() {
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                 <FaPaperPlane className="text-blue-500" />
-                                Rapports Envoyés
+                                Rapports Envoyés ({sentReports.length})
                             </h2>
                             <button
                                 onClick={exportAllSentToPDF}
-                                className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm"
+                                disabled={sentReports.length === 0}
+                                className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm disabled:opacity-50"
                             >
                                 <FaFilePdf /> Exporter PDF
                             </button>
@@ -428,7 +461,7 @@ export function DirectorReports() {
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                 <FaInbox className="text-green-500" />
-                                Rapports Reçus
+                                Rapports Reçus ({receivedReports.length})
                                 {receivedReports.filter(r => !r.isRead).length > 0 && (
                                     <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
                                         {receivedReports.filter(r => !r.isRead).length} nouveau(x)
@@ -437,7 +470,8 @@ export function DirectorReports() {
                             </h2>
                             <button
                                 onClick={exportAllReceivedToPDF}
-                                className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm"
+                                disabled={receivedReports.length === 0}
+                                className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm disabled:opacity-50"
                             >
                                 <FaFilePdf /> Exporter PDF
                             </button>
@@ -505,16 +539,12 @@ export function DirectorReports() {
                                     <p className="font-bold text-gray-800">
                                         {selectedReport.isReceived ? selectedReport.expediteurName : "Vous"}
                                     </p>
-                                    <p className="text-xs text-gray-500">
-                                        ID: {selectedReport.isReceived ? selectedReport.expediteur : currentUserId}
-                                    </p>
                                 </div>
                                 <div className="bg-green-50 p-3 rounded-lg">
                                     <p className="text-sm text-green-600 flex items-center gap-1">
                                         <FaUser /> Destinataire
                                     </p>
                                     <p className="font-bold text-gray-800">{selectedReport.concerneName}</p>
-                                    <p className="text-xs text-gray-500">ID: {selectedReport.concerne}</p>
                                 </div>
                             </div>
 
@@ -560,8 +590,8 @@ function ReportCard({ report, type, onView, onExport }) {
 
     return (
         <div className={`p-4 rounded-lg border-2 transition-all ${isUnread
-                ? 'border-green-400 bg-green-50'
-                : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+            ? 'border-green-400 bg-green-50'
+            : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
             }`}>
             <div className="flex justify-between items-start mb-2">
                 <div>
@@ -570,6 +600,11 @@ function ReportCard({ report, type, onView, onExport }) {
                         <span className="px-2 py-0.5 bg-primary-end/20 text-primary-start text-xs rounded-full font-semibold">
                             {report.objet}
                         </span>
+                        {isUnread && (
+                            <span className="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">
+                                Nouveau
+                            </span>
+                        )}
                     </div>
                     <p className="text-sm text-gray-600 mt-1">
                         {type === 'sent' ? `À: ${report.concerneName}` : `De: ${report.expediteurName}`}
@@ -584,8 +619,8 @@ function ReportCard({ report, type, onView, onExport }) {
                 <button
                     onClick={onView}
                     className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${isUnread
-                            ? 'bg-green-500 text-white hover:bg-green-600'
-                            : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                        ? 'bg-green-500 text-white hover:bg-green-600'
+                        : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
                         }`}
                 >
                     <FaEye /> Voir

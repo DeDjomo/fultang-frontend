@@ -1,6 +1,6 @@
-import { ComptaMatiereDashBoard } from "./Components/ComptaMatiereDashboard";
-import { ComptaMatiereNavLink } from "./ComptaMatiereNavLink";
-import { ComptaMatiereNavBar } from "./Components/ComptaMatiereNavBar";
+import { AccountantDashBoard } from "./Components/AccountantDashboard";
+import { AccountantNavLink } from "./AccountantNavLink";
+import { AccountantNavBar } from "./Components/AccountantNavBar";
 import { useState, useEffect } from "react";
 import {
     FaSearch,
@@ -11,85 +11,83 @@ import {
     FaTools,
     FaInfoCircle,
     FaCalendarAlt,
-    FaMapMarkerAlt,
     FaMoneyBillWave,
     FaBarcode,
     FaFilePdf,
-    FaSpinner
+    FaSpinner,
+    FaSyncAlt
 } from "react-icons/fa";
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
-import { getAllMaterielsMedicaux, getAllMaterielsDurables } from "../../services/comptabiliteMatiereApi";
+import { materielMedicalApi, materielDurableApi } from "../../services/comptabiliteMatiereApi";
 
 export function MaterialList() {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [filterCategory, setFilterCategory] = useState("all");
-    const [loading, setLoading] = useState(true);
 
     // État pour le modal de détails
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedMaterial, setSelectedMaterial] = useState(null);
 
-    // Données des matériels
+    // Données depuis l'API
     const [materials, setMaterials] = useState([]);
 
-    // Charger les données au montage
+    // Charger les données depuis l'API
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-
-                // Récupérer les matériels médicaux et durables en parallèle
-                const [medicaux, durables] = await Promise.all([
-                    getAllMaterielsMedicaux(),
-                    getAllMaterielsDurables()
-                ]);
-
-                // Transformer les données
-                const medList = (medicaux.results || medicaux).map(m => ({
-                    id: m.idMateriel || m.id,
-                    code: m.code || `MED-${m.idMateriel}`,
-                    name: m.nom_Materiel || m.name,
-                    category: "Matériel Médical",
-                    quantity: m.quantite_stock || 0,
-                    unit: m.unite_mesure || "Unité",
-                    lastUpdate: m.date_derniere_modification?.split('T')[0] || new Date().toISOString().split('T')[0],
-                    location: m.emplacement || "Non défini",
-                    prixAchat: m.prix_achat_unitaire || 0,
-                    prixVente: m.prix_vente_unitaire || null,
-                    dateEnregistrement: m.date_creation?.split('T')[0] || new Date().toISOString().split('T')[0]
-                }));
-
-                const durList = (durables.results || durables).map(m => ({
-                    id: m.idMateriel || m.id,
-                    code: m.code || `DUR-${m.idMateriel}`,
-                    name: m.nom_Materiel || m.name,
-                    category: "Matériel Durable",
-                    quantity: m.quantite_stock || 1,
-                    unit: "Pièce",
-                    lastUpdate: m.date_derniere_modification?.split('T')[0] || new Date().toISOString().split('T')[0],
-                    location: m.localisation || "Non défini",
-                    prixAchat: m.prix_achat_unitaire || 0,
-                    prixVente: null,
-                    dateEnregistrement: m.date_Enregistrement?.split('T')[0] || new Date().toISOString().split('T')[0]
-                }));
-
-                setMaterials([...medList, ...durList]);
-            } catch (err) {
-                console.error("Erreur lors du chargement des matériels:", err);
-                // Fallback to mock data
-                setMaterials([
-                    { id: 1, code: "MED-001", name: "Gants médicaux", category: "Matériel Médical", quantity: 150, unit: "Boîte", lastUpdate: "2024-12-20", location: "Stockage A", prixAchat: 15000, prixVente: 18000, dateEnregistrement: "2024-01-15" },
-                    { id: 2, code: "MED-002", name: "Seringues 5ml", category: "Matériel Médical", quantity: 200, unit: "Pièce", lastUpdate: "2024-12-19", location: "Stockage A", prixAchat: 500, prixVente: 750, dateEnregistrement: "2024-02-10" },
-                    { id: 3, code: "DUR-001", name: "Stéthoscope", category: "Matériel Durable", quantity: 5, unit: "Pièce", lastUpdate: "2024-12-18", location: "Stockage B", prixAchat: 85000, prixVente: null, dateEnregistrement: "2024-03-05" },
-                ]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
+        loadData();
     }, []);
+
+    async function loadData() {
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Charger les matériels médicaux
+            const medicauxData = await materielMedicalApi.getAll();
+            const medicaux = (medicauxData.results || medicauxData).map(m => ({
+                id: m.idMateriel || m.materiel_ptr_id,
+                code: m.code_materiel,
+                name: m.nom_Materiel,
+                category: "Matériel Médical",
+                categoryType: "medical",
+                quantity: m.quantite_stock,
+                unit: m.unite_mesure_display || m.unite_mesure,
+                lastUpdate: m.date_derniere_modification?.split('T')[0] || '-',
+                location: "Stock Pharmacie",
+                prixAchat: parseFloat(m.prix_achat_unitaire) || 0,
+                prixVente: parseFloat(m.prix_vente_unitaire) || 0,
+                dateEnregistrement: m.date_derniere_modification?.split('T')[0] || '-'
+            }));
+
+            // Charger les matériels durables
+            const durablesData = await materielDurableApi.getAll();
+            const durables = (durablesData.results || durablesData).map(m => ({
+                id: m.idMateriel || m.materiel_ptr_id,
+                code: m.code_materiel,
+                name: m.nom_Materiel,
+                category: "Matériel Durable",
+                categoryType: "durable",
+                quantity: m.quantite_stock,
+                unit: "Pièce",
+                lastUpdate: m.date_derniere_modification?.split('T')[0] || '-',
+                location: m.localisation || "Stock Général",
+                prixAchat: parseFloat(m.prix_achat_unitaire) || 0,
+                prixVente: null,
+                dateEnregistrement: m.date_Enregistrement?.split('T')[0] || '-',
+                etat: m.Etat_display || m.Etat
+            }));
+
+            setMaterials([...medicaux, ...durables]);
+
+        } catch (err) {
+            console.error("Erreur lors du chargement des données:", err);
+            setError("Impossible de charger les données. Vérifiez que le backend est en cours d'exécution.");
+        } finally {
+            setLoading(false);
+        }
+    }
 
     function getFilteredMaterials() {
         return materials.filter(material => {
@@ -107,7 +105,7 @@ export function MaterialList() {
     }
 
     function formatPrice(price) {
-        if (price === null || price === undefined) return "-";
+        if (price === null || price === undefined || price === 0) return "-";
         return new Intl.NumberFormat('fr-FR').format(price) + " FCFA";
     }
 
@@ -194,25 +192,57 @@ export function MaterialList() {
 
     const filteredMaterials = getFilteredMaterials();
 
+    if (loading) {
+        return (
+            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"ComptaMatiere"}>
+                <AccountantNavBar />
+                <div className="flex items-center justify-center h-96">
+                    <div className="text-center">
+                        <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
+                        <p className="text-gray-600">Chargement des matériels...</p>
+                    </div>
+                </div>
+            </AccountantDashBoard>
+        );
+    }
+
     return (
-        <ComptaMatiereDashBoard
-            linkList={ComptaMatiereNavLink}
-            requiredRole={"Accountant"}
+        <AccountantDashBoard
+            linkList={AccountantNavLink}
+            requiredRole={"ComptaMatiere"}
         >
-            <ComptaMatiereNavBar />
+            <AccountantNavBar />
             <div className="p-6 space-y-6">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <FaBoxes className="text-4xl text-primary-start" />
-                        <h1 className="text-3xl font-bold text-gray-800">Liste du Matériel</h1>
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-800">Liste du Matériel</h1>
+                            <p className="text-gray-500">{materials.length} matériels enregistrés</p>
+                        </div>
                     </div>
-                    <button
-                        onClick={exportToPDF}
-                        className="flex items-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all duration-300 shadow-lg"
-                    >
-                        <FaFilePdf /> Exporter PDF
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={loadData}
+                            disabled={loading}
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+                        >
+                            <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
+                        </button>
+                        <button
+                            onClick={exportToPDF}
+                            className="flex items-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all duration-300 shadow-lg"
+                        >
+                            <FaFilePdf /> Exporter PDF
+                        </button>
+                    </div>
                 </div>
+
+                {error && (
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                        {error}
+                    </div>
+                )}
 
                 {/* Filtres et recherche */}
                 <div className="bg-white rounded-lg shadow-lg p-6">
@@ -268,7 +298,7 @@ export function MaterialList() {
                             {filteredMaterials.length > 0 ? (
                                 filteredMaterials.map((material, index) => (
                                     <tr
-                                        key={material.id}
+                                        key={`${material.categoryType}-${material.id}`}
                                         className={`hover:bg-primary-end/10 cursor-pointer transition-all ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
                                         onClick={() => handleMaterialClick(material)}
                                     >
@@ -376,9 +406,7 @@ export function MaterialList() {
                                     </p>
                                 </div>
                                 <div className="bg-gray-50 p-3 rounded-lg">
-                                    <p className="text-xs text-gray-500 flex items-center gap-1">
-                                        <FaMapMarkerAlt /> Emplacement
-                                    </p>
+                                    <p className="text-xs text-gray-500">Emplacement</p>
                                     <p className="font-bold text-gray-800">{selectedMaterial.location}</p>
                                 </div>
                             </div>
@@ -412,6 +440,13 @@ export function MaterialList() {
                                     <p className="font-bold text-gray-800">{selectedMaterial.lastUpdate}</p>
                                 </div>
                             </div>
+
+                            {selectedMaterial.etat && (
+                                <div className="bg-gray-50 p-3 rounded-lg">
+                                    <p className="text-xs text-gray-500">État du matériel</p>
+                                    <p className="font-bold text-gray-800">{selectedMaterial.etat}</p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="mt-6">
@@ -425,6 +460,6 @@ export function MaterialList() {
                     </div>
                 </div>
             )}
-        </ComptaMatiereDashBoard>
+        </AccountantDashBoard>
     );
 }

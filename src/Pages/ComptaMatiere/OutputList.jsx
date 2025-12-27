@@ -1,6 +1,6 @@
-import { ComptaMatiereDashBoard } from "./Components/ComptaMatiereDashboard";
-import { ComptaMatiereNavLink } from "./ComptaMatiereNavLink";
-import { ComptaMatiereNavBar } from "./Components/ComptaMatiereNavBar";
+import { AccountantDashBoard } from "./Components/AccountantDashboard";
+import { AccountantNavLink } from "./AccountantNavLink";
+import { AccountantNavBar } from "./Components/AccountantNavBar";
 import { useState, useEffect } from "react";
 import {
     FaSearch,
@@ -11,81 +11,100 @@ import {
     FaBuilding,
     FaCalendarAlt,
     FaBoxOpen,
-    FaSpinner
+    FaSpinner,
+    FaSyncAlt
 } from "react-icons/fa";
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
-import { getAllSorties, getLignesSortie } from "../../services/comptabiliteMatiereApi";
+import { sortieApi, ligneSortieApi } from "../../services/comptabiliteMatiereApi";
 
 export function OutputList() {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [filterMotif, setFilterMotif] = useState("all");
     const [filterPeriod, setFilterPeriod] = useState("all");
-    const [loading, setLoading] = useState(true);
 
-    // Données des sorties
+    // Données des sorties depuis l'API
     const [outputs, setOutputs] = useState([]);
 
-    // Charger les sorties au montage du composant
+    // Charger les sorties depuis l'API
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-                const sortiesData = await getAllSorties();
-                const sorties = sortiesData.results || sortiesData;
-
-                // Transformer les données pour l'affichage
-                const outputsFormatted = await Promise.all(sorties.map(async (s) => {
-                    // Récupérer les lignes de sortie si nécessaire
-                    let articles = s.lignes || [];
-                    if (articles.length === 0 && s.idSortie) {
-                        try {
-                            const lignesData = await getLignesSortie(s.idSortie);
-                            articles = lignesData.results || lignesData || [];
-                        } catch (e) {
-                            articles = [];
-                        }
-                    }
-
-                    return {
-                        id: s.numero_sortie || `SOR-${s.idSortie}`,
-                        serviceMedical: s.service_responsable || "Service",
-                        dateSortie: s.date_sortie?.split('T')[0] || new Date().toISOString().split('T')[0],
-                        dateEnregistrement: s.date_creation?.split('T')[0] || new Date().toISOString().split('T')[0],
-                        motifSortie: s.motif_sortie?.toLowerCase() || "utilisation",
-                        articles: articles.map(a => ({
-                            nomMateriel: a.materiel_nom || a.nom_materiel || "Matériel",
-                            codeMateriel: a.materiel_code || a.code || "N/A",
-                            typeMateriel: a.type_materiel || "Matériel",
-                            quantite: a.quantite || 0
-                        }))
-                    };
-                }));
-
-                setOutputs(outputsFormatted);
-            } catch (err) {
-                console.error("Erreur lors du chargement des sorties:", err);
-                // Fallback to mock data
-                setOutputs([
-                    { id: "SOR-2024-001", serviceMedical: "Service Médical", dateSortie: "2024-12-20", dateEnregistrement: "2024-12-20", motifSortie: "vente", articles: [{ nomMateriel: "Gants médicaux", codeMateriel: "MED-001", typeMateriel: "Matériel Médical", quantite: 20 }] },
-                    { id: "SOR-2024-002", serviceMedical: "Pharmacie", dateSortie: "2024-12-19", dateEnregistrement: "2024-12-19", motifSortie: "perime", articles: [{ nomMateriel: "Compresses stériles", codeMateriel: "MED-003", typeMateriel: "Matériel Médical", quantite: 50 }] },
-                ]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
+        loadData();
     }, []);
+
+    async function loadData() {
+        try {
+            setLoading(true);
+            setError(null);
+
+            const sortiesData = await sortieApi.getAll();
+            const sorties = (sortiesData.results || sortiesData);
+
+            // Pour chaque sortie, charger ses lignes
+            const outputsWithLines = await Promise.all(
+                sorties.map(async (s) => {
+                    try {
+                        const lignesData = await ligneSortieApi.getBySortie(s.idSortie);
+                        const lignes = (lignesData.results || lignesData).map(l => ({
+                            nomMateriel: l.materiel_nom || `Matériel #${l.id_materiel}`,
+                            codeMateriel: l.materiel_code || "",
+                            typeMateriel: l.type_materiel === "MEDICAL" ? "Matériel Médical" : "Matériel Durable",
+                            quantite: l.quantite
+                        }));
+
+                        return {
+                            id: s.numero_sortie || `SOR-${s.idSortie}`,
+                            idSortie: s.idSortie,
+                            serviceMedical: s.service_medical || "Non spécifié",
+                            dateSortie: s.date_sortie?.split('T')[0] || '-',
+                            dateEnregistrement: s.date_sortie?.split('T')[0] || '-',
+                            motifSortie: mapMotif(s.motif_sortie),
+                            articles: lignes
+                        };
+                    } catch {
+                        return {
+                            id: s.numero_sortie || `SOR-${s.idSortie}`,
+                            idSortie: s.idSortie,
+                            serviceMedical: s.service_medical || "Non spécifié",
+                            dateSortie: s.date_sortie?.split('T')[0] || '-',
+                            dateEnregistrement: s.date_sortie?.split('T')[0] || '-',
+                            motifSortie: mapMotif(s.motif_sortie),
+                            articles: []
+                        };
+                    }
+                })
+            );
+
+            setOutputs(outputsWithLines);
+
+        } catch (err) {
+            console.error("Erreur lors du chargement des sorties:", err);
+            setError("Impossible de charger les sorties. Vérifiez que le backend est en cours d'exécution.");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function mapMotif(motif) {
+        const map = {
+            'VENTE': 'vente',
+            'UTILISATION_SERVICE': 'utilisation',
+            'DEFECTUEUX': 'defectueux',
+            'PERIME': 'perime',
+            'PERTE': 'defectueux'
+        };
+        return map[motif] || 'defectueux';
+    }
 
     function getFilteredOutputs() {
         return outputs.filter(output => {
             const matchesSearch = output.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 output.serviceMedical.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                output.articles.some(a =>
+                (output.articles && output.articles.some(a =>
                     a.nomMateriel.toLowerCase().includes(searchTerm.toLowerCase()) ||
                     a.codeMateriel.toLowerCase().includes(searchTerm.toLowerCase())
-                );
+                ));
 
             const matchesMotif = filterMotif === "all" || output.motifSortie === filterMotif;
 
@@ -126,17 +145,14 @@ export function OutputList() {
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.getWidth();
 
-        // Titre du document
         doc.setFontSize(20);
         doc.setTextColor(26, 115, 163);
         doc.text("Liste des Sorties de Matériel", pageWidth / 2, 20, { align: "center" });
 
-        // Sous-titre avec la date
         doc.setFontSize(10);
         doc.setTextColor(100);
         doc.text(`Généré le: ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, pageWidth / 2, 28, { align: "center" });
 
-        // Ligne de séparation
         doc.setDrawColor(80, 194, 185);
         doc.setLineWidth(0.5);
         doc.line(14, 32, pageWidth - 14, 32);
@@ -147,13 +163,11 @@ export function OutputList() {
         const sortiesActuelles = filteredOutputs;
 
         sortiesActuelles.forEach((output) => {
-            // Vérifier si on a besoin d'une nouvelle page
             if (yPosition > 250) {
                 doc.addPage();
                 yPosition = 20;
             }
 
-            // En-tête de la sortie
             doc.setFillColor(26, 115, 163);
             doc.rect(margin, yPosition - 5, pageWidth - 2 * margin, 10, 'F');
 
@@ -165,7 +179,6 @@ export function OutputList() {
 
             yPosition += 12;
 
-            // Infos de la sortie
             doc.setTextColor(0);
             doc.setFontSize(9);
             doc.setFont(undefined, 'normal');
@@ -178,25 +191,27 @@ export function OutputList() {
                 utilisation: "Utilisation"
             };
             doc.text(`Motif: ${motifLabels[output.motifSortie] || output.motifSortie}`, margin + 3, yPosition);
-            doc.text(`Enregistré le: ${output.dateEnregistrement}`, margin + 60, yPosition);
 
             yPosition += 8;
 
-            // Articles
             doc.setFont(undefined, 'bold');
             doc.text("Articles:", margin + 3, yPosition);
             yPosition += 6;
 
             doc.setFont(undefined, 'normal');
-            output.articles.forEach((article) => {
-                doc.text(`• ${article.nomMateriel} (${article.codeMateriel}) - Qté: ${article.quantite} - ${article.typeMateriel}`, margin + 5, yPosition);
+            if (output.articles && output.articles.length > 0) {
+                output.articles.forEach((article) => {
+                    doc.text(`• ${article.nomMateriel} (${article.codeMateriel}) - Qté: ${article.quantite}`, margin + 5, yPosition);
+                    yPosition += 5;
+                });
+            } else {
+                doc.text(`  Aucun article`, margin + 5, yPosition);
                 yPosition += 5;
-            });
+            }
 
             yPosition += 8;
         });
 
-        // Pied de page
         const pageHeight = doc.internal.pageSize.getHeight();
         doc.setDrawColor(80, 194, 185);
         doc.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
@@ -206,31 +221,62 @@ export function OutputList() {
         doc.text(`Total: ${filteredOutputs.length} sortie(s)`, margin, pageHeight - 12);
         doc.text("Fultang Clinic - Comptable Matière", pageWidth - margin, pageHeight - 12, { align: "right" });
 
-        // Télécharger le PDF
         doc.save(`sorties_materiel_${new Date().toISOString().split('T')[0]}.pdf`);
     }
 
     const filteredOutputs = getFilteredOutputs();
 
+    if (loading) {
+        return (
+            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"ComptaMatiere"}>
+                <AccountantNavBar />
+                <div className="flex items-center justify-center h-96">
+                    <div className="text-center">
+                        <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
+                        <p className="text-gray-600">Chargement des sorties...</p>
+                    </div>
+                </div>
+            </AccountantDashBoard>
+        );
+    }
+
     return (
-        <ComptaMatiereDashBoard
-            linkList={ComptaMatiereNavLink}
-            requiredRole={"Accountant"}
+        <AccountantDashBoard
+            linkList={AccountantNavLink}
+            requiredRole={"ComptaMatiere"}
         >
-            <ComptaMatiereNavBar />
+            <AccountantNavBar />
             <div className="p-6 space-y-6">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <FaListAlt className="text-4xl text-primary-start" />
-                        <h1 className="text-3xl font-bold text-gray-800">Liste des Sorties</h1>
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-800">Liste des Sorties</h1>
+                            <p className="text-gray-500">{outputs.length} sorties enregistrées</p>
+                        </div>
                     </div>
-                    <button
-                        onClick={exportToPDF}
-                        className="flex items-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all duration-300 shadow-lg"
-                    >
-                        <FaFilePdf /> Exporter PDF
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={loadData}
+                            disabled={loading}
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+                        >
+                            <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
+                        </button>
+                        <button
+                            onClick={exportToPDF}
+                            className="flex items-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all duration-300 shadow-lg"
+                        >
+                            <FaFilePdf /> Exporter PDF
+                        </button>
+                    </div>
                 </div>
+
+                {error && (
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                        {error}
+                    </div>
+                )}
 
                 {/* Filtres */}
                 <div className="bg-white rounded-lg shadow-lg p-6">
@@ -308,7 +354,7 @@ export function OutputList() {
                     Affichage de {filteredOutputs.length} sur {outputs.length} sorties
                 </div>
             </div>
-        </ComptaMatiereDashBoard>
+        </AccountantDashBoard>
     );
 }
 
@@ -320,7 +366,6 @@ function OutputCard({ output, getMotifBadge }) {
 
     const [showDetails, setShowDetails] = useState(false);
 
-    // Calculer le total d'articles
     const totalArticles = output.articles ? output.articles.length : 0;
     const totalQuantite = output.articles ? output.articles.reduce((sum, a) => sum + a.quantite, 0) : 0;
 
@@ -364,7 +409,7 @@ function OutputCard({ output, getMotifBadge }) {
                     </div>
                 </div>
 
-                {showDetails && output.articles && (
+                {showDetails && output.articles && output.articles.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                         <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
                             <FaBoxOpen className="text-primary-start" />

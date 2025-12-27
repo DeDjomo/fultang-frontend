@@ -1,6 +1,6 @@
-import { ComptaMatiereDashBoard } from "./Components/ComptaMatiereDashboard";
-import { ComptaMatiereNavLink } from "./ComptaMatiereNavLink";
-import { ComptaMatiereNavBar } from "./Components/ComptaMatiereNavBar";
+import { AccountantDashBoard } from "./Components/AccountantDashboard";
+import { AccountantNavLink } from "./AccountantNavLink";
+import { AccountantNavBar } from "./Components/AccountantNavBar";
 import { useState, useEffect } from "react";
 import {
     FaFileAlt,
@@ -11,161 +11,123 @@ import {
     FaInbox,
     FaEnvelope,
     FaUser,
-    FaSpinner
+    FaSpinner,
+    FaSyncAlt,
+    FaCheckCircle
 } from "react-icons/fa";
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
-import { getAllRapports, createRapport, markRapportAsRead, getPersonnelList } from "../../services/comptabiliteMatiereApi";
+import { rapportApi } from "../../services/comptabiliteMatiereApi";
 
 export function AccountantReports() {
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState(null);
+    const [successMessage, setSuccessMessage] = useState("");
+
     // État pour le formulaire de nouveau rapport
     const [reportForm, setReportForm] = useState({
         objet: "",
-        concerne: "",
+        destinataire: "",
         corps: ""
     });
 
-    const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
+    // ID du comptable connecté
+    const currentUserId = parseInt(localStorage.getItem("personnel_id") || "1");
+    const currentUserName = localStorage.getItem("user_name") || "Comptable Matière";
 
-    // Liste du personnel de l'hôpital
-    const [personnelList, setPersonnelList] = useState([
-        { id: "ADMIN-001", name: "M. Nkongo Paul", role: "Administrateur" },
-        { id: "DIR-001", name: "Dr. Kamdem Jean", role: "Directeur" },
-        { id: "MED-001", name: "Dr. Fotso Marie", role: "Médecin Chef" },
-        { id: "PHARM-001", name: "Mme. Tchuente Claire", role: "Pharmacienne" },
-        { id: "LAB-001", name: "M. Biya Charles", role: "Chef Laboratoire" },
-        { id: "COMPT-001", name: "M. Dupont Michel", role: "Comptable Matière" },
-        { id: "FIN-001", name: "Mme. Lefebvre Anne", role: "Comptable Financier" },
-        { id: "RH-001", name: "M. Martin Pierre", role: "Ressources Humaines" },
-    ]);
-
-    // ID du comptable connecté (simulé - à récupérer depuis l'authentification)
-    const currentUserId = "COMPT-001";
-    const currentUserName = "M. Dupont Michel";
-
-    // Rapports envoyés par le comptable
+    // Rapports depuis l'API
     const [sentReports, setSentReports] = useState([]);
-
-    // Rapports reçus par le comptable
     const [receivedReports, setReceivedReports] = useState([]);
-
-    // Charger les données au montage
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-
-                // Récupérer les rapports et le personnel
-                const [rapportsData, personnelData] = await Promise.all([
-                    getAllRapports(),
-                    getPersonnelList().catch(() => null)
-                ]);
-
-                const rapports = rapportsData.results || rapportsData || [];
-
-                // Séparer les rapports envoyés et reçus
-                const sent = rapports.filter(r => r.expediteur === currentUserId || r.idPersonnel_expediteur === currentUserId);
-                const received = rapports.filter(r => r.destinataire === currentUserId || r.idPersonnel_destinataire === currentUserId);
-
-                // Transformer pour l'affichage
-                setSentReports(sent.map(r => ({
-                    id: r.idRapport || r.id,
-                    objet: r.objet || "Rapport",
-                    concerne: r.idPersonnel_destinataire || r.destinataire,
-                    concerneName: r.destinataire_nom || "Destinataire",
-                    corps: r.corps || "",
-                    dateEnvoi: r.date_creation?.split('T')[0] || new Date().toISOString().split('T')[0],
-                    expediteur: currentUserId
-                })));
-
-                setReceivedReports(received.map(r => ({
-                    id: r.idRapport || r.id,
-                    objet: r.objet || "Rapport",
-                    concerne: currentUserId,
-                    concerneName: currentUserName,
-                    corps: r.corps || "",
-                    dateEnvoi: r.date_creation?.split('T')[0] || new Date().toISOString().split('T')[0],
-                    expediteur: r.idPersonnel_expediteur || r.expediteur,
-                    expediteurName: r.expediteur_nom || "Expéditeur",
-                    isRead: r.statut === 'lu'
-                })));
-
-                // Mettre à jour le personnel si disponible
-                if (personnelData) {
-                    const personnel = personnelData.results || personnelData || [];
-                    if (personnel.length > 0) {
-                        setPersonnelList(personnel.map(p => ({
-                            id: p.idPersonnel || p.id,
-                            name: p.nom_complet || `${p.prenom || ''} ${p.nom || ''}`.trim(),
-                            role: p.fonction || p.role || "Personnel"
-                        })));
-                    }
-                }
-            } catch (err) {
-                console.error("Erreur lors du chargement des rapports:", err);
-                // Garder les données mock en cas d'erreur
-                setSentReports([
-                    { id: "RPT-2024-001", objet: "Stock", concerne: "DIR-001", concerneName: "Dr. Kamdem Jean", corps: "Rapport sur le stock...", dateEnvoi: "2024-12-20", expediteur: currentUserId }
-                ]);
-                setReceivedReports([
-                    { id: "RPT-2024-003", objet: "Commande", concerne: currentUserId, concerneName: currentUserName, corps: "Autorisation commande...", dateEnvoi: "2024-12-21", expediteur: "DIR-001", expediteurName: "Dr. Kamdem Jean", isRead: false }
-                ]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
-    }, []);
 
     // État pour le modal de détails
     const [selectedReport, setSelectedReport] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
 
-    function generateReportId() {
-        const year = new Date().getFullYear();
-        const allReports = [...sentReports, ...receivedReports];
-        const existingThisYear = allReports.filter(r => String(r.id).includes(`RPT-${year}`));
-        const nextNumber = existingThisYear.length + 1;
-        return `RPT-${year}-${String(nextNumber).padStart(3, '0')}`;
+    // Charger les données
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    async function loadData() {
+        try {
+            setLoading(true);
+            setError(null);
+
+            const rapportsData = await rapportApi.getAll();
+            const rapports = rapportsData.results || rapportsData;
+
+            // Filtrer les rapports envoyés par le comptable
+            const sent = rapports.filter(r => r.expediteur === currentUserId);
+            setSentReports(sent.map(formatReport));
+
+            // Filtrer les rapports reçus par le comptable
+            const received = rapports.filter(r => r.destinataire === currentUserId);
+            setReceivedReports(received.map(r => ({ ...formatReport(r), isRead: r.est_lu })));
+
+        } catch (err) {
+            console.error("Erreur lors du chargement des rapports:", err);
+            setError("Impossible de charger les rapports. Vérifiez que le backend est en cours d'exécution.");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function formatReport(r) {
+        return {
+            id: r.code_rapport || `RPT-${r.idRapport}`,
+            idRapport: r.idRapport,
+            objet: r.objet,
+            corps: r.corps,
+            dateEnvoi: r.date_creation?.split('T')[0] || new Date().toISOString().split('T')[0],
+            expediteur: r.expediteur,
+            expediteurName: `Personnel #${r.expediteur}`,
+            destinataire: r.destinataire,
+            destinataireName: `Personnel #${r.destinataire}`,
+            type: r.type_rapport,
+            concerneName: `Personnel #${r.destinataire}`,
+            concerne: r.destinataire
+        };
     }
 
     async function handleSubmitReport(e) {
         e.preventDefault();
 
-        const concernedPerson = personnelList.find(p => p.id === reportForm.concerne);
+        if (!reportForm.destinataire) {
+            setError("Veuillez saisir l'ID du destinataire.");
+            return;
+        }
 
         try {
             setSubmitting(true);
+            setError(null);
 
-            // Créer le rapport via l'API
-            const rapportData = {
+            const now = new Date();
+            const year = now.getFullYear();
+            const existingCount = sentReports.length + receivedReports.length;
+            const codeRapport = `RPT-${year}-${String(existingCount + 1).padStart(3, '0')}`;
+
+            const newReportData = {
+                code_rapport: codeRapport,
                 objet: reportForm.objet,
                 corps: reportForm.corps,
-                idPersonnel_destinataire: reportForm.concerne,
-                idPersonnel_expediteur: currentUserId
+                type_rapport: "GENERAL",
+                expediteur: currentUserId,
+                destinataire: parseInt(reportForm.destinataire),
+                date_creation: now.toISOString().split('T')[0],
+                est_lu: false
             };
 
-            const createdRapport = await createRapport(rapportData);
+            await rapportApi.create(newReportData);
 
-            // Ajouter à la liste locale
-            const newReport = {
-                id: createdRapport.idRapport || generateReportId(),
-                objet: reportForm.objet,
-                concerne: reportForm.concerne,
-                concerneName: concernedPerson ? concernedPerson.name : "",
-                corps: reportForm.corps,
-                dateEnvoi: new Date().toISOString().split('T')[0],
-                expediteur: currentUserId
-            };
+            setSuccessMessage("Rapport envoyé avec succès !");
+            setTimeout(() => setSuccessMessage(""), 3000);
+            setReportForm({ objet: "", destinataire: "", corps: "" });
+            await loadData();
 
-            setSentReports([newReport, ...sentReports]);
-            setReportForm({ objet: "", concerne: "", corps: "" });
-            alert("Rapport envoyé avec succès !");
         } catch (err) {
-            console.error("Erreur lors de l'envoi du rapport:", err);
-            alert("Erreur lors de l'envoi du rapport. Veuillez réessayer.");
+            console.error("Erreur lors de l'envoi:", err);
+            setError("Erreur lors de l'envoi du rapport. Veuillez réessayer.");
         } finally {
             setSubmitting(false);
         }
@@ -176,18 +138,14 @@ export function AccountantReports() {
         setShowDetailModal(true);
 
         // Si c'est un rapport reçu et non lu, le marquer comme lu
-        if (isReceived && !report.isRead) {
+        if (isReceived && !report.isRead && report.idRapport) {
             try {
-                await markRapportAsRead(report.id);
-                setReceivedReports(receivedReports.map(r =>
+                await rapportApi.patch(report.idRapport, { est_lu: true });
+                setReceivedReports(prev => prev.map(r =>
                     r.id === report.id ? { ...r, isRead: true } : r
                 ));
             } catch (err) {
-                console.error("Erreur lors du marquage comme lu:", err);
-                // Marquer localement quand même
-                setReceivedReports(receivedReports.map(r =>
-                    r.id === report.id ? { ...r, isRead: true } : r
-                ));
+                console.error("Erreur lors du marquage:", err);
             }
         }
     }
@@ -198,7 +156,6 @@ export function AccountantReports() {
         const margin = 20;
         const maxWidth = pageWidth - 2 * margin;
 
-        // En-tête
         doc.setFontSize(18);
         doc.setTextColor(26, 115, 163);
         doc.text("FULTANG CLINIC", pageWidth / 2, 20, { align: "center" });
@@ -207,12 +164,10 @@ export function AccountantReports() {
         doc.setTextColor(80, 194, 185);
         doc.text("Rapport Officiel", pageWidth / 2, 28, { align: "center" });
 
-        // Ligne de séparation
         doc.setDrawColor(80, 194, 185);
         doc.setLineWidth(0.5);
         doc.line(margin, 35, pageWidth - margin, 35);
 
-        // Informations du rapport
         doc.setFontSize(10);
         doc.setTextColor(0);
 
@@ -237,22 +192,20 @@ export function AccountantReports() {
 
         yPos += 12;
         doc.setFont(undefined, 'bold');
-        doc.text("Expéditeur (ID):", margin, yPos);
+        doc.text("Expéditeur:", margin, yPos);
         doc.setFont(undefined, 'normal');
-        doc.text(isReceived ? report.expediteur : currentUserId, margin + 40, yPos);
+        doc.text(isReceived ? report.expediteurName : currentUserName, margin + 40, yPos);
 
         yPos += 8;
         doc.setFont(undefined, 'bold');
-        doc.text("Destinataire (ID):", margin, yPos);
+        doc.text("Destinataire:", margin, yPos);
         doc.setFont(undefined, 'normal');
-        doc.text(report.concerne, margin + 45, yPos);
+        doc.text(report.concerneName || report.destinataireName, margin + 45, yPos);
 
-        // Ligne de séparation
         yPos += 10;
         doc.setDrawColor(200);
         doc.line(margin, yPos, pageWidth - margin, yPos);
 
-        // Corps du rapport
         yPos += 15;
         doc.setFont(undefined, 'bold');
         doc.setFontSize(12);
@@ -262,21 +215,18 @@ export function AccountantReports() {
         doc.setFont(undefined, 'normal');
         doc.setFontSize(11);
 
-        // Diviser le texte en lignes pour le wrapper
         const lines = doc.splitTextToSize(report.corps, maxWidth);
         doc.text(lines, margin, yPos);
 
-        // Pied de page
         const pageHeight = doc.internal.pageSize.getHeight();
         doc.setDrawColor(80, 194, 185);
         doc.line(margin, pageHeight - 25, pageWidth - margin, pageHeight - 25);
 
         doc.setFontSize(9);
         doc.setTextColor(100);
-        doc.text(`Document généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, margin, pageHeight - 18);
-        doc.text("Fultang Clinic - Système de Gestion", pageWidth - margin, pageHeight - 18, { align: "right" });
+        doc.text(`Document généré le ${new Date().toLocaleDateString('fr-FR')}`, margin, pageHeight - 18);
+        doc.text("Fultang Clinic - Comptable Matière", pageWidth - margin, pageHeight - 18, { align: "right" });
 
-        // Télécharger
         doc.save(`rapport_${report.id}.pdf`);
     }
 
@@ -285,7 +235,6 @@ export function AccountantReports() {
         const pageWidth = doc.internal.pageSize.getWidth();
         const margin = 14;
 
-        // Titre
         doc.setFontSize(16);
         doc.setTextColor(26, 115, 163);
         doc.text("Liste des Rapports Envoyés", pageWidth / 2, 20, { align: "center" });
@@ -296,7 +245,7 @@ export function AccountantReports() {
 
         let yPos = 40;
 
-        sentReports.forEach((report, index) => {
+        sentReports.forEach((report) => {
             if (yPos > 250) {
                 doc.addPage();
                 yPos = 20;
@@ -361,19 +310,52 @@ export function AccountantReports() {
         doc.save(`rapports_recus_${new Date().toISOString().split('T')[0]}.pdf`);
     }
 
+    if (loading) {
+        return (
+            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"ComptaMatiere"}>
+                <AccountantNavBar />
+                <div className="flex items-center justify-center h-96">
+                    <div className="text-center">
+                        <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
+                        <p className="text-gray-600">Chargement des rapports...</p>
+                    </div>
+                </div>
+            </AccountantDashBoard>
+        );
+    }
+
     return (
-        <ComptaMatiereDashBoard
-            linkList={ComptaMatiereNavLink}
-            requiredRole={"Accountant"}
+        <AccountantDashBoard
+            linkList={AccountantNavLink}
+            requiredRole={"ComptaMatiere"}
         >
-            <ComptaMatiereNavBar />
+            <AccountantNavBar />
             <div className="p-6 space-y-6">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <FaFileAlt className="text-4xl text-primary-start" />
                         <h1 className="text-3xl font-bold text-gray-800">Gestion des Rapports</h1>
                     </div>
+                    <button
+                        onClick={loadData}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+                    >
+                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
+                    </button>
                 </div>
+
+                {error && (
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                        {error}
+                    </div>
+                )}
+
+                {successMessage && (
+                    <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
+                        <FaCheckCircle /> {successMessage}
+                    </div>
+                )}
 
                 {/* Formulaire de saisie d'un rapport */}
                 <div className="bg-white rounded-lg shadow-lg p-6">
@@ -400,21 +382,18 @@ export function AccountantReports() {
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Concerné *
+                                    ID Destinataire *
                                 </label>
-                                <select
-                                    value={reportForm.concerne}
-                                    onChange={(e) => setReportForm({ ...reportForm, concerne: e.target.value })}
+                                <input
+                                    type="number"
+                                    value={reportForm.destinataire}
+                                    onChange={(e) => setReportForm({ ...reportForm, destinataire: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
+                                    placeholder="Saisir l'ID du destinataire (ex: 1, 2, 3...)"
                                     required
-                                >
-                                    <option value="">Sélectionner un destinataire</option>
-                                    {personnelList.filter(p => p.id !== currentUserId).map(person => (
-                                        <option key={person.id} value={person.id}>
-                                            {person.name} - {person.role}
-                                        </option>
-                                    ))}
-                                </select>
+                                    min="1"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">ID du personnel destinataire</p>
                             </div>
                         </div>
                         <div>
@@ -433,9 +412,11 @@ export function AccountantReports() {
                         <div className="flex justify-end">
                             <button
                                 type="submit"
-                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all"
+                                disabled={submitting}
+                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
                             >
-                                <FaPaperPlane /> Envoyer
+                                {submitting ? <FaSpinner className="animate-spin" /> : <FaPaperPlane />}
+                                Envoyer
                             </button>
                         </div>
                     </form>
@@ -448,11 +429,12 @@ export function AccountantReports() {
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                 <FaPaperPlane className="text-blue-500" />
-                                Rapports Envoyés
+                                Rapports Envoyés ({sentReports.length})
                             </h2>
                             <button
                                 onClick={exportAllSentToPDF}
-                                className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm"
+                                disabled={sentReports.length === 0}
+                                className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm disabled:opacity-50"
                             >
                                 <FaFilePdf /> Exporter PDF
                             </button>
@@ -479,7 +461,7 @@ export function AccountantReports() {
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                 <FaInbox className="text-green-500" />
-                                Rapports Reçus
+                                Rapports Reçus ({receivedReports.length})
                                 {receivedReports.filter(r => !r.isRead).length > 0 && (
                                     <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
                                         {receivedReports.filter(r => !r.isRead).length} nouveau(x)
@@ -488,7 +470,8 @@ export function AccountantReports() {
                             </h2>
                             <button
                                 onClick={exportAllReceivedToPDF}
-                                className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm"
+                                disabled={receivedReports.length === 0}
+                                className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm disabled:opacity-50"
                             >
                                 <FaFilePdf /> Exporter PDF
                             </button>
@@ -556,16 +539,12 @@ export function AccountantReports() {
                                     <p className="font-bold text-gray-800">
                                         {selectedReport.isReceived ? selectedReport.expediteurName : "Vous"}
                                     </p>
-                                    <p className="text-xs text-gray-500">
-                                        ID: {selectedReport.isReceived ? selectedReport.expediteur : currentUserId}
-                                    </p>
                                 </div>
                                 <div className="bg-green-50 p-3 rounded-lg">
                                     <p className="text-sm text-green-600 flex items-center gap-1">
                                         <FaUser /> Destinataire
                                     </p>
                                     <p className="font-bold text-gray-800">{selectedReport.concerneName}</p>
-                                    <p className="text-xs text-gray-500">ID: {selectedReport.concerne}</p>
                                 </div>
                             </div>
 
@@ -595,7 +574,7 @@ export function AccountantReports() {
                     </div>
                 </div>
             )}
-        </ComptaMatiereDashBoard>
+        </AccountantDashBoard>
     );
 }
 
@@ -621,6 +600,11 @@ function ReportCard({ report, type, onView, onExport }) {
                         <span className="px-2 py-0.5 bg-primary-end/20 text-primary-start text-xs rounded-full font-semibold">
                             {report.objet}
                         </span>
+                        {isUnread && (
+                            <span className="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">
+                                Nouveau
+                            </span>
+                        )}
                     </div>
                     <p className="text-sm text-gray-600 mt-1">
                         {type === 'sent' ? `À: ${report.concerneName}` : `De: ${report.expediteurName}`}

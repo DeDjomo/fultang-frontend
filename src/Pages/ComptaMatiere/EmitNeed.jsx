@@ -1,10 +1,9 @@
-import { ComptaMatiereDashBoard } from "./Components/ComptaMatiereDashboard";
-import { ComptaMatiereNavLink } from "./ComptaMatiereNavLink";
-import { ComptaMatiereNavBar } from "./Components/ComptaMatiereNavBar";
+import { AccountantDashBoard } from "./Components/AccountantDashboard";
+import { AccountantNavLink } from "./AccountantNavLink";
+import { AccountantNavBar } from "./Components/AccountantNavBar";
 import { useState } from "react";
-import { FaPlus, FaTrash, FaSave, FaSpinner } from "react-icons/fa";
+import { FaPlus, FaTrash, FaSave } from "react-icons/fa";
 import PropTypes from "prop-types";
-import { createBesoin, createLigneBesoin } from "../../services/comptabiliteMatiereApi";
 
 export function EmitNeed() {
     const [needItems, setNeedItems] = useState([
@@ -16,8 +15,6 @@ export function EmitNeed() {
         requestDate: new Date().toISOString().split('T')[0],
         urgency: "normal"
     });
-    const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState("");
 
     function addNeedItem() {
         const newItem = {
@@ -42,61 +39,19 @@ export function EmitNeed() {
         ));
     }
 
-    async function handleSubmit(e) {
+    function handleSubmit(e) {
         e.preventDefault();
-        setError("");
-
-        try {
-            setSubmitting(true);
-
-            // Créer le besoin principal
-            const besoinData = {
-                motif: `Besoin de ${needInfo.department} - ${needItems.map(i => i.material).join(', ')}`,
-                service_demandeur: needInfo.department,
-                priorite: needInfo.urgency === 'urgent' ? 'URGENT' : 'NORMAL'
-            };
-
-            const createdBesoin = await createBesoin(besoinData);
-
-            // Créer les lignes de besoin
-            for (const item of needItems) {
-                if (item.material && item.quantity) {
-                    await createLigneBesoin({
-                        besoin: createdBesoin.idBesoin || createdBesoin.id,
-                        designation: item.material,
-                        quantite: parseInt(item.quantity),
-                        description: item.description,
-                        priorite: item.priority.toUpperCase()
-                    });
-                }
-            }
-
-            alert("Besoin enregistré avec succès !");
-
-            // Réinitialiser le formulaire
-            setNeedItems([
-                { id: 1, material: "", quantity: "", priority: "normal", description: "" }
-            ]);
-            setNeedInfo({
-                department: "",
-                requestedBy: "",
-                requestDate: new Date().toISOString().split('T')[0],
-                urgency: "normal"
-            });
-        } catch (err) {
-            console.error("Erreur lors de l'enregistrement du besoin:", err);
-            setError("Erreur lors de l'enregistrement du besoin. Veuillez réessayer.");
-        } finally {
-            setSubmitting(false);
-        }
+        console.log("Need submitted:", { needInfo, needItems });
+        // Ici, vous ajouterez la logique d'envoi au backend
+        alert("Besoin enregistré avec succès !");
     }
 
     return (
-        <ComptaMatiereDashBoard
-            linkList={ComptaMatiereNavLink}
-            requiredRole={"Accountant"}
+        <AccountantDashBoard
+            linkList={AccountantNavLink}
+            requiredRole={"ComptaMatiere"}
         >
-            <ComptaMatiereNavBar />
+            <AccountantNavBar />
             <div className="p-6 space-y-6">
                 <div className="flex justify-between items-center">
                     <h1 className="text-3xl font-bold text-gray-800">Émettre un Besoin</h1>
@@ -216,7 +171,7 @@ export function EmitNeed() {
                     </div>
                 </form>
             </div>
-        </ComptaMatiereDashBoard>
+        </AccountantDashBoard>
     );
 }
 
