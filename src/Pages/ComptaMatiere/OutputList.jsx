@@ -34,19 +34,31 @@ export function OutputList() {
     }, []);
 
     async function loadData() {
+        const token = localStorage.getItem("token_key_fultang");
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+        const baseUrl = "http://127.0.0.1:8000/api";
+
         try {
             setLoading(true);
             setError(null);
 
-            const sortiesData = await sortieApi.getAll();
-            const sorties = (sortiesData.results || sortiesData);
+            // 1. Charger les sorties
+            const sortiesRes = await fetch(`${baseUrl}/sorties/`, { headers, cache: "no-store" });
+            const sortiesData = await sortiesRes.json();
+            const sorties = (sortiesData.results || sortiesData || []);
 
-            // Pour chaque sortie, charger ses lignes
+            // 2. Pour chaque sortie, charger ses lignes (N+1 optimisation possible backend, mais ici frontend-side)
             const outputsWithLines = await Promise.all(
                 sorties.map(async (s) => {
                     try {
-                        const lignesData = await ligneSortieApi.getBySortie(s.idSortie);
-                        const lignes = (lignesData.results || lignesData).map(l => ({
+                        const lignesRes = await fetch(`${baseUrl}/lignes-sortie/?id_sortie=${s.idSortie}`, { headers, cache: "no-store" });
+                        const lignesData = await lignesRes.json();
+                        const lignesRaw = lignesData.results || lignesData || [];
+
+                        const lignes = lignesRaw.map(l => ({
                             nomMateriel: l.materiel_nom || `Matériel #${l.id_materiel}`,
                             codeMateriel: l.materiel_code || "",
                             typeMateriel: l.type_materiel === "MEDICAL" ? "Matériel Médical" : "Matériel Durable",
@@ -62,7 +74,8 @@ export function OutputList() {
                             motifSortie: mapMotif(s.motif_sortie),
                             articles: lignes
                         };
-                    } catch {
+                    } catch (e) {
+                        console.warn("Erreur chargement lignes sortie " + s.idSortie, e);
                         return {
                             id: s.numero_sortie || `SOR-${s.idSortie}`,
                             idSortie: s.idSortie,
@@ -79,8 +92,8 @@ export function OutputList() {
             setOutputs(outputsWithLines);
 
         } catch (err) {
-            console.error("Erreur lors du chargement des sorties:", err);
-            setError("Impossible de charger les sorties. Vérifiez que le backend est en cours d'exécution.");
+            console.error("Erreur chargement sorties:", err);
+            setError("Impossible de charger les sorties fraîches.");
         } finally {
             setLoading(false);
         }

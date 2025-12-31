@@ -39,14 +39,48 @@ export function MaterialList() {
         loadData();
     }, []);
 
-    async function loadData() {
-        try {
-            setLoading(true);
-            setError(null);
+    /**
+     * 📡 CHARGEMENT DE LA LISTE DU MATÉRIEL
+     * 
+     * Sources de données:
+     * 1. GET /api/materiels-medicaux/ -> Consommables (médicaments, seringues...)
+     * 2. GET /api/materiels-durables/ -> Équipements (lits, microscopes...)
+     * 
+     * Opération:
+     * Récupération parallèle puis fusion des deux listes pour un affichage unifié.
+     */
+    /**
+     * 📡 CHARGEMENT DES DONNÉES (Mode "Toujours Frais")
+     * Récupération parallèle avec désactivation explicite du cache.
+     */
+    const loadData = async () => {
+        setLoading(true);
+        setError(null);
 
-            // Charger les matériels médicaux
-            const medicauxData = await materielMedicalApi.getAll();
-            const medicaux = (medicauxData.results || medicauxData).map(m => ({
+        const token = localStorage.getItem("token_key_fultang");
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+        const baseUrl = "http://127.0.0.1:8000/api";
+
+        try {
+            console.log("🚀 MaterialList - Chargement données fraîches...");
+
+            // Récupérer les données en parallèle
+            const [medicauxRes, durablesRes] = await Promise.all([
+                fetch(`${baseUrl}/materiels-medicaux/`, { headers, cache: "no-store" }).then(res => res.json()),
+                fetch(`${baseUrl}/materiels-durables/`, { headers, cache: "no-store" }).then(res => res.json())
+            ]);
+
+            // Extraire les résultats
+            const medicauxData = medicauxRes.results || medicauxRes || [];
+            const durablesData = durablesRes.results || durablesRes || [];
+
+            console.log(`📦 Reçu: ${medicauxData.length} médicaux, ${durablesData.length} durables`);
+
+            // 🔄 NORMALISATION DES DONNÉES
+            const medicaux = medicauxData.map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
@@ -61,9 +95,7 @@ export function MaterialList() {
                 dateEnregistrement: m.date_derniere_modification?.split('T')[0] || '-'
             }));
 
-            // Charger les matériels durables
-            const durablesData = await materielDurableApi.getAll();
-            const durables = (durablesData.results || durablesData).map(m => ({
+            const durables = durablesData.map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
@@ -80,14 +112,13 @@ export function MaterialList() {
             }));
 
             setMaterials([...medicaux, ...durables]);
-
         } catch (err) {
-            console.error("Erreur lors du chargement des données:", err);
-            setError("Impossible de charger les données. Vérifiez que le backend est en cours d'exécution.");
+            console.error("❌ Erreur:", err);
+            setError("Impossible de charger la liste du matériel.");
         } finally {
             setLoading(false);
         }
-    }
+    };
 
     function getFilteredMaterials() {
         return materials.filter(material => {

@@ -38,14 +38,40 @@ export function RegisterOutput() {
         loadData();
     }, []);
 
+    /**
+     * 📡 CHARGEMENT DES DONNÉES INITIALES
+     * 
+     * Objectifs:
+     * 1. Charger tout le catalogue (Médical + Durable) pour l'autocomplétion sans latence.
+     * 2. Générer automatiquement le prochain numéro de sortie (SOR-YYYY-NNN).
+     * 
+     * URLs Appeleés:
+     * - GET /api/materiels-medicaux/
+     * - GET /api/materiels-durables/
+     * - GET /api/sorties/ (pour calculer le dernier ID)
+     */
     async function loadData() {
+        const token = localStorage.getItem("token_key_fultang");
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+        const baseUrl = "http://127.0.0.1:8000/api";
+
         try {
             setLoading(true);
             setError(null);
 
-            // Charger les matériels médicaux
-            const medicauxData = await materielMedicalApi.getAll();
-            const medicaux = (medicauxData.results || medicauxData).map(m => ({
+            // Charger les matériels médicaux et durables en parallèle (cache désactivé)
+            const [medicauxRes, durablesRes] = await Promise.all([
+                fetch(`${baseUrl}/materiels-medicaux/`, { headers, cache: "no-store" }).then(res => res.json()),
+                fetch(`${baseUrl}/materiels-durables/`, { headers, cache: "no-store" }).then(res => res.json())
+            ]);
+
+            const medicauxData = medicauxRes.results || medicauxRes || [];
+            const durablesData = durablesRes.results || durablesRes || [];
+
+            const medicaux = medicauxData.map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
@@ -55,9 +81,7 @@ export function RegisterOutput() {
                 prixVente: parseFloat(m.prix_vente_unitaire) || 0
             }));
 
-            // Charger les matériels durables
-            const durablesData = await materielDurableApi.getAll();
-            const durables = (durablesData.results || durablesData).map(m => ({
+            const durables = durablesData.map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
@@ -70,16 +94,21 @@ export function RegisterOutput() {
             setMaterialsDatabase([...medicaux, ...durables]);
 
             // Générer le numéro de sortie
-            const sortiesData = await sortieApi.getAll();
-            const sorties = sortiesData.results || sortiesData;
+            // Récupérer toutes les sorties pour trouver le dernier numéro
+            // Note: Optimisation possible -> Endpoint dédié backend 'next-number'
+            const sortiesRes = await fetch(`${baseUrl}/sorties/`, { headers, cache: "no-store" });
+            const sortiesData = await sortiesRes.json();
+            const sorties = sortiesData.results || sortiesData || [];
+
             const year = new Date().getFullYear();
             const count = sorties.filter(s => s.numero_sortie?.includes(`SOR-${year}`)).length + 1;
             const newNumber = `SOR-${year}-${String(count).padStart(3, '0')}`;
+
             setOutputInfo(prev => ({ ...prev, numeroSortie: newNumber }));
 
         } catch (err) {
-            console.error("Erreur lors du chargement:", err);
-            setError("Impossible de charger les données. Vérifiez que le backend est en cours d'exécution.");
+            console.error("Erreur chargement:", err);
+            setError("Impossible de charger les données fraîches.");
         } finally {
             setLoading(false);
         }
@@ -171,7 +200,9 @@ export function RegisterOutput() {
         try {
             setSubmitting(true);
 
-            // Créer la sortie
+            // 💾 TRANSACTION DE SAUVEGARDE
+            // Étape 1: Créer l'entête de la sortie
+            // POST /api/sorties/
             const personnelId = parseInt(localStorage.getItem("personnel_id") || "1");
             const sortieData = {
                 numero_sortie: outputInfo.numeroSortie,
@@ -183,7 +214,9 @@ export function RegisterOutput() {
 
             const createdSortie = await sortieApi.create(sortieData);
 
-            // Créer les lignes de sortie
+            // Étape 2: Créer les lignes de sortie et décrémenter le stock
+            // - POST /api/lignes-sortie/ (pour chaque article)
+            // - PATCH /api/materiels-.../ (mise à jour quantite_stock)
             for (const item of outputItems) {
                 const ligneData = {
                     id_sortie: createdSortie.idSortie,

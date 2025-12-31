@@ -1,19 +1,16 @@
 import { AccountantDashBoard } from "./Components/AccountantDashboard";
 import { AccountantNavLink } from "./AccountantNavLink";
 import { AccountantNavBar } from "./Components/AccountantNavBar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FaPlus, FaTrash, FaSave, FaTruck, FaExclamationTriangle, FaCheckCircle } from "react-icons/fa";
 import PropTypes from "prop-types";
 
 export function RegisterDelivery() {
-    // Base de matériels existants (simulée - à remplacer par API)
-    const [materialsDatabase, setMaterialsDatabase] = useState([
-        { code: "MED-001", name: "Gants médicaux", category: "Matériel Médical", quantity: 150 },
-        { code: "MED-002", name: "Seringues 5ml", category: "Matériel Médical", quantity: 200 },
-        { code: "MED-003", name: "Compresses stériles", category: "Matériel Médical", quantity: 30 },
-        { code: "DUR-001", name: "Stéthoscope", category: "Matériel Durable", quantity: 5 },
-        { code: "DUR-002", name: "Thermomètre digital", category: "Matériel Durable", quantity: 8 },
-    ]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // Liste des matériels (chargée depuis l'API)
+    const [materialsDatabase, setMaterialsDatabase] = useState([]);
 
     const [deliveryItems, setDeliveryItems] = useState([
         {
@@ -51,13 +48,99 @@ export function RegisterDelivery() {
 
     const [formError, setFormError] = useState("");
 
+    // Charger les données au montage
+    useEffect(() => {
+        loadData();
+    }, []);
+
+    /**
+     * 📡 CHARGEMENT DES DONNÉES (Mode "Toujours Frais")
+     */
+    async function loadData() {
+        setLoading(true);
+        setError(null);
+
+        const token = localStorage.getItem("token_key_fultang");
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+        const baseUrl = "http://127.0.0.1:8000/api";
+
+        const fetchJson = async (url) => {
+            const res = await fetch(url, { headers, cache: "no-store" });
+            if (!res.ok) {
+                // Tenter de lire le corps pour avoir des détails si c'est du JSON
+                try {
+                    const errBody = await res.json();
+                    throw new Error(errBody.detail || `Erreur HTTP ${res.status}`);
+                } catch (e) {
+                    throw new Error(`Erreur HTTP ${res.status} lors de l'appel à ${url}`);
+                }
+            }
+            return res.json();
+        };
+
+        try {
+            console.log("Chargement des données RegisterDelivery...");
+            // Charger les deux catalogues en parallèle
+            const [medicauxRes, durablesRes] = await Promise.all([
+                fetchJson(`${baseUrl}/materiels-medicaux/`),
+                fetchJson(`${baseUrl}/materiels-durables/`)
+            ]);
+
+            let medicauxData = medicauxRes.results || medicauxRes || [];
+            if (!Array.isArray(medicauxData)) {
+                console.warn("API Materiels Médicaux a renvoyé un format inattendu (pas un tableau):", medicauxData);
+                medicauxData = [];
+            }
+
+            let durablesData = durablesRes.results || durablesRes || [];
+            if (!Array.isArray(durablesData)) {
+                console.warn("API Materiels Durables a renvoyé un format inattendu (pas un tableau):", durablesData);
+                durablesData = [];
+            }
+
+            // Normalisation
+            const medicaux = medicauxData.map(m => ({
+                id: m.idMateriel || m.materiel_ptr_id,
+                code: m.code_materiel,
+                name: m.nom_Materiel,
+                category: "Matériel Médical",
+                quantity: m.quantite_stock,
+                prixAchat: parseFloat(m.prix_achat_unitaire) || 0
+            }));
+
+            const durables = durablesData.map(m => ({
+                id: m.idMateriel || m.materiel_ptr_id,
+                code: m.code_materiel,
+                name: m.nom_Materiel,
+                category: "Matériel Durable",
+                quantity: m.quantite_stock,
+                prixAchat: parseFloat(m.prix_achat_unitaire) || 0
+            }));
+
+            setMaterialsDatabase([...medicaux, ...durables]);
+            console.log("Données chargées avec succès.");
+
+        } catch (err) {
+            console.error("Erreur chargement:", err);
+            setError(`Impossible de charger le catalogue matériel: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
+    }
+
     // Générer un code automatique pour nouveau matériel
     function generateMaterialCode(type) {
         const prefix = type === "Matériel Médical" ? "MED" : "DUR";
         const existingCodes = materialsDatabase
-            .filter(m => m.code.startsWith(prefix))
+            .filter(m => m.code && m.code.startsWith(prefix))
             .map(m => parseInt(m.code.split('-')[1]) || 0);
-        const nextNumber = Math.max(...existingCodes, 0) + 1;
+
+        // Trouver le max
+        const nextNumber = existingCodes.length > 0 ? Math.max(...existingCodes) + 1 : 1;
+
         return `${prefix}-${String(nextNumber).padStart(3, '0')}`;
     }
 
@@ -160,7 +243,7 @@ export function RegisterDelivery() {
         return null;
     }
 
-    function handleSubmit(e) {
+    async function handleSubmit(e) {
         e.preventDefault();
         setFormError("");
 
@@ -170,110 +253,155 @@ export function RegisterDelivery() {
             return;
         }
 
-        // Traitement de chaque article
-        const processedItems = deliveryItems.map(item => {
-            if (item.isNewMaterial) {
-                // Créer le nouveau matériel dans la base
-                const newMaterial = {
-                    code: item.materialCode,
-                    name: item.material,
-                    category: item.type,
-                    quantity: parseInt(item.quantityReceived),
-                    description: item.description,
-                    emplacement: item.emplacement,
-                    prix_achat: parseFloat(item.unitPrice),
-                    // Champs spécifiques selon le type
-                    ...(item.type === "Matériel Médical" ? {
-                        prix_vente: parseFloat(item.prixVente),
-                        unite: item.unite,
-                        seuil_alerte: parseInt(item.seuilAlerte) || 10
-                    } : {
-                        localisation: item.localisation,
-                        numero_serie: item.numeroSerie,
-                        date_acquisition: deliveryInfo.deliveryDate,
-                        duree_garantie: parseInt(item.dureeGarantie) || 0,
-                        etat: 'bon'
-                    })
-                };
-
-                // Ajouter à la base locale (simulé)
-                setMaterialsDatabase(prev => [...prev, {
-                    code: newMaterial.code,
-                    name: newMaterial.name,
-                    category: newMaterial.category,
-                    quantity: newMaterial.quantity
-                }]);
-
-                console.log("Nouveau matériel créé:", newMaterial);
-                return { ...item, materialCode: newMaterial.code };
-            } else {
-                // Incrémenter la quantité du matériel existant
-                const quantityToAdd = parseInt(item.quantityReceived);
-                setMaterialsDatabase(prev => prev.map(m =>
-                    m.code === item.materialCode
-                        ? { ...m, quantity: m.quantity + quantityToAdd }
-                        : m
-                ));
-                console.log(`Stock de ${item.materialCode} incrémenté de ${quantityToAdd}`);
-                return item;
-            }
-        });
-
-        // Créer l'objet livraison
-        const deliveryData = {
-            ...deliveryInfo,
-            calculatedAmount: calculateTotal(),
-            items: processedItems.map(item => ({
-                materialCode: item.materialCode,
-                material: item.material,
-                type: item.type,
-                quantityOrdered: item.quantityOrdered,
-                quantityReceived: item.quantityReceived,
-                unitPrice: item.unitPrice,
-                justification: item.justification,
-                isNewMaterial: item.isNewMaterial
-            }))
+        const token = localStorage.getItem("token_key_fultang");
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
         };
+        const baseUrl = "http://127.0.0.1:8000/api";
 
-        console.log("Livraison enregistrée:", deliveryData);
+        try {
+            setLoading(true); // Réutiliser loading state ou créer submitting state
 
-        // Sauvegarder dans localStorage
-        const savedDeliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-        savedDeliveries.unshift(deliveryData);
-        localStorage.setItem('deliveries', JSON.stringify(savedDeliveries));
+            // 1. Créer la livraison (Entête)
+            const personnelId = parseInt(localStorage.getItem("personnel_id") || "1");
+            const deliveryData = {
+                fournisseur: deliveryInfo.supplier,
+                numero_bon_livraison: deliveryInfo.deliveryNoteNumber,
+                date_livraison: deliveryInfo.deliveryDate,
+                date_reception: deliveryInfo.receptionDate,
+                montant_total: calculateTotal(),
+                idPersonnel: personnelId
+            };
 
-        alert(`Livraison enregistrée avec succès !\n\nMontant total: ${calculateTotal().toLocaleString('fr-FR')} FCFA\n\n${deliveryItems.filter(i => i.isNewMaterial).length} nouveau(x) matériel(s) créé(s)\n${deliveryItems.filter(i => !i.isNewMaterial).length} matériel(s) existant(s) mis à jour`);
+            const livRes = await fetch(`${baseUrl}/livraisons/`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(deliveryData)
+            });
 
-        // Réinitialiser le formulaire
-        setDeliveryInfo({
-            supplier: "",
-            deliveryNoteNumber: "",
-            deliveryDate: new Date().toISOString().split('T')[0],
-            receptionDate: new Date().toISOString().split('T')[0],
-            supplierContact: "",
-            amount: ""
-        });
-        setDeliveryItems([{
-            id: Date.now(),
-            isNewMaterial: false,
-            material: "",
-            materialCode: "",
-            type: "Matériel Médical",
-            quantityOrdered: "",
-            quantityReceived: "",
-            unitPrice: "",
-            justification: "",
-            prixVente: "",
-            unite: "boîte",
-            datePeremption: "",
-            lot: "",
-            seuilAlerte: "10",
-            localisation: "",
-            numeroSerie: "",
-            dureeGarantie: "",
-            description: "",
-            emplacement: ""
-        }]);
+            if (!livRes.ok) throw new Error("Erreur création livraison");
+            const createdDelivery = await livRes.json();
+            const idLivraison = createdDelivery.idLivraison;
+
+            // 2. Traiter chaque article
+            for (const item of deliveryItems) {
+                let materialId = null;
+
+                if (item.isNewMaterial) {
+                    // A. Créer le nouveau matériel
+                    const isMedical = item.type === "Matériel Médical";
+                    const newMatData = {
+                        code_materiel: item.materialCode,
+                        nom_Materiel: item.material,
+                        quantite_stock: parseInt(item.quantityReceived),
+                        prix_achat_unitaire: parseFloat(item.unitPrice),
+                        description: item.description || "",
+                        // Champs spécifiques
+                        ...(isMedical ? {
+                            prix_vente_unitaire: parseFloat(item.prixVente),
+                            unite_mesure: item.unite,
+                            seuil_alerte: parseInt(item.seuilAlerte) || 10,
+                            date_peremption: null // Pas géré dans formulaire actuel
+                        } : {
+                            localisation: item.localisation,
+                            numero_serie: item.numeroSerie,
+                            duree_garantie: parseInt(item.dureeGarantie) || 0,
+                            etat: 'bon'
+                        })
+                    };
+
+                    const endpoint = isMedical ? '/materiels-medicaux/' : '/materiels-durables/';
+                    const matRes = await fetch(`${baseUrl}${endpoint}`, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify(newMatData)
+                    });
+
+                    if (!matRes.ok) throw new Error(`Erreur création matériel ${item.material}`);
+                    const createdMat = await matRes.json();
+                    materialId = createdMat.idMateriel || createdMat.materiel_ptr_id;
+
+                } else {
+                    // B. Matériel existant : Récupérer son ID via le code
+                    const existingMat = materialsDatabase.find(m => m.code === item.materialCode);
+                    if (!existingMat) throw new Error(`Matériel introuvable ${item.materialCode}`);
+                    materialId = existingMat.id;
+
+                    // Mettre à jour le stock (PATCH)
+                    const endpoint = existingMat.category === "Matériel Médical"
+                        ? `/materiels-medicaux/${materialId}/`
+                        : `/materiels-durables/${materialId}/`;
+
+                    const newQuantity = (existingMat.quantity || 0) + parseInt(item.quantityReceived);
+
+                    await fetch(`${baseUrl}${endpoint}`, {
+                        method: 'PATCH',
+                        headers,
+                        body: JSON.stringify({ quantite_stock: newQuantity })
+                    });
+                }
+
+                // 3. Créer la ligne de livraison
+                if (materialId) {
+                    const ligneData = {
+                        id_livraison: idLivraison,
+                        id_materiel: materialId,
+                        quantite_recu: parseInt(item.quantityReceived),
+                        prix_unitaire: parseFloat(item.unitPrice),
+                        ecart_accuse: false, // Par défaut
+                        commentaire_ecart: item.justification || ""
+                    };
+
+                    await fetch(`${baseUrl}/lignes-livraison/`, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify(ligneData)
+                    });
+                }
+            }
+
+            // Succès
+            alert(`Livraison enregistrée avec succès ! (N° ${deliveryInfo.deliveryNoteNumber})`);
+
+            // Recharger les données pour mettre à jour les stocks affichés
+            await loadData();
+
+            // Reset form
+            setDeliveryInfo({
+                supplier: "",
+                deliveryNoteNumber: "",
+                deliveryDate: new Date().toISOString().split('T')[0],
+                receptionDate: new Date().toISOString().split('T')[0],
+                supplierContact: "",
+                amount: ""
+            });
+            setDeliveryItems([{
+                id: Date.now(),
+                isNewMaterial: false,
+                material: "",
+                materialCode: "",
+                type: "Matériel Médical",
+                quantityOrdered: "",
+                quantityReceived: "",
+                unitPrice: "",
+                justification: "",
+                prixVente: "",
+                unite: "boîte",
+                seuilAlerte: "10",
+                localisation: "",
+                numeroSerie: "",
+                dureeGarantie: "",
+                description: "",
+                emplacement: ""
+            }]);
+
+        } catch (err) {
+            console.error("Erreur enregistrement:", err);
+            setFormError("Erreur lors de l'enregistrement de la livraison. Détails console.");
+        } finally {
+            setLoading(false);
+        }
     }
 
     return (
@@ -289,6 +417,22 @@ export function RegisterDelivery() {
                         <h1 className="text-3xl font-bold text-gray-800">Enregistrer une Livraison</h1>
                     </div>
                 </div>
+
+                {error && (
+                    <div className="p-4 bg-red-100 border border-red-300 rounded-lg flex items-start gap-3 mb-4">
+                        <FaExclamationTriangle className="text-red-600 mt-0.5" />
+                        <div>
+                            <p className="font-bold text-red-800">Erreur de chargement</p>
+                            <p className="text-sm text-red-700">{error}</p>
+                            <button
+                                onClick={loadData}
+                                className="mt-2 text-sm text-red-800 underline hover:text-red-900"
+                            >
+                                Réessayer
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {formError && (
                     <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
@@ -345,14 +489,14 @@ export function RegisterDelivery() {
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Date de livraison *
+                                    Date de création *
                                 </label>
                                 <input
                                     type="date"
                                     value={deliveryInfo.deliveryDate}
-                                    onChange={(e) => setDeliveryInfo({ ...deliveryInfo, deliveryDate: e.target.value })}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                    required
+                                    className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed text-gray-600"
+                                    disabled
+                                    title="Date de création automatique (non modifiable)"
                                 />
                             </div>
 

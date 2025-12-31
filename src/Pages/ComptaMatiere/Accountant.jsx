@@ -52,67 +52,86 @@ export function Accountant() {
     loadData();
   }, []);
 
-  async function loadData() {
+  /**
+   * 📡 CHARGEMENT DES DONNÉES (Mode "Toujours Frais")
+   * Utilisation de fetch avec cache: "no-store" pour éviter le cache navigateur.
+   */
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+
+    const token = localStorage.getItem("token_key_fultang");
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+    const baseUrl = "http://127.0.0.1:8000/api";
+
     try {
-      setLoading(true);
-      setError(null);
+      console.log("🚀 Dashboard - Chargement des données fraîches...");
 
-      // Charger les matériels médicaux
-      const medicauxData = await materielMedicalApi.getAll();
-      const medicaux = medicauxData.results || medicauxData;
+      const [medicauxRes, durablesRes, sortiesRes, livraisonsRes, besoinsRes] = await Promise.all([
+        fetch(`${baseUrl}/materiels-medicaux/?page_size=1000`, { headers, cache: "no-store" }).then(res => res.json()),
+        fetch(`${baseUrl}/materiels-durables/?page_size=1000`, { headers, cache: "no-store" }).then(res => res.json()),
+        fetch(`${baseUrl}/sorties/?page_size=1000`, { headers, cache: "no-store" }).then(res => res.json()),
+        fetch(`${baseUrl}/livraisons/?page_size=1000`, { headers, cache: "no-store" }).then(res => res.json()),
+        fetch(`${baseUrl}/besoins/?page_size=1000`, { headers, cache: "no-store" }).then(res => res.json())
+      ]);
 
-      // Charger les matériels durables
-      const durablesData = await materielDurableApi.getAll();
-      const durables = durablesData.results || durablesData;
+      // Extraire les résultats (gestion format paginé Django Rest Framework)
+      const medicaux = medicauxRes.results || medicauxRes || [];
+      const durables = durablesRes.results || durablesRes || [];
+      const sorties = sortiesRes.results || sortiesRes || [];
+      const livraisons = livraisonsRes.results || livraisonsRes || [];
+      const besoins = besoinsRes.results || besoinsRes || [];
 
-      // Charger les sorties
-      const sortiesData = await sortieApi.getAll();
-      const sorties = sortiesData.results || sortiesData;
+      // 🔢 OPÉRATIONS STATISTIQUES
+      // Compter uniquement les besoins EN_COURS (à traiter par le comptable)
+      const pendingCount = besoins.filter(b => b.statut === 'EN_COURS').length;
 
-      // Charger les livraisons
-      const livraisonsData = await livraisonApi.getAll();
-      const livraisons = livraisonsData.results || livraisonsData;
-
-      // Charger les besoins
-      const besoinsData = await besoinApi.getAll();
-      const besoins = besoinsData.results || besoinsData;
-
-      // Calculer les statistiques
       setStats({
         totalMaterial: medicaux.length + durables.length,
         totalMedical: medicaux.length,
         totalOutputs: sorties.length,
-        pendingNeeds: besoins.filter(b => b.statut === 'NON_TRAITE' || b.statut === 'EN_COURS').length,
+        pendingNeeds: pendingCount,
         totalDeliveries: livraisons.length,
         totalDurable: durables.length,
       });
 
-      // Récupérer les besoins en cours avec leurs lignes
-      const besoinsNonTraites = besoins.filter(b => b.statut === 'NON_TRAITE' || b.statut === 'EN_COURS');
-      const besoinsFormates = await Promise.all(
-        besoinsNonTraites.slice(0, 10).map(async (b) => {
-          let lignes = [];
-          try {
-            const lignesData = await ligneBesoinApi.getByBesoin(b.idBesoin);
-            lignes = lignesData.results || lignesData;
-          } catch {
-            // Ignorer les erreurs de chargement des lignes
-          }
+      // Récupérer UNIQUEMENT les besoins EN_COURS pour le comptable
+      const besoinsEnCoursFiltered = besoins.filter(b =>
+        b.statut === 'EN_COURS'
+      ).slice(0, 20);
 
-          const quantiteTotal = lignes.reduce((sum, l) => sum + (l.quantite_demandee || 0), 0);
-          const description = lignes.length > 0
-            ? lignes.map(l => l.materiel_nom).join(', ')
-            : b.motif;
+      const besoinsFormates = await Promise.all(
+        besoinsEnCoursFiltered.map(async (b) => {
+          // Récupérer les lignes de chaque besoin individuellement avec no-store
+          let description = b.motif;
+          let quantiteTotal = 1;
+
+          try {
+            const lignesRes = await fetch(`${baseUrl}/lignes-besoin/?besoin=${b.idBesoin}&page_size=1000`, { headers, cache: "no-store" });
+            const lignesData = await lignesRes.json();
+            const lignes = lignesData.results || lignesData || [];
+
+            if (lignes.length > 0) {
+              quantiteTotal = lignes.reduce((sum, l) => sum + (l.quantite_demandee || 0), 0);
+              description = lignes.map(l => l.materiel_nom).join(', ');
+            }
+          } catch (err) {
+            console.warn(`Erreur lignes pour besoin ${b.idBesoin}`, err);
+          }
 
           return {
             id: b.idBesoin,
             code: b.code_besoin || `BES-${b.idBesoin}`,
             departement: `Personnel #${b.idPersonnel_emetteur}`,
-            description: description || b.motif || 'Non spécifié',
-            quantite: quantiteTotal || lignes.length || 1,
+            description: description || 'Non spécifié',
+            quantite: quantiteTotal,
             priorite: mapPriorite(b.priorite),
             dateEmission: b.date_creation_besoin?.split('T')[0] || '-',
             statut: mapStatut(b.statut),
+            rawStatut: b.statut, // Conserver le statut original pour les actions
           };
         })
       );
@@ -120,12 +139,12 @@ export function Accountant() {
       setBesoinsEnCours(besoinsFormates);
 
     } catch (err) {
-      console.error("Erreur lors du chargement:", err);
-      setError("Impossible de charger les données. Vérifiez que le backend est en cours d'exécution.");
+      console.error("❌ Erreur chargement:", err);
+      setError("Impossible de charger les données fraîches.");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   function mapPriorite(priorite) {
     const map = {
@@ -145,6 +164,45 @@ export function Accountant() {
     };
     return map[statut] || 'en_attente';
   }
+
+  /**
+   * 📝 TRAITER UN BESOIN (Passer de EN_COURS à TRAITE)
+   */
+  const handleTraiterBesoin = async (besoin) => {
+    const confirmation = window.confirm(`Voulez-vous marquer le besoin ${besoin.code} comme traité ?`);
+    if (!confirmation) return;
+
+    const token = localStorage.getItem("token_key_fultang");
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+    const baseUrl = "http://127.0.0.1:8000/api";
+
+    try {
+      setLoading(true);
+
+      const response = await fetch(`${baseUrl}/besoins/${besoin.id}/`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ statut: 'TRAITE' })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP ${response.status}`);
+      }
+
+      // Recharger les données
+      await loadData();
+      alert(`✅ Besoin ${besoin.code} marqué comme traité avec succès !`);
+
+    } catch (err) {
+      console.error("Erreur lors du traitement du besoin:", err);
+      alert("❌ Erreur lors du traitement du besoin. Veuillez réessayer.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const scrollToBesoins = () => {
     besoinsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -308,6 +366,7 @@ export function Accountant() {
                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Priorité</th>
                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Date</th>
                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Statut</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -323,6 +382,15 @@ export function Accountant() {
                       <td className="px-4 py-3 text-center text-sm text-gray-500">{besoin.dateEmission}</td>
                       <td className="px-4 py-3 text-center">
                         <StatutBadge statut={besoin.statut} />
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleTraiterBesoin(besoin)}
+                          disabled={loading}
+                          className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                        >
+                          {loading ? 'Traitement...' : 'Traiter'}
+                        </button>
                       </td>
                     </tr>
                   ))}

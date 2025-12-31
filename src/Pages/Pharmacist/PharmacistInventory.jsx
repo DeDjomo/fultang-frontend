@@ -18,11 +18,6 @@ import {
     FaSyncAlt
 } from "react-icons/fa";
 import jsPDF from "jspdf";
-import {
-    materielMedicalApi,
-    archiveInventaireApi,
-    ligneArchiveApi
-} from "../../services/comptabiliteMatiereApi";
 
 export function PharmacistInventory() {
     const navigate = useNavigate();
@@ -58,13 +53,21 @@ export function PharmacistInventory() {
     }, []);
 
     async function loadData() {
+        const token = localStorage.getItem("token_key_fultang");
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+        const baseUrl = "http://127.0.0.1:8000/api";
+
         try {
             setLoading(true);
             setError(null);
 
-            // Charger les matériels médicaux
-            const materielsData = await materielMedicalApi.getAll();
-            const medicationsFormatted = (materielsData.results || materielsData).map(m => ({
+            // Charger les matériels médicaux avec fetch
+            const materielsRes = await fetch(`${baseUrl}/materiels-medicaux/`, { headers, cache: "no-store" });
+            const materielsData = await materielsRes.json();
+            const medicationsFormatted = (materielsData.results || materielsData || []).map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
@@ -76,9 +79,10 @@ export function PharmacistInventory() {
             }));
             setMedications(medicationsFormatted);
 
-            // Charger les archives d'inventaire
-            const archivesData = await archiveInventaireApi.getAll();
-            const archivesList = archivesData.results || archivesData;
+            // Charger les archives d'inventaire avec fetch
+            const archivesRes = await fetch(`${baseUrl}/archives-inventaire/`, { headers, cache: "no-store" });
+            const archivesData = await archivesRes.json();
+            const archivesList = archivesData.results || archivesData || [];
             setArchives(archivesList);
 
             // Vérifier s'il y a un inventaire en cours
@@ -99,9 +103,17 @@ export function PharmacistInventory() {
     }
 
     async function loadArchiveLines(archive) {
+        const token = localStorage.getItem("token_key_fultang");
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+        const baseUrl = "http://127.0.0.1:8000/api";
+
         try {
-            const linesData = await ligneArchiveApi.getByArchive(archive.id_archive);
-            const lines = linesData.results || linesData;
+            const linesRes = await fetch(`${baseUrl}/lignes-archive-inventaire/?archive=${archive.id_archive}`, { headers, cache: "no-store" });
+            const linesData = await linesRes.json();
+            const lines = linesData.results || linesData || [];
 
             // Mettre à jour les médicaments avec les données de l'archive
             setMedications(prev => prev.map(med => {
@@ -141,24 +153,41 @@ export function PharmacistInventory() {
                 observations: `Inventaire démarré le ${now.toLocaleDateString('fr-FR')}`
             };
 
-            const newArchive = await archiveInventaireApi.create(archiveData);
+            const token = localStorage.getItem("token_key_fultang");
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+            const baseUrl = "http://127.0.0.1:8000/api";
+
+            const archiveRes = await fetch(`${baseUrl}/archives-inventaire/`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(archiveData)
+            });
+            const newArchive = await archiveRes.json();
             setCurrentArchive(newArchive);
 
             // Créer les lignes d'archive pour chaque médicament
             for (const med of medications) {
-                await ligneArchiveApi.create({
-                    id_archive: newArchive.id_archive,
-                    id_materiel: med.id,
-                    code_materiel: med.code,
-                    nom_materiel: med.name,
-                    prix_vente: med.prixVente,
-                    quantite_ancien_stock: med.quantiteActuelle
+                await fetch(`${baseUrl}/lignes-archive-inventaire/`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        id_archive: newArchive.id_archive,
+                        id_materiel: med.id,
+                        code_materiel: med.code,
+                        nom_materiel: med.name,
+                        prix_vente: med.prixVente,
+                        quantite_ancien_stock: med.quantiteActuelle
+                    })
                 });
             }
 
             // Recharger les archives
-            const archivesData = await archiveInventaireApi.getAll();
-            setArchives(archivesData.results || archivesData);
+            const archivesRes = await fetch(`${baseUrl}/archives-inventaire/`, { headers, cache: "no-store" });
+            const archivesData = await archivesRes.json();
+            setArchives(archivesData.results || archivesData || []);
 
             // Réinitialiser les nouvelles quantités
             setMedications(medications.map(m => ({ ...m, nouvelleQuantite: "" })));
@@ -194,9 +223,17 @@ export function PharmacistInventory() {
             setSaving(true);
             setError(null);
 
+            const token = localStorage.getItem("token_key_fultang");
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+            const baseUrl = "http://127.0.0.1:8000/api";
+
             // Récupérer les lignes de l'archive en cours
-            const linesData = await ligneArchiveApi.getByArchive(currentArchive.id_archive);
-            const lines = linesData.results || linesData;
+            const linesRes = await fetch(`${baseUrl}/lignes-archive-inventaire/?archive=${currentArchive.id_archive}`, { headers, cache: "no-store" });
+            const linesData = await linesRes.json();
+            const lines = linesData.results || linesData || [];
 
             // Mettre à jour chaque ligne avec la nouvelle quantité
             for (const med of medications) {
@@ -208,23 +245,35 @@ export function PharmacistInventory() {
                     if (difference > 0) statutDiff = "EXCEDENT";
                     else if (difference < 0) statutDiff = "DEFICIT";
 
-                    await ligneArchiveApi.patch(line.id_ligne_archive, {
-                        quantite_nouveau_stock: nouveauStock,
-                        difference: difference,
-                        statut_difference: statutDiff
+                    await fetch(`${baseUrl}/lignes-archive-inventaire/${line.id_ligne_archive}/`, {
+                        method: 'PATCH',
+                        headers,
+                        body: JSON.stringify({
+                            quantite_nouveau_stock: nouveauStock,
+                            difference: difference,
+                            statut_difference: statutDiff
+                        })
                     });
 
                     // Mettre à jour le stock du matériel
-                    await materielMedicalApi.patch(med.id, {
-                        quantite_stock: nouveauStock
+                    await fetch(`${baseUrl}/materiels-medicaux/${med.id}/`, {
+                        method: 'PATCH',
+                        headers,
+                        body: JSON.stringify({
+                            quantite_stock: nouveauStock
+                        })
                     });
                 }
             }
 
             // Terminer l'archive
-            await archiveInventaireApi.patch(currentArchive.id_archive, {
-                statut: "TERMINE",
-                date_termine: new Date().toISOString()
+            await fetch(`${baseUrl}/archives-inventaire/${currentArchive.id_archive}/`, {
+                method: 'PATCH',
+                headers,
+                body: JSON.stringify({
+                    statut: "TERMINE",
+                    date_termine: new Date().toISOString()
+                })
             });
 
             // Recharger les données
@@ -268,16 +317,32 @@ export function PharmacistInventory() {
     }
 
     async function viewArchive(archive) {
+        const token = localStorage.getItem("token_key_fultang");
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+        const baseUrl = "http://127.0.0.1:8000/api";
+
         try {
             setLoading(true);
-            const linesData = await ligneArchiveApi.getByArchive(archive.id_archive);
-            const lines = linesData.results || linesData;
+            const linesRes = await fetch(`${baseUrl}/lignes-archive-inventaire/?archive=${archive.id_archive}`, { headers, cache: "no-store" });
+
+            if (!linesRes.ok) {
+                throw new Error(`Erreur HTTP ${linesRes.status}: ${linesRes.statusText}`);
+            }
+
+            const linesData = await linesRes.json();
+            const lines = Array.isArray(linesData) ? linesData : (linesData.results || []);
+
+            console.log(`📦 Archive ${archive.code_archive}: ${lines.length} lignes chargées`);
+
             setSelectedArchiveLines(lines);
             setSelectedArchive(archive);
             setShowArchiveModal(true);
         } catch (err) {
-            console.error("Erreur lors du chargement de l'archive:", err);
-            setError("Impossible de charger les détails de l'archive.");
+            console.error("❌ Erreur lors du chargement de l'archive:", err);
+            setError(`Impossible de charger les détails de l'archive: ${err.message}`);
         } finally {
             setLoading(false);
         }

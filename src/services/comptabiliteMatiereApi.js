@@ -4,7 +4,7 @@
  */
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_COMPTABILITE_MATIERE_URL || "http://127.0.0.1:8000/api";
+const API_BASE_URL = import.meta.env.VITE_BACKEND_COMPTABILITE_MATIERE_URL || "http://127.0.0.1:8000";
 
 // Instance Axios pour la comptabilité matière
 const apiClient = axios.create({
@@ -56,202 +56,216 @@ async function fetchAllPages(endpoint) {
 
 // ============================================
 // MATÉRIELS MÉDICAUX
+// URL Backend: GET /api/materiels-medicaux/
+// Opération: Récupération de la liste des consommables médicaux
 // ============================================
 export const materielMedicalApi = {
     getAll: async () => {
         // Charger toutes les pages
-        return await fetchAllPages("/materiels-medicaux/");
+        return await fetchAllPages("/api/materiels-medicaux/");
     },
     getById: async (id) => {
-        const response = await apiClient.get(`/materiels-medicaux/${id}/`);
+        const response = await apiClient.get(`/api/materiels-medicaux/${id}/`);
         return response.data;
     },
     create: async (data) => {
-        const response = await apiClient.post("/materiels-medicaux/", data);
+        const response = await apiClient.post("/api/materiels-medicaux/", data);
         return response.data;
     },
     update: async (id, data) => {
-        const response = await apiClient.put(`/materiels-medicaux/${id}/`, data);
+        const response = await apiClient.put(`/api/materiels-medicaux/${id}/`, data);
         return response.data;
     },
     patch: async (id, data) => {
-        const response = await apiClient.patch(`/materiels-medicaux/${id}/`, data);
+        const response = await apiClient.patch(`/api/materiels-medicaux/${id}/`, data);
         return response.data;
     },
     delete: async (id) => {
-        const response = await apiClient.delete(`/materiels-medicaux/${id}/`);
+        const response = await apiClient.delete(`/api/materiels-medicaux/${id}/`);
         return response.data;
     }
 };
 
 // ============================================
 // MATÉRIELS DURABLES
+// URL Backend: GET /api/materiels-durables/
+// Opération: Récupération de la liste des équipements (lits, machines...)
 // ============================================
 export const materielDurableApi = {
     getAll: async () => {
-        const response = await apiClient.get("/materiels-durables/");
+        const response = await apiClient.get("/api/materiels-durables/");
         return response.data;
     },
     getById: async (id) => {
-        const response = await apiClient.get(`/materiels-durables/${id}/`);
+        const response = await apiClient.get(`/api/materiels-durables/${id}/`);
         return response.data;
     },
     create: async (data) => {
-        const response = await apiClient.post("/materiels-durables/", data);
+        const response = await apiClient.post("/api/materiels-durables/", data);
         return response.data;
     },
     update: async (id, data) => {
-        const response = await apiClient.put(`/materiels-durables/${id}/`, data);
+        const response = await apiClient.put(`/api/materiels-durables/${id}/`, data);
         return response.data;
     },
     delete: async (id) => {
-        const response = await apiClient.delete(`/materiels-durables/${id}/`);
+        const response = await apiClient.delete(`/api/materiels-durables/${id}/`);
         return response.data;
     }
 };
 
 // ============================================
 // ARCHIVES D'INVENTAIRE
+// URL Backend: GET /api/archives-inventaire/
+// Opération: Historique des inventaires réalisés
 // ============================================
 export const archiveInventaireApi = {
     getAll: async () => {
-        return await fetchAllPages("/archives-inventaire/");
+        return await fetchAllPages("/api/archives-inventaire/");
     },
     getById: async (id) => {
-        const response = await apiClient.get(`/archives-inventaire/${id}/`);
+        const response = await apiClient.get(`/api/archives-inventaire/${id}/`);
         return response.data;
     },
     create: async (data) => {
-        const response = await apiClient.post("/archives-inventaire/", data);
+        const response = await apiClient.post("/api/archives-inventaire/", data);
         return response.data;
     },
     update: async (id, data) => {
-        const response = await apiClient.put(`/archives-inventaire/${id}/`, data);
+        const response = await apiClient.put(`/api/archives-inventaire/${id}/`, data);
         return response.data;
     },
     patch: async (id, data) => {
-        const response = await apiClient.patch(`/archives-inventaire/${id}/`, data);
+        const response = await apiClient.patch(`/api/archives-inventaire/${id}/`, data);
         return response.data;
     },
     terminer: async (id) => {
-        const response = await apiClient.patch(`/archives-inventaire/${id}/`, { statut: "TERMINE" });
+        const response = await apiClient.patch(`/api/archives-inventaire/${id}/`, { statut: "TERMINE" });
         return response.data;
     },
     delete: async (id) => {
-        const response = await apiClient.delete(`/archives-inventaire/${id}/`);
+        const response = await apiClient.delete(`/api/archives-inventaire/${id}/`);
         return response.data;
     }
 };
 
 // ============================================
 // LIGNES D'ARCHIVE D'INVENTAIRE
+// URL Backend: GET /api/lignes-archive/
+// Opération: Détails des produits pour un inventaire donné
 // ============================================
 export const ligneArchiveApi = {
     getAll: async () => {
-        return await fetchAllPages("/lignes-archive/");
+        return await fetchAllPages("/api/lignes-archive/");
     },
     getByArchive: async (archiveId) => {
-        const response = await apiClient.get(`/lignes-archive/?archive=${archiveId}`);
+        const response = await apiClient.get(`/api/lignes-archive/?archive=${archiveId}`);
         return response.data;
     },
     getById: async (id) => {
-        const response = await apiClient.get(`/lignes-archive/${id}/`);
+        const response = await apiClient.get(`/api/lignes-archive/${id}/`);
         return response.data;
     },
     create: async (data) => {
-        const response = await apiClient.post("/lignes-archive/", data);
+        const response = await apiClient.post("/api/lignes-archive/", data);
         return response.data;
     },
     update: async (id, data) => {
-        const response = await apiClient.put(`/lignes-archive/${id}/`, data);
+        const response = await apiClient.put(`/api/lignes-archive/${id}/`, data);
         return response.data;
     },
     patch: async (id, data) => {
-        const response = await apiClient.patch(`/lignes-archive/${id}/`, data);
+        const response = await apiClient.patch(`/api/lignes-archive/${id}/`, data);
         return response.data;
     },
     delete: async (id) => {
-        const response = await apiClient.delete(`/lignes-archive/${id}/`);
+        const response = await apiClient.delete(`/api/lignes-archive/${id}/`);
         return response.data;
     }
 };
 
 // ============================================
 // SORTIES
+// URL Backend: GET /api/sorties/
+// Opération: Gestion des sorties de stock vers les services
 // ============================================
 export const sortieApi = {
     getAll: async () => {
-        return await fetchAllPages("/sorties/");
+        return await fetchAllPages("/api/sorties/");
     },
     getById: async (id) => {
-        const response = await apiClient.get(`/sorties/${id}/`);
+        const response = await apiClient.get(`/api/sorties/${id}/`);
         return response.data;
     },
     create: async (data) => {
-        const response = await apiClient.post("/sorties/", data);
+        const response = await apiClient.post("/api/sorties/", data);
         return response.data;
     },
     update: async (id, data) => {
-        const response = await apiClient.put(`/sorties/${id}/`, data);
+        const response = await apiClient.put(`/api/sorties/${id}/`, data);
         return response.data;
     },
     delete: async (id) => {
-        const response = await apiClient.delete(`/sorties/${id}/`);
+        const response = await apiClient.delete(`/api/sorties/${id}/`);
         return response.data;
     }
 };
 
 // ============================================
 // LIGNES DE SORTIE
+// URL Backend: GET /api/lignes-sortie/
+// Opération: Détail des produits contenus dans une sortie
 // ============================================
 export const ligneSortieApi = {
     getAll: async () => {
-        const response = await apiClient.get("/lignes-sortie/");
+        const response = await apiClient.get("/api/lignes-sortie/");
         return response.data;
     },
     getBySortie: async (sortieId) => {
-        const response = await apiClient.get(`/lignes-sortie/?id_sortie=${sortieId}`);
+        const response = await apiClient.get(`/api/lignes-sortie/?id_sortie=${sortieId}`);
         return response.data;
     },
     create: async (data) => {
-        const response = await apiClient.post("/lignes-sortie/", data);
+        const response = await apiClient.post("/api/lignes-sortie/", data);
         return response.data;
     },
     delete: async (id) => {
-        const response = await apiClient.delete(`/lignes-sortie/${id}/`);
+        const response = await apiClient.delete(`/api/lignes-sortie/${id}/`);
         return response.data;
     }
 };
 
 // ============================================
 // RAPPORTS
+// URL Backend: GET /api/rapports/
+// Opération: Rapports générés par le système ou les utilisateurs
 // ============================================
 export const rapportApi = {
     getAll: async () => {
-        return await fetchAllPages("/rapports/");
+        return await fetchAllPages("/api/rapports/");
     },
     getById: async (id) => {
-        const response = await apiClient.get(`/rapports/${id}/`);
+        const response = await apiClient.get(`/api/rapports/${id}/`);
         return response.data;
     },
     create: async (data) => {
-        const response = await apiClient.post("/rapports/", data);
+        const response = await apiClient.post("/api/rapports/", data);
         return response.data;
     },
     update: async (id, data) => {
-        const response = await apiClient.put(`/rapports/${id}/`, data);
+        const response = await apiClient.put(`/api/rapports/${id}/`, data);
         return response.data;
     },
     patch: async (id, data) => {
-        const response = await apiClient.patch(`/rapports/${id}/`, data);
+        const response = await apiClient.patch(`/api/rapports/${id}/`, data);
         return response.data;
     },
     marquerLu: async (id) => {
-        const response = await apiClient.patch(`/rapports/${id}/`, { est_lu: true, statut: "lu" });
+        const response = await apiClient.patch(`/api/rapports/${id}/`, { est_lu: true, statut: "lu" });
         return response.data;
     },
     delete: async (id) => {
-        const response = await apiClient.delete(`/rapports/${id}/`);
+        const response = await apiClient.delete(`/api/rapports/${id}/`);
         return response.data;
     }
 };
@@ -261,22 +275,22 @@ export const rapportApi = {
 // ============================================
 export const besoinApi = {
     getAll: async () => {
-        return await fetchAllPages("/besoins/");
+        return await fetchAllPages("/api/besoins/");
     },
     getById: async (id) => {
-        const response = await apiClient.get(`/besoins/${id}/`);
+        const response = await apiClient.get(`/api/besoins/${id}/`);
         return response.data;
     },
     create: async (data) => {
-        const response = await apiClient.post("/besoins/", data);
+        const response = await apiClient.post("/api/besoins/", data);
         return response.data;
     },
     update: async (id, data) => {
-        const response = await apiClient.put(`/besoins/${id}/`, data);
+        const response = await apiClient.put(`/api/besoins/${id}/`, data);
         return response.data;
     },
     delete: async (id) => {
-        const response = await apiClient.delete(`/besoins/${id}/`);
+        const response = await apiClient.delete(`/api/besoins/${id}/`);
         return response.data;
     }
 };
@@ -286,19 +300,19 @@ export const besoinApi = {
 // ============================================
 export const ligneBesoinApi = {
     getAll: async () => {
-        const response = await apiClient.get("/lignes-besoin/");
+        const response = await apiClient.get("/api/lignes-besoin/");
         return response.data;
     },
     getByBesoin: async (besoinId) => {
-        const response = await apiClient.get(`/lignes-besoin/?id_besoin=${besoinId}`);
+        const response = await apiClient.get(`/api/lignes-besoin/?id_besoin=${besoinId}`);
         return response.data;
     },
     create: async (data) => {
-        const response = await apiClient.post("/lignes-besoin/", data);
+        const response = await apiClient.post("/api/lignes-besoin/", data);
         return response.data;
     },
     delete: async (id) => {
-        const response = await apiClient.delete(`/lignes-besoin/${id}/`);
+        const response = await apiClient.delete(`/api/lignes-besoin/${id}/`);
         return response.data;
     }
 };
@@ -308,22 +322,22 @@ export const ligneBesoinApi = {
 // ============================================
 export const livraisonApi = {
     getAll: async () => {
-        return await fetchAllPages("/livraisons/");
+        return await fetchAllPages("/api/livraisons/");
     },
     getById: async (id) => {
-        const response = await apiClient.get(`/livraisons/${id}/`);
+        const response = await apiClient.get(`/api/livraisons/${id}/`);
         return response.data;
     },
     create: async (data) => {
-        const response = await apiClient.post("/livraisons/", data);
+        const response = await apiClient.post("/api/livraisons/", data);
         return response.data;
     },
     update: async (id, data) => {
-        const response = await apiClient.put(`/livraisons/${id}/`, data);
+        const response = await apiClient.put(`/api/livraisons/${id}/`, data);
         return response.data;
     },
     delete: async (id) => {
-        const response = await apiClient.delete(`/livraisons/${id}/`);
+        const response = await apiClient.delete(`/api/livraisons/${id}/`);
         return response.data;
     }
 };
@@ -333,18 +347,18 @@ export const livraisonApi = {
 // ============================================
 export const ligneLivraisonApi = {
     getAll: async () => {
-        return await fetchAllPages("/lignes-livraison/");
+        return await fetchAllPages("/api/lignes-livraison/");
     },
     getByLivraison: async (livraisonId) => {
-        const response = await apiClient.get(`/lignes-livraison/?id_livraison=${livraisonId}`);
+        const response = await apiClient.get(`/api/lignes-livraison/?id_livraison=${livraisonId}`);
         return response.data;
     },
     create: async (data) => {
-        const response = await apiClient.post("/lignes-livraison/", data);
+        const response = await apiClient.post("/api/lignes-livraison/", data);
         return response.data;
     },
     delete: async (id) => {
-        const response = await apiClient.delete(`/lignes-livraison/${id}/`);
+        const response = await apiClient.delete(`/api/lignes-livraison/${id}/`);
         return response.data;
     }
 };

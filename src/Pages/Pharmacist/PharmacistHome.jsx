@@ -28,13 +28,26 @@ export function PharmacistHome() {
     }, []);
 
     async function loadData() {
+        const token = localStorage.getItem("token_key_fultang");
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+        const baseUrl = "http://127.0.0.1:8000/api";
+
         try {
             setLoading(true);
             setError(null);
 
-            // Charger les matériels médicaux
-            const materielsData = await materielMedicalApi.getAll();
-            const medicationsList = (materielsData.results || materielsData).map(m => ({
+            // Charger en parallèle
+            const [materielsRes, sortiesRes] = await Promise.all([
+                fetch(`${baseUrl}/materiels-medicaux/`, { headers, cache: "no-store" }).then(res => res.json()),
+                fetch(`${baseUrl}/sorties/`, { headers, cache: "no-store" }).then(res => res.json())
+            ]);
+
+            // 1. Traiter Matériels
+            const materielsData = materielsRes.results || materielsRes || [];
+            const medicationsList = materielsData.map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
@@ -44,27 +57,25 @@ export function PharmacistHome() {
             }));
             setMedications(medicationsList);
 
-            // Charger les sorties du jour (ventes)
-            const sortiesData = await sortieApi.getAll();
-            const sorties = sortiesData.results || sortiesData;
+            // 2. Traiter Ventes du jour
+            const sortiesData = sortiesRes.results || sortiesRes || [];
             const today = new Date().toISOString().split('T')[0];
 
-            // Filtrer les ventes du jour
-            const ventesAujourdHui = sorties.filter(s => {
+            const ventesAujourdHui = sortiesData.filter(s => {
                 const sortieDate = s.date_sortie?.split('T')[0] || '';
                 return sortieDate === today && s.motif_sortie === 'VENTE';
             }).map(s => ({
                 id: s.idSortie,
-                medication: s.numero_sortie,
-                quantity: 1,
+                medication: s.numero_sortie, // On affiche le N° de sortie faute de nom précis ici sans join
+                quantity: 1, // Simplification, idéalement il faudrait les lignes
                 total: parseFloat(s.montant_total) || 0,
                 time: new Date(s.date_sortie).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
             }));
             setDailySales(ventesAujourdHui);
 
         } catch (err) {
-            console.error("Erreur lors du chargement des données:", err);
-            setError("Impossible de charger les données. Vérifiez que le backend est en cours d'exécution.");
+            console.error("Erreur chargement données:", err);
+            setError("Impossible de charger les données fraîches.");
         } finally {
             setLoading(false);
         }

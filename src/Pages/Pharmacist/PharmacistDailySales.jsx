@@ -45,13 +45,26 @@ export function PharmacistDailySales() {
     }, []);
 
     async function loadData() {
+        const token = localStorage.getItem("token_key_fultang");
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+        const baseUrl = "http://127.0.0.1:8000/api";
+
         try {
             setLoading(true);
             setError(null);
 
-            // Charger les matériels médicaux
-            const materielsData = await materielMedicalApi.getAll();
-            const medicationsList = (materielsData.results || materielsData).map(m => ({
+            // Charger les deux en parallèle
+            const [materielsRes, sortiesRes] = await Promise.all([
+                fetch(`${baseUrl}/materiels-medicaux/`, { headers, cache: "no-store" }).then(res => res.json()),
+                fetch(`${baseUrl}/sorties/`, { headers, cache: "no-store" }).then(res => res.json())
+            ]);
+
+            // 1. Matériels disponibles
+            const materiels = materielsRes.results || materielsRes || [];
+            const medicationsList = materiels.map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
@@ -59,13 +72,11 @@ export function PharmacistDailySales() {
             }));
             setMedicationsDatabase(medicationsList);
 
-            // Charger les sorties du jour (ventes)
-            const sortiesData = await sortieApi.getAll();
-            const sorties = sortiesData.results || sortiesData;
+            // 2. Ventes du jour
+            const sortiesData = sortiesRes.results || sortiesRes || [];
             const today = new Date().toISOString().split('T')[0];
 
-            // Filtrer les ventes du jour
-            const ventesAujourdHui = sorties.filter(s => {
+            const ventesAujourdHui = sortiesData.filter(s => {
                 const sortieDate = s.date_sortie?.split('T')[0] || '';
                 return sortieDate === today && s.motif_sortie === 'VENTE';
             }).map(s => ({
@@ -79,8 +90,8 @@ export function PharmacistDailySales() {
             setDailySales(ventesAujourdHui);
 
         } catch (err) {
-            console.error("Erreur lors du chargement des données:", err);
-            setError("Impossible de charger les données. Vérifiez que le backend est en cours d'exécution.");
+            console.error("Erreur chargement données:", err);
+            setError("Impossible de charger les données fraîches.");
         } finally {
             setLoading(false);
         }
@@ -156,6 +167,13 @@ export function PharmacistDailySales() {
             }
         }
 
+        const token = localStorage.getItem("token_key_fultang");
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+        const baseUrl = "http://127.0.0.1:8000/api";
+
         try {
             setSubmitting(true);
             setError(null);
@@ -163,28 +181,45 @@ export function PharmacistDailySales() {
             // Récupérer l'ID du personnel connecté
             const personnelId = parseInt(localStorage.getItem("personnel_id") || "1");
 
-            // Créer la sortie (vente)
+            // 1. Créer la sortie (vente)
             const sortieData = {
                 numero_sortie: generateSaleId(),
                 motif_sortie: "VENTE",
                 idPersonnel: personnelId
             };
 
-            const newSortie = await sortieApi.create(sortieData);
+            const sortieRes = await fetch(`${baseUrl}/sorties/`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(sortieData)
+            });
 
-            // Créer les lignes de sortie
+            if (!sortieRes.ok) throw new Error("Erreur lors de la création de la vente");
+            const newSortie = await sortieRes.json();
+            const idSortie = newSortie.idSortie;
+
+            // 2. Créer les lignes de sortie et décrémenter stock
             for (const article of saleForm.articles) {
-                await ligneSortieApi.create({
-                    id_sortie: newSortie.idSortie,
-                    id_materiel: article.materialId,
-                    type_materiel: "MEDICAL",
-                    quantite: parseInt(article.quantity)
+                // A. Ligne Sortie
+                await fetch(`${baseUrl}/lignes-sortie/`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        id_sortie: idSortie,
+                        id_materiel: article.materialId,
+                        type_materiel: "MEDICAL",
+                        quantite: parseInt(article.quantity)
+                    })
                 });
 
-                // Mettre à jour le stock du matériel
+                // B. Mettre à jour le stock du matériel (PATCH)
                 const newStock = article.stockDisponible - parseInt(article.quantity);
-                await materielMedicalApi.patch(article.materialId, {
-                    quantite_stock: newStock
+                await fetch(`${baseUrl}/materiels-medicaux/${article.materialId}/`, {
+                    method: 'PATCH',
+                    headers,
+                    body: JSON.stringify({
+                        quantite_stock: newStock
+                    })
                 });
             }
 
@@ -201,7 +236,7 @@ export function PharmacistDailySales() {
 
         } catch (err) {
             console.error("Erreur lors de l'enregistrement de la vente:", err);
-            setError("Impossible d'enregistrer la vente. Veuillez réessayer.");
+            setError("Impossible d'enregistrer la vente. Détails console.");
         } finally {
             setSubmitting(false);
         }

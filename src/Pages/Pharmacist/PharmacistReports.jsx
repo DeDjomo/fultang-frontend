@@ -19,7 +19,6 @@ import {
 } from "react-icons/fa";
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
-import { rapportApi } from "../../services/comptabiliteMatiereApi";
 
 export function PharmacistReports() {
     const [loading, setLoading] = useState(true);
@@ -54,25 +53,43 @@ export function PharmacistReports() {
     }, []);
 
     async function loadData() {
+        const token = localStorage.getItem("token_key_fultang");
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+        const baseUrl = "http://127.0.0.1:8000/api";
+
         try {
             setLoading(true);
             setError(null);
 
-            // Charger tous les rapports
-            const rapportsData = await rapportApi.getAll();
-            const rapports = rapportsData.results || rapportsData;
+            // Charger tous les rapports avec fetch
+            const rapportsRes = await fetch(`${baseUrl}/rapports/`, { headers, cache: "no-store" });
+
+            if (!rapportsRes.ok) {
+                throw new Error(`Erreur HTTP ${rapportsRes.status}: ${rapportsRes.statusText}`);
+            }
+
+            const rapportsData = await rapportsRes.json();
+            const rapports = Array.isArray(rapportsData) ? rapportsData : (rapportsData.results || []);
+
+            console.log("📊 Rapports chargés:", rapports.length, "rapports");
+            console.log("👤 Current User ID:", currentUserId);
 
             // Filtrer les rapports envoyés par le pharmacien
             const sent = rapports.filter(r => r.expediteur === currentUserId);
             setSentReports(sent.map(formatReport));
+            console.log("📤 Rapports envoyés:", sent.length);
 
             // Filtrer les rapports reçus par le pharmacien
             const received = rapports.filter(r => r.destinataire === currentUserId);
             setReceivedReports(received.map(r => ({ ...formatReport(r), isRead: r.est_lu })));
+            console.log("📥 Rapports reçus:", received.length);
 
         } catch (err) {
-            console.error("Erreur lors du chargement des rapports:", err);
-            setError("Impossible de charger les rapports. Vérifiez que le backend est en cours d'exécution.");
+            console.error("❌ Erreur lors du chargement des rapports:", err);
+            setError(`Impossible de charger les rapports: ${err.message}`);
         } finally {
             setLoading(false);
         }
@@ -119,6 +136,13 @@ export function PharmacistReports() {
             return;
         }
 
+        const token = localStorage.getItem("token_key_fultang");
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        };
+        const baseUrl = "http://127.0.0.1:8000/api";
+
         try {
             setSubmitting(true);
             setError(null);
@@ -129,10 +153,18 @@ export function PharmacistReports() {
                 expediteur: currentUserId,
                 destinataire: reportForm.destinataire ? parseInt(reportForm.destinataire) : null,
                 type_rapport: pendingInventoryData ? "INVENTAIRE" : "GENERAL",
-                archive_associee: pendingInventoryData?.archiveId ? parseInt(pendingInventoryData.archiveId) : null
+                archive_associee: pendingInventoryData?.archiveDbId || null
             };
 
-            await rapportApi.create(reportData);
+            const response = await fetch(`${baseUrl}/rapports/`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(reportData)
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erreur HTTP ${response.status}`);
+            }
 
             // Nettoyer les données d'inventaire en attente
             localStorage.removeItem('pending_inventory_report');
@@ -159,8 +191,19 @@ export function PharmacistReports() {
 
         // Marquer comme lu si c'est un rapport reçu
         if (isReceived && !report.isRead && report.idRapport) {
+            const token = localStorage.getItem("token_key_fultang");
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+            const baseUrl = "http://127.0.0.1:8000/api";
+
             try {
-                await rapportApi.patch(report.idRapport, { est_lu: true });
+                await fetch(`${baseUrl}/rapports/${report.idRapport}/`, {
+                    method: 'PATCH',
+                    headers,
+                    body: JSON.stringify({ est_lu: true })
+                });
                 setReceivedReports(receivedReports.map(r =>
                     r.id === report.id ? { ...r, isRead: true } : r
                 ));
