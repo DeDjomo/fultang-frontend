@@ -261,7 +261,7 @@ export function RapportsPage() {
                             <div className="bg-white rounded-lg shadow-lg p-5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <FaChartLine className="text-blue-500" />
-                                    <h2 className="text-lg font-bold text-gray-800">Évolution Mensuelle (2025 vs 2024)</h2>
+                                    <h2 className="text-lg font-bold text-gray-800">Évolution Mensuelle ({new Date().getFullYear()} vs {new Date().getFullYear() - 1})</h2>
                                 </div>
                                 <ResponsiveContainer width="100%" height={300}>
                                     <AreaChart data={stats.evolution}>
@@ -270,8 +270,8 @@ export function RapportsPage() {
                                         <YAxis tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
                                         <Tooltip formatter={(value) => formatCurrency(value)} />
                                         <Legend />
-                                        <Area type="monotone" dataKey="actuel" name="2025" fill="#8884d8" stroke="#8884d8" fillOpacity={0.3} />
-                                        <Area type="monotone" dataKey="precedent" name="2024" fill="#82ca9d" stroke="#82ca9d" fillOpacity={0.3} />
+                                        <Area type="monotone" dataKey="actuel" name={`${new Date().getFullYear()}`} fill="#8884d8" stroke="#8884d8" fillOpacity={0.3} />
+                                        <Area type="monotone" dataKey="precedent" name={`${new Date().getFullYear() - 1}`} fill="#ff4d4f" stroke="#ff4d4f" fillOpacity={0.3} />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
@@ -468,7 +468,7 @@ export function RapportsPage() {
                                 </table>
                             </div>
 
-                            <div style={{ marginTop: '50px', display: 'flex', justifyContent: 'space-between' }}>
+                            <div style={{ marginTop: '200px', display: 'flex', justifyContent: 'space-between' }}>
                                 <div style={{ textAlign: 'center' }}>
                                     <p>___________________________</p>
                                     <p>Le Comptable</p>

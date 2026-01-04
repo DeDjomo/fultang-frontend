@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Modal, message } from 'antd';
-import { DollarSign, Plus, X, Send } from 'lucide-react';
+import { DollarSign, Plus, X, Send, Printer, Check } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { getPatientQuittances, createQuittance, redirectPatientToService } from '../../services/quittancesApi';
 import { getAllServices } from '../../services/servicesApi';
@@ -19,6 +19,10 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
     const [loading, setLoading] = useState(false);
     const [showAddForm, setShowAddForm] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+
+    // Print state
+    const [lastQuittance, setLastQuittance] = useState(null);
+    const [showSuccess, setShowSuccess] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -70,6 +74,103 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
         }
     };
 
+    const handlePrint = () => {
+        if (!lastQuittance) return;
+
+        const printWindow = window.open('', '_blank', 'width=800,height=600');
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Receipt - Fultang Polyclinic</title>
+                <style>
+                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; padding: 20px; max-width: 800px; margin: 0 auto; }
+                    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
+                    .logo { font-size: 24px; font-weight: bold; color: #2c3e50; margin-bottom: 5px; }
+                    .info { font-size: 14px; color: #7f8c8d; margin: 2px 0; }
+                    .receipt-title { text-align: center; font-size: 20px; font-weight: bold; margin: 20px 0; text-transform: uppercase; letter-spacing: 1px; }
+                    .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+                    .detail-row { margin-bottom: 10px; }
+                    .label { font-weight: bold; font-size: 12px; color: #7f8c8d; text-transform: uppercase; display: block; margin-bottom: 4px; }
+                    .value { font-size: 16px; }
+                    .amount-box { background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; margin: 30px 0; border: 1px solid #e9ecef; }
+                    .amount-label { font-size: 14px; color: #7f8c8d; margin-bottom: 5px; }
+                    .amount-value { font-size: 32px; font-weight: bold; color: #27ae60; }
+                    .footer { text-align: center; margin-top: 50px; font-size: 12px; color: #95a5a6; border-top: 1px solid #eee; padding-top: 20px; }
+                    @media print {
+                        body { padding: 0; }
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="logo">FULTANG POLYCLINIC</div>
+                    <div class="info">General Medicine • Surgery • Laboratory • Pharmacy</div>
+                    <div class="info">Yaoundé, Cameroon • Tel: +237 699 99 99 99</div>
+                </div>
+
+                <div class="receipt-title">Payment Receipt</div>
+
+                <div class="details-grid">
+                    <div>
+                        <div class="detail-row">
+                            <span class="label">Receipt Number</span>
+                            <span class="value">${lastQuittance.numero_quittance}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Date</span>
+                            <span class="value">${new Date(lastQuittance.date_paiement).toLocaleString()}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Cashier</span>
+                            <span class="value">${lastQuittance.caissier_nom || 'N/A'}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="detail-row">
+                            <span class="label">Patient Name</span>
+                            <span class="value">${lastQuittance.patient_full_name}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="label">Patient ID</span>
+                            <span class="value">${lastQuittance.patient_matricule || 'N/A'}</span>
+                        </div>
+                         <div class="detail-row">
+                            <span class="label">Service</span>
+                            <span class="value">${lastQuittance.type_recette}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-row">
+                    <span class="label">Description</span>
+                    <span class="value">${lastQuittance.Motif}</span>
+                </div>
+
+                 <div class="detail-row" style="margin-top: 15px;">
+                    <span class="label">Payment Method</span>
+                    <span class="value" style="text-transform: capitalize;">${lastQuittance.mode_paiement.replace('_', ' ')}</span>
+                </div>
+
+                <div class="amount-box">
+                    <div class="amount-label">Amount Paid</div>
+                    <div class="amount-value">${parseFloat(lastQuittance.Montant_paye).toLocaleString('fr-FR')} FCFA</div>
+                </div>
+
+                <div class="footer">
+                    <p>Processed by <strong>${lastQuittance.caissier_nom || 'System'}</strong> on ${new Date().toLocaleString()}</p>
+                    <p>Thank you for choosing Fultang Polyclinic.</p>
+                </div>
+                <script>
+                    window.onload = function() { window.print(); window.close(); }
+                </script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    };
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
 
@@ -97,7 +198,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
     const handleSubmitQuittance = async (e) => {
         e.preventDefault();
 
-        if (!formData.numero_quittance || !formData.Montant_paye || !formData.Motif) {
+        if (!formData.Montant_paye || !formData.Motif) {
             message.warning('Please fill all fields');
             return;
         }
@@ -120,7 +221,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
         setSubmitting(true);
         try {
             const dataToSend = {
-                numero_quittance: formData.numero_quittance,
+                // numero_quittance is now auto-generated by backend
                 date_paiement: new Date().toISOString(),
                 Montant_paye: parseFloat(formData.Montant_paye),
                 Motif: formData.Motif,
@@ -155,8 +256,11 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
             };
 
             console.log('Sending quittance data:', dataToSend);
-            await createQuittance(dataToSend);
+            const response = await createQuittance(dataToSend);
             message.success('Receipt added successfully');
+
+            setLastQuittance(response);
+            setShowSuccess(true);
             setShowAddForm(false);
             setFormData({
                 numero_quittance: '',
@@ -202,6 +306,8 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
 
     const handleClose = () => {
         setShowAddForm(false);
+        setShowSuccess(false);
+        setLastQuittance(null);
         setShowRedirectForm(false);
         setFormData({
             numero_quittance: '',
@@ -243,9 +349,10 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
                 </div>
 
                 {/* Action Buttons */}
+                {/* Action Buttons */}
                 <div className="flex gap-3 mb-6">
                     <button
-                        onClick={() => { setShowAddForm(!showAddForm); setShowRedirectForm(false); }}
+                        onClick={() => { setShowAddForm(!showAddForm); setShowSuccess(false); setShowRedirectForm(false); }}
                         className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white px-5 py-2.5 rounded-lg hover:opacity-90 transition font-semibold shadow-md"
                     >
                         <Plus className="w-5 h-5" />
@@ -260,6 +367,34 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
                     </button>
                 </div>
 
+                {/* Success View */}
+                {showSuccess && (
+                    <div className="bg-green-50 p-8 rounded-lg mb-6 border-2 border-green-200 shadow-lg text-center">
+                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Check className="w-8 h-8 text-green-600" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-800 mb-2">Receipt Created Successfully!</h3>
+                        <p className="text-gray-600 mb-6">
+                            Receipt <strong>{lastQuittance?.numero_quittance}</strong> has been generated for {parseFloat(lastQuittance?.Montant_paye || 0).toLocaleString()} FCFA.
+                        </p>
+                        <div className="flex justify-center gap-4">
+                            <button
+                                onClick={() => { setShowSuccess(false); setLastQuittance(null); }}
+                                className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-semibold transition"
+                            >
+                                Close
+                            </button>
+                            <button
+                                onClick={handlePrint}
+                                className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:opacity-90 font-semibold transition flex items-center gap-2 shadow-md"
+                            >
+                                <Printer className="w-5 h-5" />
+                                Print Receipt
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Add Receipt Form */}
                 {showAddForm && (
                     <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg mb-6 border-2 border-green-200 shadow-lg">
@@ -269,19 +404,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
                         </h3>
                         <form onSubmit={handleSubmitQuittance} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Receipt Number</label>
-                                    <input
-                                        type="text"
-                                        name="numero_quittance"
-                                        value={formData.numero_quittance}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                        placeholder="e.g., QT-2024-001"
-                                        required
-                                    />
-                                </div>
-                                <div>
+                                <div className="col-span-1">
                                     <label className="block text-sm font-semibold text-gray-700 mb-2">Amount (FCFA)</label>
                                     <input
                                         type="number"
@@ -295,21 +418,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
                                         required
                                     />
                                 </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Purpose / Description</label>
-                                    <textarea
-                                        name="Motif"
-                                        value={formData.Motif}
-                                        onChange={handleInputChange}
-                                        rows="3"
-                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
-                                        placeholder="Payment purpose or description..."
-                                        required
-                                    />
-                                </div>
-                                <div>
+                                <div className="col-span-1">
                                     <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Method</label>
                                     <select
                                         name="mode_paiement"
@@ -324,6 +433,18 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
                                         <option value="carte">Carte Bancaire</option>
                                     </select>
                                 </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Purpose / Description</label>
+                                <textarea
+                                    name="Motif"
+                                    value={formData.Motif}
+                                    onChange={handleInputChange}
+                                    rows="3"
+                                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                                    placeholder="Payment purpose or description..."
+                                    required
+                                />
                             </div>
 
                             {/* Conditional Check Fields */}

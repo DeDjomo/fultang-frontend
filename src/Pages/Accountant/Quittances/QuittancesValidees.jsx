@@ -164,9 +164,9 @@ export function QuittancesValideesPage() {
             )
         },
         {
-            title: 'Validé par',
-            key: 'comptable',
-            render: (_, record) => record.comptable_nom || 'N/A'
+            title: 'Créé par',
+            key: 'caissier',
+            render: (_, record) => record.caissier_nom || 'N/A'
         },
         {
             title: 'Actions',
