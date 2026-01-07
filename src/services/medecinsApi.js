@@ -112,11 +112,14 @@ export const hospitaliserPatient = async (data) => {
 
 /**
  * Récupérer les chambres disponibles
+ * @param {number|null} serviceId - ID du service pour filtrer (optionnel)
  */
-export const getChambresDisponibles = async () => {
-    const response = await axiosInstance.get('/chambres/', {
-        params: { disponible: true }
-    });
+export const getChambresDisponibles = async (serviceId = null) => {
+    const params = { places_disponibles: 'true' };
+    if (serviceId) {
+        params.service = serviceId;
+    }
+    const response = await axiosInstance.get('/chambres/', { params });
     return response.data;
 };
 

@@ -70,3 +70,35 @@ export const deleteChambre = async (id) => {
         throw error;
     }
 };
+
+/**
+ * Recupere les chambres d'un service specifique.
+ * @param {number} serviceId - ID du service
+ */
+export const getChambresParService = async (serviceId) => {
+    try {
+        const response = await axiosInstance.get(`${BASE_URL}/`, {
+            params: { service: serviceId }
+        });
+        return response.data;
+    } catch (error) {
+        console.error(`Error fetching chambres for service ${serviceId}:`, error);
+        throw error;
+    }
+};
+
+/**
+ * Recupere les chambres disponibles d'un service.
+ * @param {number} serviceId - ID du service
+ */
+export const getChambresDisponiblesParService = async (serviceId) => {
+    try {
+        const response = await axiosInstance.get(`${BASE_URL}/`, {
+            params: { service: serviceId, places_disponibles: 'true' }
+        });
+        return response.data;
+    } catch (error) {
+        console.error(`Error fetching available chambres for service ${serviceId}:`, error);
+        throw error;
+    }
+};
