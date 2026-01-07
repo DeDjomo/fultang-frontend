@@ -1,375 +1,432 @@
 import { ReceptionistNavBar } from "./ReceptionistNavBar.jsx";
-import { FaArrowLeft, FaArrowRight, FaEdit, FaEye, FaPlus, FaSearch, FaMoneyBillWave } from "react-icons/fa";
-import { FolderOpen } from 'lucide-react';
-import { Tooltip } from "antd";
+import { FaEdit, FaPlus, FaMoneyBillWave } from "react-icons/fa";
+import { FolderOpen, Users, Search, RefreshCw, Eye, Phone, ChevronLeft, ChevronRight, Calendar, CreditCard } from 'lucide-react';
+
 import { DashBoard } from "../../GlobalComponents/DashBoard.jsx";
 import { receptionistNavLink } from "./receptionistNavLink.js";
-import { useEffect, useState, useRef, useLayoutEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { AddNewPatientModal } from "./addNewPatientModal.jsx";
 import { SuccessModal } from "../Modals/SuccessModal.jsx";
 import Wait from "../Modals/wait.jsx";
 import { ViewPatientDetailsModal } from "./ViewPatientDetailsModal.jsx";
 import { EditPatientInfosModal } from "./EditPatientInfosModal.jsx";
 import { OpenSessionModal } from "./OpenSessionModal.jsx";
-import axiosInstance from "../../Utils/axiosInstance.js";
-import Loader from "../../GlobalComponents/Loader.jsx";
-import noPatientImage from "../../assets/noPatients.png";
-import ServerErrorPage from "../../GlobalComponents/ServerError.jsx";
 
+import { Button, Tag, Space, Table, Input, Tooltip, Dropdown, Menu } from 'antd';
+import {
+    PlusOutlined,
+    SearchOutlined,
+    MoreOutlined,
+    UserOutlined,
+    EyeOutlined,
+    EditOutlined,
+    DeleteOutlined,
+    FileTextOutlined
+} from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+
+import { getAllPatients } from '../../services/patientsApi';
+import { useFeedback } from '../../contexts/FeedbackContext.jsx';
+import { useAutoRefresh, deepEqual, useWebSocket } from '../../hooks/usePolling';
+import Loader from '../../GlobalComponents/Loader';
 
 
 export function Receptionist() {
+    const [patients, setPatients] = useState([]);
+    const [filteredPatients, setFilteredPatients] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [errorStatus, setErrorStatus] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
 
+    const [searchTerm, setSearchTerm] = useState('');
+    const searchText = searchTerm;
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 8;
+    const startIndex = (currentPage - 1) * itemsPerPage;
 
     const [canOpenAddNewPatientModal, setCanOpenAddNewPatientModal] = useState(false);
-    const [canOpenSuccessModal, setCanOPenSuccessModal] = useState(false);
-    const [canOpenViewPatientDetailModal, setCanOpenViewPatientDetailModal] = useState(false);
-    const [successMessage, setSuccessMessage] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
-    const [selectedPatientDetails, setSelectedPatientDetails] = useState({});
     const [canOpenEditPatientDetailModal, setCanOpenEditPatientDetailModal] = useState(false);
+    const [canOpenViewPatientDetailModal, setCanOpenViewPatientDetailModal] = useState(false);
     const [canOpenSessionModal, setCanOpenSessionModal] = useState(false);
     const [canOpenSendToCashierModal, setCanOpenSendToCashierModal] = useState(false);
-    const [patients, setPatients] = useState([]);
-    const [nexUrlForRenderPatientList, setNexUrlForRenderPatientList] = useState("");
-    const [previousUrlForRenderPatientList, setPreviousUrlForRenderPatientList] = useState("");
-    const [actualPageNumber, setActualPageNumber] = useState(0);
-    const [numberOfPages, setNumberOfPages] = useState(0);
-    const [waitData, setWaitData] = useState(false);
-    const [errorStatus, setErrorStatus] = useState(null);
-    const [errorMessage, setErrorMessage] = useState("");
-    const [searchTerm, setSearchTerm] = useState("");
-    const [itemsPerPage, setItemsPerPage] = useState(10);
-    const tableContainerRef = useRef(null);
-    const [tableHeight, setTableHeight] = useState(0);
+    const [canOpenSuccessModal, setCanOPenSuccessModal] = useState(false);
+    const [successMessage, setSuccessMessage] = useState("");
 
+    const [selectedPatientDetails, setSelectedPatientDetails] = useState(null);
 
+    const waitData = loading;
 
+    const navigate = useNavigate();
+    const { showSuccess, showError } = useFeedback();
 
-
-
-
-
-    // Calculate available space for patients list
-    useLayoutEffect(() => {
-        function calculatePageSize() {
-            // Estimates/Measurements
-            const NAVBAR_HEIGHT = 100; // Approximate
-            const HEADER_SEARCH_HEIGHT = 80;
-            const TABLE_HEADER_HEIGHT = 60;
-            const PAGINATION_HEIGHT = 100;
-            const ROW_HEIGHT = 70; // Comfortable height for rows
-            const BOTTOM_PADDING = 20;
-
-            const occupiedHeight = NAVBAR_HEIGHT + HEADER_SEARCH_HEIGHT + TABLE_HEADER_HEIGHT + PAGINATION_HEIGHT + BOTTOM_PADDING;
-            const availableHeight = window.innerHeight - occupiedHeight;
-
-            // Ensure at least 5 items
-            const calculatedLimit = Math.max(5, Math.floor(availableHeight / ROW_HEIGHT));
-
-            setItemsPerPage(calculatedLimit);
+    const fetchPatients = useCallback(async (isBackground = false) => {
+        if (!isBackground) setLoading(true);
+        try {
+            const response = await getAllPatients();
+            // L'API peut retourner { results: [...] } ou directement [...]
+            const data = response.data || response.results || response || [];
+            if (Array.isArray(data)) {
+                setPatients(prev => deepEqual(prev, data) ? prev : data);
+            }
+        } catch (error) {
+            console.error('Error fetching patients:', error);
+            // Suppression de l'erreur pendant le polling
+        } finally {
+            if (!isBackground) setLoading(false);
         }
-
-        calculatePageSize();
-        window.addEventListener('resize', calculatePageSize);
-
-        return () => window.removeEventListener('resize', calculatePageSize);
     }, []);
 
-    function updateActualPageNumber(action) {
-        if (action === "next") {
-            if (actualPageNumber < numberOfPages) {
-                setActualPageNumber(actualPageNumber + 1);
-            }
+    useEffect(() => {
+        fetchPatients();
+    }, [fetchPatients]);
+
+    // WebSocket for real-time updates (replaces polling)
+    const { isConnected } = useWebSocket((message) => {
+        if (message.model === 'patient') {
+            console.log('[Receptionist] Patient updated via WebSocket:', message.action);
+            fetchPatients(true); // Background refresh
         }
-        else {
-            if (actualPageNumber > 1) {
-                setActualPageNumber(actualPageNumber - 1);
-            }
-        }
-    }
-
-
-
+    });
 
     useEffect(() => {
-        async function fetchPatients() {
-            setWaitData(true);
-            try {
-                const response = await axiosInstance.get(`/patients/?page_size=${itemsPerPage}`);
-                setWaitData(false);
-                if (response.status === 200) {
-                    console.log(response)
-                    // API retourne soit 'data' soit 'results' selon le format
-                    const patientsList = response.data.data || response.data.results || [];
-                    setPatients(patientsList);
-                    // Gestion pagination si présente
-                    setNexUrlForRenderPatientList(response.data.next || null);
-                    setPreviousUrlForRenderPatientList(response.data.previous || null);
-                    setActualPageNumber(response.data.current_page || 1);
-                    setNumberOfPages(response.data.total_pages || 1);
-                    setErrorStatus(null);
-                    setErrorMessage("");
-                }
-            }
-            catch (error) {
-                setWaitData(false);
-                console.log(error);
-                if (error.status === 403 || error.status === 500 || error.status === 503) {
-                    setErrorMessage("Erreur lors de la récupération des patients");
-                    setErrorStatus(error.status);
-                }
-                else {
-                    setErrorStatus(null);
-                    setErrorMessage("");
-                }
+        if (!searchText) {
+            setFilteredPatients(patients);
+        } else {
+            const lowerSearch = searchText.toLowerCase();
+            const filtered = patients.filter(patient =>
+                patient.nom?.toLowerCase().includes(lowerSearch) ||
+                patient.prenom?.toLowerCase().includes(lowerSearch) ||
+                patient.matricule?.toLowerCase().includes(lowerSearch) ||
+                patient.telephone?.includes(lowerSearch)
+            );
+            if (!deepEqual(filteredPatients, filtered)) {
+                setFilteredPatients(filtered);
             }
         }
+    }, [searchText, patients]);
+    // Pagination logic
+    const totalPages = Math.ceil(filteredPatients.length / itemsPerPage);
+    const endIndex = startIndex + itemsPerPage;
+    const currentPatients = filteredPatients.slice(startIndex, endIndex);
 
-        fetchPatients();
-    }, [itemsPerPage]);
+    const handlePrevPage = () => {
+        if (currentPage > 1) setCurrentPage(currentPage - 1);
+    };
 
+    const handleNextPage = () => {
+        if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+    };
 
-
-
-
-    async function fetchNextOrPreviousPatientList(url) {
-        if (url) {
-            try {
-                setWaitData(true);
-                const response = await axiosInstance.get(url);
-                if (response.status === 200) {
-                    setWaitData(false);
-                    //console.log(response)
-                    setPatients(response.data.results);
-                    setNexUrlForRenderPatientList(response.data.next);
-                    setPreviousUrlForRenderPatientList(response.data.previous);
-                    setActualPageNumber(response.data.current_page);
-                    setNumberOfPages(response.data.total_pages);
-                }
-            } catch (error) {
-                setWaitData(false);
-                console.log(error);
-            }
+    const calculateAge = (dateNaissance) => {
+        if (!dateNaissance) return null;
+        const today = new Date();
+        const birth = new Date(dateNaissance);
+        let age = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+            age--;
         }
-    }
+        return age;
+    };
 
-
-
-
-
+    const getGenderColor = (genre) => {
+        if (genre?.toLowerCase() === 'masculin' || genre?.toLowerCase() === 'm') {
+            return 'blue';
+        }
+        return 'pink';
+    };
 
     return (
         <DashBoard linkList={receptionistNavLink} requiredRole={"receptioniste"}>
             <ReceptionistNavBar />
-            <div className="mt-5 flex flex-col relative">
 
-                {/*Header content with search bar*/}
-                <div className="flex justify-between mb-5">
-                    <p className="font-bold text-xl mt-2 ml-5">Patients List</p>
-                    <div className="flex mr-5">
-                        <div className="flex w-[300px] h-10 border-2 border-secondary rounded-lg">
-                            <FaSearch className="text-xl text-secondary m-2" />
-                            <input
-                                type="text"
-                                placeholder="Rechercher un patient..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="border-none focus:outline-none focus:ring-0 w-full"
-                            />
+            <div className="p-6">
+                {/* Modern gradient header */}
+                <div className="bg-gradient-to-br from-primary-end to-primary-start text-white rounded-lg p-6 mb-6 shadow-lg">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div className="flex items-center gap-3">
+                            <Users className="w-8 h-8" />
+                            <div>
+                                <h1 className="text-2xl font-bold">Patients List</h1>
+                                <p className="text-sm opacity-90">
+                                    {filteredPatients.length} registered patient{filteredPatients.length !== 1 ? 's' : ''}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={fetchPatients}
+                                className="flex items-center gap-2 bg-white text-primary-end px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                                disabled={waitData}
+                            >
+                                <RefreshCw className={`w-5 h-5 ${waitData ? 'animate-spin' : ''}`} />
+                                Refresh
+                            </button>
+                            <button
+                                onClick={() => setCanOpenAddNewPatientModal(true)}
+                                className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+                            >
+                                <FaPlus className="w-4 h-4" />
+                                New Patient
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                {/*List of registered patients*/}
+                {/* Search bar */}
+                <div className="mb-6">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <input
+                            type="text"
+                            placeholder="Search by name, ID, phone..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-primary-end transition-colors"
+                        />
+                    </div>
+                </div>
 
-                <>
-                    {waitData ? (
-                        <div className="h-[500px] w-full flex justify-center items-center">
-                            <Loader size={"medium"} color={"primary-end"} />
-                        </div>) :
-                        errorStatus ?
-                            <div className="mt-16">
-                                <ServerErrorPage errorStatus={errorStatus} message={errorMessage} />
-                            </div>
-                            : (patients.length > 0 ?
-                                (
-                                    <div className="ml-5 mr-5 ">
-                                        <table className="w-full border-separate border-spacing-y-2">
-                                            <thead>
-                                                <tr className="bg-gradient-to-l from-primary-start to-primary-end">
-                                                    <th className="text-center text-white p-4 text-xl font-bold rounded-l-2xl">No</th>
-                                                    <th className="text-center text-white p-4 text-xl font-bold">Matricule</th>
-                                                    <th className="text-center text-white p-4 text-xl font-bold">Nom</th>
-                                                    <th className="text-center text-white p-4 text-xl font-bold">Prénom</th>
-                                                    <th className="text-center text-white p-4 text-xl font-bold">Contact</th>
-                                                    <th className="text-center text-white p-4 text-xl font-bold rounded-r-2xl">Operations</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {patients.filter(p => {
-                                                    const search = searchTerm.toLowerCase();
-                                                    return (p.nom?.toLowerCase().includes(search) || p.prenom?.toLowerCase().includes(search) || p.matricule?.toLowerCase().includes(search));
-                                                }).map((patient, index) => (
-                                                    <tr key={patient.id || index} className="bg-gray-100">
-                                                        <td className="p-4 text-md text-blue-900 rounded-l-lg text-center">{index + 1}</td>
-                                                        <td className="p-4 text-md text-center font-mono">{patient.matricule}</td>
-                                                        <td className="p-4 text-md text-center font-bold">{patient.nom}</td>
-                                                        <td className="p-4 text-md text-center">{patient.prenom}</td>
-                                                        <td className="p-4 text-md text-center">{patient.contact}</td>
-                                                        <td className="p-4 relative bg-gray-100 rounded-r-lg">
-                                                            <div className="w-full items-center justify-center flex gap-6">
-                                                                <Tooltip placement={"left"} title={"view details"}>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setSelectedPatientDetails(patient), setCanOpenViewPatientDetailModal(true)
-                                                                        }}
-                                                                        className="flex items-center justify-center w-9 h-9 text-primary-end text-xl hover:bg-gray-300 hover:rounded-full transition-all duration-300">
-                                                                        <FaEye />
-                                                                    </button>
-                                                                </Tooltip>
-                                                                <Tooltip placement={"right"} title={"Edit"}>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setSelectedPatientDetails(patient), setCanOpenEditPatientDetailModal(true)
-                                                                        }}
-                                                                        className="flex items-center justify-center w-9 h-9 text-green-500 text-xl hover:bg-gray-300 hover:rounded-full transition-all duration-300">
-                                                                        <FaEdit />
-                                                                    </button>
-                                                                </Tooltip>
-                                                                <Tooltip placement={"right"} title={"Ouvrir session"}>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setSelectedPatientDetails(patient);
-                                                                            setCanOpenSessionModal(true);
-                                                                        }}
-                                                                        className="flex items-center justify-center w-9 h-9 text-orange-500 text-xl hover:bg-gray-300 hover:rounded-full transition-all duration-300">
-                                                                        <FolderOpen className="w-5 h-5" />
-                                                                    </button>
-                                                                </Tooltip>
-                                                                <Tooltip placement={"right"} title={"Envoyer à la caisse"}>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setSelectedPatientDetails(patient);
-                                                                            setCanOpenSendToCashierModal(true);
-                                                                        }}
-                                                                        className="flex items-center justify-center w-9 h-9 text-blue-500 text-xl hover:bg-gray-300 hover:rounded-full transition-all duration-300">
-                                                                        <FaMoneyBillWave className="w-5 h-5" />
-                                                                    </button>
-                                                                </Tooltip>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                {/* Main content */}
+                {waitData ? (
+                    <div className="flex justify-center items-center h-64">
+                        <Loader size="medium" color="primary-end" />
+                    </div>
+                ) : errorStatus ? (
+                    <div className="mt-16">
+                        <ServerErrorPage errorStatus={errorStatus} message={errorMessage} />
+                    </div>
+                ) : currentPatients.length === 0 ? (
+                    <div className="text-center py-12">
+                        <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                        <h3 className="font-bold text-xl text-gray-700 mb-2">
+                            {searchTerm ? 'No patient found' : 'No registered patients'}
+                        </h3>
+                        <p className="text-gray-500 mb-6">
+                            {searchTerm ? 'Try with different search terms' : 'Start by adding a new patient'}
+                        </p>
+                        {!searchTerm && (
+                            <button
+                                onClick={() => setCanOpenAddNewPatientModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-primary-end text-white rounded-lg mx-auto hover:bg-primary-start transition-colors"
+                            >
+                                <FaPlus />
+                                Add a patient
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    <>
+                        {/* Patient cards grid */}
+                        <div className="grid gap-4">
+                            {currentPatients.map((patient, index) => {
+                                const age = calculateAge(patient.date_naissance);
 
+                                return (
+                                    <div
+                                        key={patient.id || index}
+                                        className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all duration-300"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            {/* Main info */}
+                                            <div className="flex items-center gap-4 flex-1">
+                                                {/* Avatar */}
+                                                <div className="bg-gradient-to-br from-primary-end to-primary-start text-white rounded-full w-14 h-14 flex items-center justify-center font-bold text-lg shadow-md flex-shrink-0">
+                                                    {patient.prenom?.[0]}{patient.nom?.[0]}
+                                                </div>
 
-                                        {/*Pagination content */}
-                                        <div className="fixed w-full justify-center -right-16 bottom-0 flex mt-6 mb-4">
-                                            <div className="flex gap-4">
-                                                <Tooltip placement={"left"} title={"previous slide"}>
+                                                {/* Details */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-3 flex-wrap">
+                                                        <h3 className="text-lg font-bold text-gray-800">
+                                                            {patient.nom} {patient.prenom}
+                                                        </h3>
+                                                        {patient.genre && (
+                                                            <Tag color={getGenderColor(patient.genre)}>
+                                                                {patient.genre}
+                                                            </Tag>
+                                                        )}
+                                                        {age !== null && (
+                                                            <span className="text-sm text-gray-500">{age} years</span>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex items-center gap-6 mt-2 text-sm text-gray-500 flex-wrap">
+                                                        <span className="flex items-center gap-1.5 font-mono">
+                                                            <CreditCard className="w-4 h-4" />
+                                                            {patient.matricule}
+                                                        </span>
+                                                        {patient.contact && (
+                                                            <span className="flex items-center gap-1.5">
+                                                                <Phone className="w-4 h-4" />
+                                                                {patient.contact}
+                                                            </span>
+                                                        )}
+                                                        {patient.date_naissance && (
+                                                            <span className="flex items-center gap-1.5">
+                                                                <Calendar className="w-4 h-4" />
+                                                                {new Date(patient.date_naissance).toLocaleDateString('en-US')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div className="flex items-center gap-2 ml-4">
+                                                <Tooltip title="View details">
                                                     <button
-                                                        onClick={async () => {
-                                                            await fetchNextOrPreviousPatientList(previousUrlForRenderPatientList), updateActualPageNumber("prev")
+                                                        onClick={() => {
+                                                            setSelectedPatientDetails(patient);
+                                                            setCanOpenViewPatientDetailModal(true);
                                                         }}
-                                                        className="w-14 h-14 border-2 rounded-lg hover:bg-secondary text-xl  text-secondary hover:text-2xl duration-300 transition-all  hover:text-white shadow-xl flex justify-center items-center mt-2">
-                                                        <FaArrowLeft />
+                                                        className="p-2 text-primary-end hover:bg-primary-end/10 rounded-lg transition-colors"
+                                                    >
+                                                        <Eye className="w-5 h-5" />
                                                     </button>
                                                 </Tooltip>
-                                                <p className="text-secondary text-2xl font-bold mt-4">{actualPageNumber}/{numberOfPages}</p>
-                                                <Tooltip placement={"right"} title={"next slide"}>
+                                                <Tooltip title="Edit">
                                                     <button
-                                                        onClick={async () => {
-                                                            await fetchNextOrPreviousPatientList(nexUrlForRenderPatientList), updateActualPageNumber("next")
+                                                        onClick={() => {
+                                                            setSelectedPatientDetails(patient);
+                                                            setCanOpenEditPatientDetailModal(true);
                                                         }}
-                                                        className="w-14 h-14 border-2 rounded-lg hover:bg-secondary text-xl  text-secondary hover:text-2xl duration-300 transition-all  hover:text-white shadow-xl flex justify-center items-center mt-2">
-                                                        <FaArrowRight />
+                                                        className="p-2 text-green-500 hover:bg-green-50 rounded-lg transition-colors"
+                                                    >
+                                                        <FaEdit className="w-5 h-5" />
+                                                    </button>
+                                                </Tooltip>
+                                                <Tooltip title="Open session">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedPatientDetails(patient);
+                                                            setCanOpenSessionModal(true);
+                                                        }}
+                                                        className="p-2 text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
+                                                    >
+                                                        <FolderOpen className="w-5 h-5" />
+                                                    </button>
+                                                </Tooltip>
+                                                <Tooltip title="Send to cashier">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedPatientDetails(patient);
+                                                            setCanOpenSendToCashierModal(true);
+                                                        }}
+                                                        className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    >
+                                                        <FaMoneyBillWave className="w-5 h-5" />
                                                     </button>
                                                 </Tooltip>
                                             </div>
                                         </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
 
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between mt-6 px-2">
+                                <p className="text-sm text-gray-500">
+                                    Showing {startIndex + 1} to {Math.min(endIndex, filteredPatients.length)} of {filteredPatients.length} patients
+                                </p>
 
-                                        {/* Add new patient button & modal */}
-                                        <Tooltip placement={"top"} title={"Add new patient"}>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={handlePrevPage}
+                                        disabled={currentPage === 1}
+                                        className={`flex items-center gap-1 px-4 py-2 rounded-lg font-medium transition-all ${currentPage === 1
+                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            : 'bg-white border border-gray-300 text-gray-700 hover:border-primary-end hover:text-primary-end'
+                                            }`}
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                        Previous
+                                    </button>
+
+                                    <div className="flex items-center gap-1">
+                                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                                             <button
-                                                onClick={() => setCanOpenAddNewPatientModal(true)}
-                                                className="fixed bottom-5 right-16 rounded-full w-14 h-14 bg-gradient-to-r text-3xl font-bold text-white from-primary-start to-primary-end hover:text-4xl transition-all duration-300  flex items-center justify-center">
-                                                <FaPlus />
+                                                key={page}
+                                                onClick={() => setCurrentPage(page)}
+                                                className={`w-10 h-10 rounded-lg font-medium transition-all ${currentPage === page
+                                                    ? 'bg-gradient-to-r from-primary-end to-primary-start text-white shadow-md'
+                                                    : 'bg-white border border-gray-300 text-gray-700 hover:border-primary-end'
+                                                    }`}
+                                            >
+                                                {page}
                                             </button>
-                                        </Tooltip>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center py-12 px-4 text-center mt-20">
-                                        <img src={noPatientImage} alt={"image"} className="w-36 h-36 rounded-lg" />
-                                        <h3 className="font-bold text-2xl mt-4 mb-2 text-gray-800">No patients recorded</h3>
-                                        <p className="text-gray-600 mb-6 max-w-xl text-md font-medium">
-                                            There are currently no patients registered in the system. Get started by adding a new patient.
-                                        </p>
-                                        <button
-                                            onClick={() => setCanOpenAddNewPatientModal(true)}
-                                            className="flex items-center px-4 py-2 bg-primary-start font-semibold text-white rounded-md hover:bg-primary-end transition-all duration-300"
-                                        >
-                                            <span className="mr-2 text-lg">+</span>
-                                            Add a new patient
-                                        </button>
+                                        ))}
                                     </div>
 
-                                )
-                            )}
-
-                    {/* Modals content */}
-                    <AddNewPatientModal isOpen={canOpenAddNewPatientModal}
-                        onClose={() => {
-                            setCanOpenAddNewPatientModal(false)
-                        }}
-                        setCanOpenSuccessModal={setCanOPenSuccessModal}
-                        setSuccessMessage={setSuccessMessage}
-                        setIsLoading={setIsLoading}
-                    />
-                    <EditPatientInfosModal isOpen={canOpenEditPatientDetailModal}
-                        onClose={() => {
-                            setCanOpenEditPatientDetailModal(false)
-                        }} setCanOpenSuccessModal={setCanOPenSuccessModal}
-                        setSuccessMessage={setSuccessMessage}
-                        setIsLoading={setIsLoading}
-                        patientData={selectedPatientDetails}
-                    />
-                    <SuccessModal isOpen={canOpenSuccessModal}
-                        message={successMessage}
-                        canOpenSuccessModal={setCanOPenSuccessModal}
-                        makeAction={() => window.location.reload()}
-                    />
-                    <ViewPatientDetailsModal
-                        isOpen={canOpenViewPatientDetailModal}
-                        patient={selectedPatientDetails}
-                        onClose={() => {
-                            setCanOpenViewPatientDetailModal(false)
-                        }}
-                    />
-                    <OpenSessionModal
-                        isOpen={canOpenSessionModal}
-                        onClose={() => setCanOpenSessionModal(false)}
-                        patient={selectedPatientDetails}
-                        onSuccess={() => {
-                            setSuccessMessage("Session ouverte avec succès!");
-                            setCanOPenSuccessModal(true);
-                        }}
-                    />
-                    <OpenSessionModal
-                        isOpen={canOpenSendToCashierModal}
-                        onClose={() => setCanOpenSendToCashierModal(false)}
-                        patient={selectedPatientDetails}
-                        mode="cashier"
-                        onSuccess={() => {
-                            setSuccessMessage("Patient envoyé à la caisse avec succès!");
-                            setCanOPenSuccessModal(true);
-                        }}
-                    />
-                    {isLoading && <Wait />}
-                </>
+                                    <button
+                                        onClick={handleNextPage}
+                                        disabled={currentPage === totalPages}
+                                        className={`flex items-center gap-1 px-4 py-2 rounded-lg font-medium transition-all ${currentPage === totalPages
+                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            : 'bg-white border border-gray-300 text-gray-700 hover:border-primary-end hover:text-primary-end'
+                                            }`}
+                                    >
+                                        Next
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
+
+            {/* Modals */}
+            <AddNewPatientModal
+                isOpen={canOpenAddNewPatientModal}
+                onClose={() => setCanOpenAddNewPatientModal(false)}
+                setCanOpenSuccessModal={setCanOPenSuccessModal}
+                setSuccessMessage={setSuccessMessage}
+                setIsLoading={setIsLoading}
+            />
+            <EditPatientInfosModal
+                isOpen={canOpenEditPatientDetailModal}
+                onClose={() => setCanOpenEditPatientDetailModal(false)}
+                setCanOpenSuccessModal={setCanOPenSuccessModal}
+                setSuccessMessage={setSuccessMessage}
+                setIsLoading={setIsLoading}
+                patientData={selectedPatientDetails}
+            />
+            <SuccessModal
+                isOpen={canOpenSuccessModal}
+                message={successMessage}
+                canOpenSuccessModal={setCanOPenSuccessModal}
+                makeAction={() => window.location.reload()}
+            />
+            <ViewPatientDetailsModal
+                isOpen={canOpenViewPatientDetailModal}
+                patient={selectedPatientDetails}
+                onClose={() => setCanOpenViewPatientDetailModal(false)}
+            />
+            <OpenSessionModal
+                isOpen={canOpenSessionModal}
+                onClose={() => setCanOpenSessionModal(false)}
+                patient={selectedPatientDetails}
+                onSuccess={() => {
+                    setSuccessMessage("Session opened successfully!");
+                    setCanOPenSuccessModal(true);
+                }}
+            />
+            <OpenSessionModal
+                isOpen={canOpenSendToCashierModal}
+                onClose={() => setCanOpenSendToCashierModal(false)}
+                patient={selectedPatientDetails}
+                mode="cashier"
+                onSuccess={() => {
+                    setSuccessMessage("Patient sent to cashier successfully!");
+                    setCanOPenSuccessModal(true);
+                }}
+            />
+            {isLoading && <Wait />}
         </DashBoard>
-    )
+    );
 }

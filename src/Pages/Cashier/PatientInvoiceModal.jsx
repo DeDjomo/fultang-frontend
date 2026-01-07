@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Modal, message } from 'antd';
+import { Modal } from 'antd';
 import { DollarSign, Plus, X, Send, Printer, Check } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { getPatientQuittances, createQuittance, redirectPatientToService } from '../../services/quittancesApi';
 import { getAllServices } from '../../services/servicesApi';
+import { useFeedback } from '../../contexts/FeedbackContext.jsx';
 import Loader from '../../GlobalComponents/Loader';
 
 export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
@@ -19,10 +20,11 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
     const [loading, setLoading] = useState(false);
     const [showAddForm, setShowAddForm] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const { showSuccess: feedbackSuccess, showError, showWarning } = useFeedback();
 
     // Print state
     const [lastQuittance, setLastQuittance] = useState(null);
-    const [showSuccess, setShowSuccess] = useState(false);
+    const [showSuccessView, setShowSuccessView] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -59,7 +61,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
             }
         } catch (error) {
             console.error('Error loading quittances:', error);
-            message.error('Error loading receipts');
+            showError('Erreur lors du chargement des reçus.', 'Échec');
         } finally {
             setLoading(false);
         }
@@ -199,21 +201,21 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
         e.preventDefault();
 
         if (!formData.Montant_paye || !formData.Motif) {
-            message.warning('Please fill all fields');
+            showWarning('Veuillez remplir tous les champs.', 'Champs requis');
             return;
         }
 
         // Specific validation for payment modes
         if (formData.mode_paiement === 'mobile_money') {
             if (!formData.mobile_numero || formData.mobile_numero.length !== 9) {
-                message.warning('Mobile Money number must be exactly 9 digits');
+                showWarning('Le numéro Mobile Money doit contenir exactement 9 chiffres.', 'Validation');
                 return;
             }
         }
 
         if (formData.mode_paiement === 'carte') {
             if (!formData.carte_numero || formData.carte_numero.length !== 4) {
-                message.warning('Card number must be exactly 4 digits');
+                showWarning('Le numéro de carte doit contenir exactement 4 chiffres.', 'Validation');
                 return;
             }
         }
@@ -257,10 +259,10 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
 
             console.log('Sending quittance data:', dataToSend);
             const response = await createQuittance(dataToSend);
-            message.success('Receipt added successfully');
+            feedbackSuccess('Le reçu a été ajouté avec succès.', 'Reçu créé');
 
             setLastQuittance(response);
-            setShowSuccess(true);
+            setShowSuccessView(true);
             setShowAddForm(false);
             setFormData({
                 numero_quittance: '',
@@ -275,7 +277,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
             loadQuittances();
         } catch (error) {
             console.error('Error creating quittance:', error);
-            message.error(error.response?.data?.detail || 'Error creating receipt');
+            showError(error.response?.data?.detail || 'Erreur lors de la création du reçu.', 'Échec');
         } finally {
             setSubmitting(false);
         }
@@ -283,7 +285,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
 
     const handleRedirectPatient = async () => {
         if (!selectedService) {
-            message.warning('Please select a service');
+            showWarning('Veuillez sélectionner un service.', 'Champ requis');
             return;
         }
 
@@ -291,14 +293,14 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
         try {
             const response = await redirectPatientToService(patient.id, selectedService);
             if (response.success) {
-                message.success(`Patient redirected to ${selectedService}`);
+                feedbackSuccess(`Le patient a été redirigé vers ${selectedService}.`, 'Patient redirigé');
                 setShowRedirectForm(false);
                 setSelectedService('');
                 onClose();
             }
         } catch (error) {
             console.error('Error redirecting patient:', error);
-            message.error('Error redirecting patient');
+            showError('Erreur lors de la redirection du patient.', 'Échec');
         } finally {
             setSubmitting(false);
         }
@@ -306,7 +308,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
 
     const handleClose = () => {
         setShowAddForm(false);
-        setShowSuccess(false);
+        setShowSuccessView(false);
         setLastQuittance(null);
         setShowRedirectForm(false);
         setFormData({
@@ -352,7 +354,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
                 {/* Action Buttons */}
                 <div className="flex gap-3 mb-6">
                     <button
-                        onClick={() => { setShowAddForm(!showAddForm); setShowSuccess(false); setShowRedirectForm(false); }}
+                        onClick={() => { setShowAddForm(!showAddForm); setShowSuccessView(false); setShowRedirectForm(false); }}
                         className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white px-5 py-2.5 rounded-lg hover:opacity-90 transition font-semibold shadow-md"
                     >
                         <Plus className="w-5 h-5" />
@@ -368,7 +370,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
                 </div>
 
                 {/* Success View */}
-                {showSuccess && (
+                {showSuccessView && (
                     <div className="bg-green-50 p-8 rounded-lg mb-6 border-2 border-green-200 shadow-lg text-center">
                         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                             <Check className="w-8 h-8 text-green-600" />
@@ -379,7 +381,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
                         </p>
                         <div className="flex justify-center gap-4">
                             <button
-                                onClick={() => { setShowSuccess(false); setLastQuittance(null); }}
+                                onClick={() => { setShowSuccessView(false); setLastQuittance(null); }}
                                 className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-semibold transition"
                             >
                                 Close

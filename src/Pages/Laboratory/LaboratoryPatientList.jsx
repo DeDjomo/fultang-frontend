@@ -1,6 +1,6 @@
 import { FaArrowLeft, FaArrowRight, FaEdit, FaEye, FaSearch } from "react-icons/fa";
 import { Tooltip } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { ViewPatientDetailsModal } from "../Receptionist/ViewPatientDetailsModal.jsx";
 import axiosInstance from "../../Utils/axiosInstance.js";
 import { LaboratoryDashBoard } from "../Laboratory/LaboratoryDashBoard.jsx";
@@ -8,6 +8,7 @@ import { LaboratoryNavBar } from "../Laboratory/LaboratoryNavBar.jsx";
 import { laboratoryNavLink } from "../Laboratory/LaboratoryNavLink.js";
 import { useNavigate } from "react-router-dom";
 import { useAuthentication } from "../../Utils/Provider.jsx";
+import { useAutoRefresh, deepEqual } from "../../hooks/usePolling";
 
 export function LaboratoryPatientList() {
     const [selectedPatientDetails, setSelectedPatientDetails] = useState({});
@@ -39,41 +40,35 @@ export function LaboratoryPatientList() {
         }
     }
 
-    // On utilise ici l'endpoint des exam-request pour récupérer la liste des examens,
-    // puis on en extrait les patients.
-    async function fetchPatients() {
+    const fetchPatients = useCallback(async () => {
         try {
             const response = await axiosInstance.get("/exam-request/");
             if (response.status === 200) {
-                console.log(response.data);
-                // L'API peut renvoyer directement un tableau ou un objet contenant une propriété "results"
                 const examRequests = Array.isArray(response.data)
                     ? response.data
                     : response.data.results || [];
-                // Extraire le patient de chaque examen
                 const patientsArr = examRequests.map((exam) => exam.idPatient);
-                // Filtrer les doublons en utilisant une Map (clé = patient.id)
                 const uniquePatients = Array.from(
                     new Map(patientsArr.map((p) => [p.id, p])).values()
                 );
-                setPatients(uniquePatients);
+
+                setPatients(prev => deepEqual(prev, uniquePatients) ? prev : uniquePatients);
+
                 setNumberOfPatients(uniquePatients.length);
-                // Si votre API est paginée, vous pouvez récupérer next/previous s'ils existent
                 setNexUrlForRenderPatientList(response.data.next || "");
                 setPreviousUrlForRenderPatientList(response.data.previous || "");
             }
         } catch (error) {
-            setPatients([]);
-            setNumberOfPatients(0);
-            setNexUrlForRenderPatientList("");
-            setPreviousUrlForRenderPatientList("");
             console.log(error);
         }
-    }
+    }, []);
 
     useEffect(() => {
         fetchPatients();
-    }, []);
+    }, [fetchPatients]);
+
+    // Auto-refresh toutes les 5 secondes
+    useAutoRefresh(fetchPatients, 5000, false);
 
     async function fetchNextOrPreviousPatientList(url) {
         if (url) {
@@ -128,68 +123,68 @@ export function LaboratoryPatientList() {
                 <div className="ml-5 mr-5 ">
                     <table className="w-full border-separate border-spacing-y-2">
                         <thead>
-                        <tr>
-                            <th className="text-center text-white p-4 text-xl font-bold bg-primary-end border-gray-200 rounded-l-2xl ">
-                                No
-                            </th>
-                            <th className="text-center text-white p-4 text-xl font-bold bg-primary-end border-gray-200">
-                                First Name
-                            </th>
-                            <th className="text-center text-white p-4 text-xl font-bold bg-primary-end border-gray-200">
-                                Last Name
-                            </th>
-                            <th className="text-center text-white p-4 text-xl font-bold bg-primary-end border-gray-200">
-                                Gender
-                            </th>
-                            <th className="text-center text-white p-4 text-xl font-bold bg-primary-end border-gray-200">
-                                Address
-                            </th>
-                            <th className="text-center text-white p-4 text-xl font-bold bg-primary-end flex-col rounded-r-2xl">
-                                <p>Operations</p>
-                            </th>
-                        </tr>
+                            <tr>
+                                <th className="text-center text-white p-4 text-xl font-bold bg-primary-end border-gray-200 rounded-l-2xl ">
+                                    No
+                                </th>
+                                <th className="text-center text-white p-4 text-xl font-bold bg-primary-end border-gray-200">
+                                    First Name
+                                </th>
+                                <th className="text-center text-white p-4 text-xl font-bold bg-primary-end border-gray-200">
+                                    Last Name
+                                </th>
+                                <th className="text-center text-white p-4 text-xl font-bold bg-primary-end border-gray-200">
+                                    Gender
+                                </th>
+                                <th className="text-center text-white p-4 text-xl font-bold bg-primary-end border-gray-200">
+                                    Address
+                                </th>
+                                <th className="text-center text-white p-4 text-xl font-bold bg-primary-end flex-col rounded-r-2xl">
+                                    <p>Operations</p>
+                                </th>
+                            </tr>
                         </thead>
                         <tbody>
-                        {patients.map((patient, index) => (
-                            <tr key={patient.id || index} className="bg-gray-100">
-                                <td className="p-4 text-md text-blue-900 rounded-l-lg text-center">
-                                    {index + 1}
-                                </td>
-                                <td className="p-4 text-md text-center font-bold">
-                                    {patient.firstName}
-                                </td>
-                                <td className="p-4 text-md text-center">{patient.lastName}</td>
-                                <td className="p-4 text-md text-center">{patient.gender}</td>
-                                <td className="p-4 text-center text-md">{patient.address}</td>
-                                <td className="p-4 relative rounded-r-lg">
-                                    <div className="w-full items-center justify-center flex gap-6">
-                                        <Tooltip placement={"left"} title={"view patient information"}>
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedPatientDetails(patient);
-                                                    setCanOpenViewPatientDetailModal(true);
-                                                }}
-                                                className="flex items-center justify-center w-9 h-9 text-primary-end text-xl hover:bg-gray-300 hover:rounded-full transition-all duration-300"
-                                            >
-                                                <FaEye />
-                                            </button>
-                                        </Tooltip>
-                                        <Tooltip placement={"right"} title={"View Medical Folder"}>
-                                            <button
-                                                onClick={() => {
-                                                    navigate(`/doctor/patients/medical-folder/${patient?.id}`, {
-                                                        state: { patient },
-                                                    });
-                                                }}
-                                                className="flex items-center justify-center w-9 h-9 text-green-500 text-xl hover:bg-gray-300 hover:rounded-full transition-all duration-300"
-                                            >
-                                                <FaEdit />
-                                            </button>
-                                        </Tooltip>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
+                            {patients.map((patient, index) => (
+                                <tr key={patient.id || index} className="bg-gray-100">
+                                    <td className="p-4 text-md text-blue-900 rounded-l-lg text-center">
+                                        {index + 1}
+                                    </td>
+                                    <td className="p-4 text-md text-center font-bold">
+                                        {patient.firstName}
+                                    </td>
+                                    <td className="p-4 text-md text-center">{patient.lastName}</td>
+                                    <td className="p-4 text-md text-center">{patient.gender}</td>
+                                    <td className="p-4 text-center text-md">{patient.address}</td>
+                                    <td className="p-4 relative rounded-r-lg">
+                                        <div className="w-full items-center justify-center flex gap-6">
+                                            <Tooltip placement={"left"} title={"view patient information"}>
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedPatientDetails(patient);
+                                                        setCanOpenViewPatientDetailModal(true);
+                                                    }}
+                                                    className="flex items-center justify-center w-9 h-9 text-primary-end text-xl hover:bg-gray-300 hover:rounded-full transition-all duration-300"
+                                                >
+                                                    <FaEye />
+                                                </button>
+                                            </Tooltip>
+                                            <Tooltip placement={"right"} title={"View Medical Folder"}>
+                                                <button
+                                                    onClick={() => {
+                                                        navigate(`/doctor/patients/medical-folder/${patient?.id}`, {
+                                                            state: { patient },
+                                                        });
+                                                    }}
+                                                    className="flex items-center justify-center w-9 h-9 text-green-500 text-xl hover:bg-gray-300 hover:rounded-full transition-all duration-300"
+                                                >
+                                                    <FaEdit />
+                                                </button>
+                                            </Tooltip>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
 

@@ -1,16 +1,17 @@
 import PropTypes from 'prop-types';
-import { Calendar, Clock, Phone, CheckCircle, Eye, ClipboardList } from 'lucide-react';
+import { Calendar, Clock, Phone, CheckCircle, Eye, ClipboardList, RefreshCw } from 'lucide-react';
 import { useCalculateAge } from "../../../Utils/compute.js";
 import { FaUser } from "react-icons/fa";
 import { formatDateToTime } from "../../../Utils/formatDateMethods.js";
 import { useNavigate } from 'react-router-dom';
 
 
-export default function AppointmentCard({ appointment }) {
+export default function AppointmentCard({ appointment, onReschedule }) {
 
 
     AppointmentCard.propTypes = {
-        appointment: PropTypes.object.isRequired
+        appointment: PropTypes.object.isRequired,
+        onReschedule: PropTypes.func
     }
 
     const navigate = useNavigate();
@@ -65,7 +66,15 @@ export default function AppointmentCard({ appointment }) {
                     <p className="text-gray-600 font-semibold ml-7">{appointment.motif || "N/A"}</p>
                 </div>
             </div>
-            <div className="mt-2 flex justify-end">
+            <div className="mt-2 flex justify-end gap-3">
+                {appointment.statut === "en_attente" && onReschedule && (
+                    <button
+                        onClick={onReschedule}
+                        className="px-4 py-2 bg-orange-500 text-white rounded-lg font-bold hover:bg-orange-600 transition-colors flex items-center">
+                        <RefreshCw className="h-5 w-5 mr-2" />
+                        Reschedule
+                    </button>
+                )}
                 {appointment.statut === "en_attente" ? (
                     <button
                         onClick={handleStartConsultation}

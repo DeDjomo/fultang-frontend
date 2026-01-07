@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Modal, message, Select } from 'antd';
+import { Modal, Select } from 'antd';
 import { FolderOpen, User, Building2 } from 'lucide-react';
 import { createSession, putSessionEnAttente, rediriggerPatient } from '../../services/sessionsApi';
 import { getAllServices } from '../../services/servicesApi';
 import { useAuthentication } from '../../Utils/Provider';
+import { useFeedback } from '../../contexts/FeedbackContext.jsx';
 
 /**
  * Modal pour ouvrir une session pour un patient.
@@ -20,6 +21,7 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess, mode = '
     const [loading, setLoading] = useState(false);
     const [loadingServices, setLoadingServices] = useState(false);
     const { userData } = useAuthentication();
+    const { showSuccess, showError, showWarning } = useFeedback();
 
     useEffect(() => {
         if (isOpen) {
@@ -35,7 +37,7 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess, mode = '
             setServices(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Error fetching services:', error);
-            message.error('Error during du chargement des services');
+            showError('Erreur lors du chargement des services.', 'Échec du chargement');
         } finally {
             setLoadingServices(false);
         }
@@ -43,7 +45,7 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess, mode = '
 
     const handleSubmit = async () => {
         if (!selectedService) {
-            message.warning('Please sélectionner un service');
+            showWarning('Veuillez sélectionner un service.', 'Champ requis');
             return;
         }
 
@@ -64,9 +66,9 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess, mode = '
                 // 3. Si mode cashier, mettre en attente
                 if (mode === 'cashier') {
                     await putSessionEnAttente(sessionId);
-                    message.success('Patient redirigé vers la caisse avec succès!');
+                    showSuccess('Le patient a été redirigé vers la caisse avec succès!', 'Patient redirigé');
                 } else {
-                    message.success('Patient redirigé avec succès!');
+                    showSuccess('Le patient a été redirigé avec succès!', 'Redirection réussie');
                 }
             } else {
                 // Mode création (Receptionist)
@@ -81,9 +83,9 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess, mode = '
                 if (mode === 'cashier') {
                     const newSessionId = response.data.id || response.data.data.id;
                     await putSessionEnAttente(newSessionId);
-                    message.success('Patient envoyé à la caisse avec succès!');
+                    showSuccess('Le patient a été envoyé à la caisse avec succès!', 'Patient envoyé');
                 } else {
-                    message.success('Session ouverte avec succès!');
+                    showSuccess('La session a été ouverte avec succès!', 'Session ouverte');
                 }
             }
 
@@ -92,8 +94,8 @@ export function OpenSessionModal({ isOpen, onClose, patient, onSuccess, mode = '
             onClose();
         } catch (error) {
             console.error('Error creating session:', error);
-            const errorMessage = error.response?.data?.detail || error.response?.data?.error || 'Error during de l\'ouverture de la session';
-            message.error(errorMessage);
+            const errorMessage = error.response?.data?.detail || error.response?.data?.error || 'Erreur lors de l\'ouverture de la session.';
+            showError(errorMessage, 'Échec');
         } finally {
             setLoading(false);
         }

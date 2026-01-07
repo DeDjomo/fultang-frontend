@@ -4,8 +4,9 @@ import { DashBoard } from "../../GlobalComponents/DashBoard.jsx";
 import userIcon from "../../assets/userIcon.png";
 import { useAuthentication } from "../../Utils/Provider.jsx";
 import PatientsList from "./PatientsList.jsx";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getPatientsEnAttente } from "../../services/caissierApi.js";
+import { useAutoRefresh, deepEqual } from "../../hooks/usePolling";
 
 export function Cashier() {
   const { userData } = useAuthentication();
@@ -21,24 +22,28 @@ export function Cashier() {
     return () => clearInterval(interval);
   }, []);
 
-  const fetchPatients = async (page = 1) => {
-    setIsLoading(true);
+  const fetchPatients = useCallback(async (page = 1, isBackground = false) => {
+    if (!isBackground) setIsLoading(true);
     try {
       const response = await getPatientsEnAttente();
-      setIsLoading(false);
+      if (!isBackground) setIsLoading(false);
       if (response.success) {
-        setPatients(response.data || []);
+        const newData = response.data || [];
+        setPatients(prev => deepEqual(prev, newData) ? prev : newData);
         setTotalCount(response.count || 0);
       }
     } catch (error) {
-      setIsLoading(false);
+      if (!isBackground) setIsLoading(false);
       console.error('Error loading patients:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchPatients();
-  }, []);
+  }, [fetchPatients]);
+
+  // Auto-refresh toutes les 5 secondes
+  useAutoRefresh(() => fetchPatients(1, true), 5000, false);
 
   const handleFetchPage = (page) => {
     // Client-side pagination - data already loaded
