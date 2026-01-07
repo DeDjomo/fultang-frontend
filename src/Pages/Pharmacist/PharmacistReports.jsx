@@ -19,6 +19,7 @@ import {
 } from "react-icons/fa";
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
+import { getAllPersonnel } from "../../services/personnelApi";
 
 export function PharmacistReports() {
     const [loading, setLoading] = useState(true);
@@ -38,6 +39,9 @@ export function PharmacistReports() {
     // Rapports envoyés et reçus (depuis l'API)
     const [sentReports, setSentReports] = useState([]);
     const [receivedReports, setReceivedReports] = useState([]);
+
+    // Liste du personnel pour le sélecteur de destinataire
+    const [personnelList, setPersonnelList] = useState([]);
 
     const [selectedReport, setSelectedReport] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -64,8 +68,15 @@ export function PharmacistReports() {
             setLoading(true);
             setError(null);
 
-            // Charger tous les rapports avec fetch
-            const rapportsRes = await fetch(`${baseUrl}/rapports/`, { headers, cache: "no-store" });
+            // Charger rapports et personnel en parallèle
+            const [rapportsRes, personnelData] = await Promise.all([
+                fetch(`${baseUrl}/rapports/`, { headers, cache: "no-store" }),
+                getAllPersonnel()
+            ]);
+
+            // Stocker la liste du personnel
+            const personnel = personnelData.results || personnelData || [];
+            setPersonnelList(personnel);
 
             if (!rapportsRes.ok) {
                 throw new Error(`Erreur HTTP ${rapportsRes.status}: ${rapportsRes.statusText}`);
@@ -77,14 +88,23 @@ export function PharmacistReports() {
             console.log("📊 Rapports chargés:", rapports.length, "rapports");
             console.log("👤 Current User ID:", currentUserId);
 
+            // Helper pour obtenir le nom du personnel
+            const getPersonnelName = (id) => {
+                const person = personnel.find(p => p.idpersonnel === id || p.id === id);
+                if (person) {
+                    return `${person.nom || ''} ${person.prenom || ''}`;
+                }
+                return `Personnel #${id}`;
+            };
+
             // Filtrer les rapports envoyés par le pharmacien
             const sent = rapports.filter(r => r.expediteur === currentUserId);
-            setSentReports(sent.map(formatReport));
+            setSentReports(sent.map(r => formatReport(r, getPersonnelName)));
             console.log("📤 Rapports envoyés:", sent.length);
 
             // Filtrer les rapports reçus par le pharmacien
             const received = rapports.filter(r => r.destinataire === currentUserId);
-            setReceivedReports(received.map(r => ({ ...formatReport(r), isRead: r.est_lu })));
+            setReceivedReports(received.map(r => ({ ...formatReport(r, getPersonnelName), isRead: r.est_lu })));
             console.log("📥 Rapports reçus:", received.length);
 
         } catch (err) {
@@ -95,7 +115,7 @@ export function PharmacistReports() {
         }
     }
 
-    function formatReport(r) {
+    function formatReport(r, getPersonnelName = (id) => `Personnel #${id}`) {
         return {
             id: r.code_rapport || `RPT-${r.idRapport}`,
             idRapport: r.idRapport,
@@ -103,7 +123,9 @@ export function PharmacistReports() {
             corps: r.corps,
             dateEnvoi: r.date_creation?.split('T')[0] || new Date().toISOString().split('T')[0],
             expediteur: r.expediteur,
+            expediteurName: getPersonnelName(r.expediteur),
             destinataire: r.destinataire,
+            destinataireName: getPersonnelName(r.destinataire),
             type: r.type_rapport,
             archiveAssociee: r.archive_associee
         };
@@ -150,6 +172,7 @@ export function PharmacistReports() {
             const reportData = {
                 objet: reportForm.objet,
                 corps: reportForm.corps,
+                id_personnel: currentUserId,
                 expediteur: currentUserId,
                 destinataire: reportForm.destinataire ? parseInt(reportForm.destinataire) : null,
                 type_rapport: pendingInventoryData ? "INVENTAIRE" : "GENERAL",
@@ -380,15 +403,23 @@ export function PharmacistReports() {
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Destinataire (ID Personnel)
+                                    Destinataire
                                 </label>
-                                <input
-                                    type="number"
+                                <select
                                     value={reportForm.destinataire}
                                     onChange={(e) => setReportForm({ ...reportForm, destinataire: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
-                                    placeholder="ID du destinataire (optionnel)"
-                                />
+                                >
+                                    <option value="">-- Sélectionner un destinataire (optionnel) --</option>
+                                    {personnelList
+                                        .filter(p => (p.idpersonnel || p.id) !== currentUserId)
+                                        .map(p => (
+                                            <option key={p.idpersonnel || p.id} value={p.idpersonnel || p.id}>
+                                                {p.nom} {p.prenom} ({p.role || p.poste || 'N/A'})
+                                            </option>
+                                        ))
+                                    }
+                                </select>
                             </div>
                         </div>
                         <div>

@@ -18,6 +18,7 @@ import {
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
 import { rapportApi } from "../../services/comptabiliteMatiereApi";
+import { getAllPersonnel } from "../../services/personnelApi";
 
 export function AccountantReports() {
     const [loading, setLoading] = useState(true);
@@ -40,6 +41,9 @@ export function AccountantReports() {
     const [sentReports, setSentReports] = useState([]);
     const [receivedReports, setReceivedReports] = useState([]);
 
+    // Liste du personnel pour le sélecteur de destinataire
+    const [personnelList, setPersonnelList] = useState([]);
+
     // État pour le modal de détails
     const [selectedReport, setSelectedReport] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -54,26 +58,42 @@ export function AccountantReports() {
             setLoading(true);
             setError(null);
 
-            const rapportsData = await rapportApi.getAll();
+            // Charger les rapports et le personnel en parallèle
+            const [rapportsData, personnelData] = await Promise.all([
+                rapportApi.getAll(),
+                getAllPersonnel()
+            ]);
+
+            // Traiter les rapports
             const rapports = rapportsData.results || rapportsData;
+
+            // Stocker la liste du personnel
+            const personnel = personnelData.results || personnelData || [];
+            setPersonnelList(personnel);
+
+            // Fonction helper pour trouver le nom du personnel
+            const getPersonnelName = (id) => {
+                const p = personnel.find(p => p.id === id);
+                return p ? `${p.nom} ${p.prenom}` : `Personnel #${id}`;
+            };
 
             // Filtrer les rapports envoyés par le comptable
             const sent = rapports.filter(r => r.expediteur === currentUserId);
-            setSentReports(sent.map(formatReport));
+            setSentReports(sent.map(r => formatReport(r, getPersonnelName)));
 
             // Filtrer les rapports reçus par le comptable
             const received = rapports.filter(r => r.destinataire === currentUserId);
-            setReceivedReports(received.map(r => ({ ...formatReport(r), isRead: r.est_lu })));
+            setReceivedReports(received.map(r => ({ ...formatReport(r, getPersonnelName), isRead: r.est_lu })));
 
         } catch (err) {
-            console.error("Erreur lors du chargement des rapports:", err);
-            setError("Impossible de charger les rapports. Vérifiez que le backend est en cours d'exécution.");
+            console.error("Error loading reports:", err);
+            setError("Unable to load reports. Please verify the backend is running.");
         } finally {
             setLoading(false);
         }
     }
 
-    function formatReport(r) {
+    function formatReport(r, getPersonnelName = (id) => `Personnel #${id}`) {
         return {
             id: r.code_rapport || `RPT-${r.idRapport}`,
             idRapport: r.idRapport,
@@ -81,11 +101,11 @@ export function AccountantReports() {
             corps: r.corps,
             dateEnvoi: r.date_creation?.split('T')[0] || new Date().toISOString().split('T')[0],
             expediteur: r.expediteur,
-            expediteurName: `Personnel #${r.expediteur}`,
+            expediteurName: getPersonnelName(r.expediteur),
             destinataire: r.destinataire,
-            destinataireName: `Personnel #${r.destinataire}`,
+            destinataireName: getPersonnelName(r.destinataire),
             type: r.type_rapport,
-            concerneName: `Personnel #${r.destinataire}`,
+            concerneName: getPersonnelName(r.destinataire),
             concerne: r.destinataire
         };
     }
@@ -94,7 +114,7 @@ export function AccountantReports() {
         e.preventDefault();
 
         if (!reportForm.destinataire) {
-            setError("Veuillez saisir l'ID du destinataire.");
+            setError("Please enter the recipient ID.");
             return;
         }
 
@@ -112,22 +132,21 @@ export function AccountantReports() {
                 objet: reportForm.objet,
                 corps: reportForm.corps,
                 type_rapport: "GENERAL",
+                id_personnel: currentUserId, // Champ requis par le backend
                 expediteur: currentUserId,
-                destinataire: parseInt(reportForm.destinataire),
-                date_creation: now.toISOString().split('T')[0],
-                est_lu: false
+                destinataire: parseInt(reportForm.destinataire)
             };
 
             await rapportApi.create(newReportData);
 
-            setSuccessMessage("Rapport envoyé avec succès !");
+            setSuccessMessage("Report sent successfully!");
             setTimeout(() => setSuccessMessage(""), 3000);
             setReportForm({ objet: "", destinataire: "", corps: "" });
             await loadData();
 
         } catch (err) {
-            console.error("Erreur lors de l'envoi:", err);
-            setError("Erreur lors de l'envoi du rapport. Veuillez réessayer.");
+            console.error("Error sending report:", err);
+            setError("Error sending report. Please try again.");
         } finally {
             setSubmitting(false);
         }
@@ -145,7 +164,7 @@ export function AccountantReports() {
                     r.id === report.id ? { ...r, isRead: true } : r
                 ));
             } catch (err) {
-                console.error("Erreur lors du marquage:", err);
+                console.error("Error marking as read:", err);
             }
         }
     }
@@ -162,7 +181,7 @@ export function AccountantReports() {
 
         doc.setFontSize(14);
         doc.setTextColor(80, 194, 185);
-        doc.text("Rapport Officiel", pageWidth / 2, 28, { align: "center" });
+        doc.text("Official Report", pageWidth / 2, 28, { align: "center" });
 
         doc.setDrawColor(80, 194, 185);
         doc.setLineWidth(0.5);
@@ -174,7 +193,7 @@ export function AccountantReports() {
         let yPos = 50;
 
         doc.setFont(undefined, 'bold');
-        doc.text("Référence:", margin, yPos);
+        doc.text("Reference:", margin, yPos);
         doc.setFont(undefined, 'normal');
         doc.text(report.id, margin + 30, yPos);
 
@@ -186,19 +205,19 @@ export function AccountantReports() {
 
         yPos += 8;
         doc.setFont(undefined, 'bold');
-        doc.text("Objet:", margin, yPos);
+        doc.text("Subject:", margin, yPos);
         doc.setFont(undefined, 'normal');
         doc.text(report.objet, margin + 30, yPos);
 
         yPos += 12;
         doc.setFont(undefined, 'bold');
-        doc.text("Expéditeur:", margin, yPos);
+        doc.text("Sender:", margin, yPos);
         doc.setFont(undefined, 'normal');
         doc.text(isReceived ? report.expediteurName : currentUserName, margin + 40, yPos);
 
         yPos += 8;
         doc.setFont(undefined, 'bold');
-        doc.text("Destinataire:", margin, yPos);
+        doc.text("Recipient:", margin, yPos);
         doc.setFont(undefined, 'normal');
         doc.text(report.concerneName || report.destinataireName, margin + 45, yPos);
 
@@ -209,7 +228,7 @@ export function AccountantReports() {
         yPos += 15;
         doc.setFont(undefined, 'bold');
         doc.setFontSize(12);
-        doc.text("Corps du Rapport:", margin, yPos);
+        doc.text("Report Body:", margin, yPos);
 
         yPos += 10;
         doc.setFont(undefined, 'normal');
@@ -237,11 +256,11 @@ export function AccountantReports() {
 
         doc.setFontSize(16);
         doc.setTextColor(26, 115, 163);
-        doc.text("Liste des Rapports Envoyés", pageWidth / 2, 20, { align: "center" });
+        doc.text("Sent Reports List", pageWidth / 2, 20, { align: "center" });
 
         doc.setFontSize(10);
         doc.setTextColor(100);
-        doc.text(`Exporté le: ${new Date().toLocaleDateString('fr-FR')}`, pageWidth / 2, 28, { align: "center" });
+        doc.text(`Exported: ${new Date().toLocaleDateString('en-US')}`, pageWidth / 2, 28, { align: "center" });
 
         let yPos = 40;
 
@@ -277,11 +296,11 @@ export function AccountantReports() {
 
         doc.setFontSize(16);
         doc.setTextColor(26, 115, 163);
-        doc.text("Liste des Rapports Reçus", pageWidth / 2, 20, { align: "center" });
+        doc.text("Received Reports List", pageWidth / 2, 20, { align: "center" });
 
         doc.setFontSize(10);
         doc.setTextColor(100);
-        doc.text(`Exporté le: ${new Date().toLocaleDateString('fr-FR')}`, pageWidth / 2, 28, { align: "center" });
+        doc.text(`Exported: ${new Date().toLocaleDateString('en-US')}`, pageWidth / 2, 28, { align: "center" });
 
         let yPos = 40;
 
@@ -312,12 +331,12 @@ export function AccountantReports() {
 
     if (loading) {
         return (
-            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"ComptaMatiere"}>
+            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"comptable_matiere"}>
                 <AccountantNavBar />
                 <div className="flex items-center justify-center h-96">
                     <div className="text-center">
                         <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
-                        <p className="text-gray-600">Chargement des rapports...</p>
+                        <p className="text-gray-600">Loading reports...</p>
                     </div>
                 </div>
             </AccountantDashBoard>
@@ -327,21 +346,21 @@ export function AccountantReports() {
     return (
         <AccountantDashBoard
             linkList={AccountantNavLink}
-            requiredRole={"ComptaMatiere"}
+            requiredRole={"comptable_matiere"}
         >
             <AccountantNavBar />
             <div className="p-6 space-y-6">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <FaFileAlt className="text-4xl text-primary-start" />
-                        <h1 className="text-3xl font-bold text-gray-800">Gestion des Rapports</h1>
+                        <h1 className="text-3xl font-bold text-gray-800">Report Management</h1>
                     </div>
                     <button
                         onClick={loadData}
                         disabled={loading}
                         className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
                     >
-                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
+                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> Refresh
                     </button>
                 </div>
 
@@ -361,13 +380,13 @@ export function AccountantReports() {
                 <div className="bg-white rounded-lg shadow-lg p-6">
                     <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                         <FaEnvelope className="text-primary-end" />
-                        Rédiger un Nouveau Rapport
+                        Write a New Report
                     </h2>
                     <form onSubmit={handleSubmitReport} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Objet *
+                                    Subject *
                                 </label>
                                 <input
                                     type="text"
@@ -375,36 +394,43 @@ export function AccountantReports() {
                                     value={reportForm.objet}
                                     onChange={(e) => setReportForm({ ...reportForm, objet: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
-                                    placeholder="Objet du rapport (max 10 car.)"
+                                    placeholder="Report subject (max 10 chars)"
                                     required
                                 />
-                                <p className="text-xs text-gray-500 mt-1">{reportForm.objet.length}/10 caractères</p>
+                                <p className="text-xs text-gray-500 mt-1">{reportForm.objet.length}/10 characters</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    ID Destinataire *
+                                    Recipient *
                                 </label>
-                                <input
-                                    type="number"
+                                <select
                                     value={reportForm.destinataire}
                                     onChange={(e) => setReportForm({ ...reportForm, destinataire: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
-                                    placeholder="Saisir l'ID du destinataire (ex: 1, 2, 3...)"
                                     required
-                                    min="1"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">ID du personnel destinataire</p>
+                                >
+                                    <option value="">Select a recipient</option>
+                                    {personnelList
+                                        .filter(p => p.id !== currentUserId)
+                                        .map(p => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.nom} {p.prenom} - {p.poste || 'N/A'}
+                                            </option>
+                                        ))
+                                    }
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">Select the person to send the report to</p>
                             </div>
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Corps du rapport *
+                                Report body *
                             </label>
                             <textarea
                                 value={reportForm.corps}
                                 onChange={(e) => setReportForm({ ...reportForm, corps: e.target.value })}
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
-                                placeholder="Rédigez le contenu de votre rapport ici..."
+                                placeholder="Write your report content here..."
                                 rows="6"
                                 required
                             />
@@ -416,7 +442,7 @@ export function AccountantReports() {
                                 className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
                             >
                                 {submitting ? <FaSpinner className="animate-spin" /> : <FaPaperPlane />}
-                                Envoyer
+                                Send
                             </button>
                         </div>
                     </form>
@@ -429,14 +455,14 @@ export function AccountantReports() {
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                 <FaPaperPlane className="text-blue-500" />
-                                Rapports Envoyés ({sentReports.length})
+                                Sent Reports ({sentReports.length})
                             </h2>
                             <button
                                 onClick={exportAllSentToPDF}
                                 disabled={sentReports.length === 0}
                                 className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm disabled:opacity-50"
                             >
-                                <FaFilePdf /> Exporter PDF
+                                <FaFilePdf /> Export PDF
                             </button>
                         </div>
                         <div className="max-h-96 overflow-y-auto space-y-3">
@@ -451,7 +477,7 @@ export function AccountantReports() {
                                     />
                                 ))
                             ) : (
-                                <p className="text-gray-500 text-center py-4">Aucun rapport envoyé</p>
+                                <p className="text-gray-500 text-center py-4">No sent reports</p>
                             )}
                         </div>
                     </div>
@@ -461,10 +487,10 @@ export function AccountantReports() {
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                 <FaInbox className="text-green-500" />
-                                Rapports Reçus ({receivedReports.length})
+                                Received Reports ({receivedReports.length})
                                 {receivedReports.filter(r => !r.isRead).length > 0 && (
                                     <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                                        {receivedReports.filter(r => !r.isRead).length} nouveau(x)
+                                        {receivedReports.filter(r => !r.isRead).length} new
                                     </span>
                                 )}
                             </h2>
@@ -473,7 +499,7 @@ export function AccountantReports() {
                                 disabled={receivedReports.length === 0}
                                 className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm disabled:opacity-50"
                             >
-                                <FaFilePdf /> Exporter PDF
+                                <FaFilePdf /> Export PDF
                             </button>
                         </div>
                         <div className="max-h-96 overflow-y-auto space-y-3">
@@ -488,7 +514,7 @@ export function AccountantReports() {
                                     />
                                 ))
                             ) : (
-                                <p className="text-gray-500 text-center py-4">Aucun rapport reçu</p>
+                                <p className="text-gray-500 text-center py-4">No received reports</p>
                             )}
                         </div>
                     </div>
@@ -504,7 +530,7 @@ export function AccountantReports() {
                                 <div className="bg-primary-end/20 p-2 rounded-full">
                                     <FaFileAlt className="w-5 h-5 text-primary-start" />
                                 </div>
-                                <h2 className="text-xl font-bold text-gray-800">Détails du Rapport</h2>
+                                <h2 className="text-xl font-bold text-gray-800">Report Details</h2>
                             </div>
                             <button
                                 onClick={() => setShowDetailModal(false)}
@@ -517,7 +543,7 @@ export function AccountantReports() {
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gray-50 p-3 rounded-lg">
-                                    <p className="text-sm text-gray-600">Référence</p>
+                                    <p className="text-sm text-gray-600">Reference</p>
                                     <p className="font-bold text-gray-800">{selectedReport.id}</p>
                                 </div>
                                 <div className="bg-gray-50 p-3 rounded-lg">
@@ -527,29 +553,29 @@ export function AccountantReports() {
                             </div>
 
                             <div className="bg-gray-50 p-3 rounded-lg">
-                                <p className="text-sm text-gray-600">Objet</p>
+                                <p className="text-sm text-gray-600">Subject</p>
                                 <p className="font-bold text-gray-800">{selectedReport.objet}</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-blue-50 p-3 rounded-lg">
                                     <p className="text-sm text-blue-600 flex items-center gap-1">
-                                        <FaUser /> Expéditeur
+                                        <FaUser /> Sender
                                     </p>
                                     <p className="font-bold text-gray-800">
-                                        {selectedReport.isReceived ? selectedReport.expediteurName : "Vous"}
+                                        {selectedReport.isReceived ? selectedReport.expediteurName : "You"}
                                     </p>
                                 </div>
                                 <div className="bg-green-50 p-3 rounded-lg">
                                     <p className="text-sm text-green-600 flex items-center gap-1">
-                                        <FaUser /> Destinataire
+                                        <FaUser /> Recipient
                                     </p>
                                     <p className="font-bold text-gray-800">{selectedReport.concerneName}</p>
                                 </div>
                             </div>
 
                             <div className="bg-gray-50 p-4 rounded-lg">
-                                <p className="text-sm text-gray-600 mb-2 font-semibold">Corps du rapport</p>
+                                <p className="text-sm text-gray-600 mb-2 font-semibold">Report Body</p>
                                 <p className="text-gray-800 whitespace-pre-wrap">{selectedReport.corps}</p>
                             </div>
 
@@ -561,13 +587,13 @@ export function AccountantReports() {
                                     }}
                                     className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
                                 >
-                                    <FaFilePdf /> Télécharger PDF
+                                    <FaFilePdf /> Download PDF
                                 </button>
                                 <button
                                     onClick={() => setShowDetailModal(false)}
                                     className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
                                 >
-                                    Fermer
+                                    Close
                                 </button>
                             </div>
                         </div>
@@ -602,7 +628,7 @@ function ReportCard({ report, type, onView, onExport }) {
                         </span>
                         {isUnread && (
                             <span className="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">
-                                Nouveau
+                                New
                             </span>
                         )}
                     </div>
@@ -623,7 +649,7 @@ function ReportCard({ report, type, onView, onExport }) {
                         : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
                         }`}
                 >
-                    <FaEye /> Voir
+                    <FaEye /> View
                 </button>
                 <button
                     onClick={onExport}

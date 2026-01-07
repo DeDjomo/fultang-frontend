@@ -3,20 +3,18 @@ import { AccountantNavLink } from "./AccountantNavLink";
 import { AccountantNavBar } from "./Components/AccountantNavBar";
 import { useState, useEffect } from "react";
 import {
-    FaSearch,
-    FaEye,
-    FaFilter,
-    FaListAlt,
-    FaFilePdf,
-    FaBuilding,
-    FaCalendarAlt,
-    FaBoxOpen,
-    FaSpinner,
-    FaSyncAlt
-} from "react-icons/fa";
+    Search,
+    Eye,
+    Filter,
+    List,
+    FileText,
+    Building2,
+    Calendar,
+    PackageOpen,
+    RefreshCw
+} from "lucide-react";
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
-import { sortieApi, ligneSortieApi } from "../../services/comptabiliteMatiereApi";
 
 export function OutputList() {
     const [loading, setLoading] = useState(true);
@@ -25,10 +23,14 @@ export function OutputList() {
     const [filterMotif, setFilterMotif] = useState("all");
     const [filterPeriod, setFilterPeriod] = useState("all");
 
-    // Données des sorties depuis l'API
+    // Output data from API
     const [outputs, setOutputs] = useState([]);
 
-    // Charger les sorties depuis l'API
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 5;
+
+    // Load outputs from API
     useEffect(() => {
         loadData();
     }, []);
@@ -45,12 +47,12 @@ export function OutputList() {
             setLoading(true);
             setError(null);
 
-            // 1. Charger les sorties
+            // 1. Load outputs
             const sortiesRes = await fetch(`${baseUrl}/sorties/`, { headers, cache: "no-store" });
             const sortiesData = await sortiesRes.json();
             const sorties = (sortiesData.results || sortiesData || []);
 
-            // 2. Pour chaque sortie, charger ses lignes (N+1 optimisation possible backend, mais ici frontend-side)
+            // 2. For each output, load its lines
             const outputsWithLines = await Promise.all(
                 sorties.map(async (s) => {
                     try {
@@ -59,27 +61,27 @@ export function OutputList() {
                         const lignesRaw = lignesData.results || lignesData || [];
 
                         const lignes = lignesRaw.map(l => ({
-                            nomMateriel: l.materiel_nom || `Matériel #${l.id_materiel}`,
+                            nomMateriel: l.materiel_nom || `Material #${l.id_materiel}`,
                             codeMateriel: l.materiel_code || "",
-                            typeMateriel: l.type_materiel === "MEDICAL" ? "Matériel Médical" : "Matériel Durable",
+                            typeMateriel: l.type_materiel === "MEDICAL" ? "Medical Material" : "Durable Material",
                             quantite: l.quantite
                         }));
 
                         return {
-                            id: s.numero_sortie || `SOR-${s.idSortie}`,
+                            id: s.numero_sortie || `OUT-${s.idSortie}`,
                             idSortie: s.idSortie,
-                            serviceMedical: s.service_medical || "Non spécifié",
+                            serviceMedical: s.service_medical || "Not specified",
                             dateSortie: s.date_sortie?.split('T')[0] || '-',
                             dateEnregistrement: s.date_sortie?.split('T')[0] || '-',
                             motifSortie: mapMotif(s.motif_sortie),
                             articles: lignes
                         };
                     } catch (e) {
-                        console.warn("Erreur chargement lignes sortie " + s.idSortie, e);
+                        console.warn("Error loading output lines " + s.idSortie, e);
                         return {
-                            id: s.numero_sortie || `SOR-${s.idSortie}`,
+                            id: s.numero_sortie || `OUT-${s.idSortie}`,
                             idSortie: s.idSortie,
-                            serviceMedical: s.service_medical || "Non spécifié",
+                            serviceMedical: s.service_medical || "Not specified",
                             dateSortie: s.date_sortie?.split('T')[0] || '-',
                             dateEnregistrement: s.date_sortie?.split('T')[0] || '-',
                             motifSortie: mapMotif(s.motif_sortie),
@@ -92,8 +94,8 @@ export function OutputList() {
             setOutputs(outputsWithLines);
 
         } catch (err) {
-            console.error("Erreur chargement sorties:", err);
-            setError("Impossible de charger les sorties fraîches.");
+            console.error("Error loading outputs:", err);
+            setError("Unable to load outputs.");
         } finally {
             setLoading(false);
         }
@@ -101,13 +103,13 @@ export function OutputList() {
 
     function mapMotif(motif) {
         const map = {
-            'VENTE': 'vente',
-            'UTILISATION_SERVICE': 'utilisation',
-            'DEFECTUEUX': 'defectueux',
-            'PERIME': 'perime',
-            'PERTE': 'defectueux'
+            'VENTE': 'sale',
+            'UTILISATION_SERVICE': 'usage',
+            'DEFECTUEUX': 'defective',
+            'PERIME': 'expired',
+            'PERTE': 'defective'
         };
-        return map[motif] || 'defectueux';
+        return map[motif] || 'defective';
     }
 
     function getFilteredOutputs() {
@@ -138,14 +140,14 @@ export function OutputList() {
 
     function getMotifBadge(motif) {
         const config = {
-            defectueux: { bg: "bg-red-100", text: "text-red-800", label: "Défectueux" },
-            perime: { bg: "bg-orange-100", text: "text-orange-800", label: "Périmé" },
-            vente: { bg: "bg-green-100", text: "text-green-800", label: "Vente" },
-            transfert: { bg: "bg-blue-100", text: "text-blue-800", label: "Transfert" },
-            utilisation: { bg: "bg-purple-100", text: "text-purple-800", label: "Utilisation" }
+            defective: { bg: "bg-red-100", text: "text-red-800", label: "Defective" },
+            expired: { bg: "bg-orange-100", text: "text-orange-800", label: "Expired" },
+            sale: { bg: "bg-green-100", text: "text-green-800", label: "Sale" },
+            transfer: { bg: "bg-blue-100", text: "text-blue-800", label: "Transfer" },
+            usage: { bg: "bg-purple-100", text: "text-purple-800", label: "Usage" }
         };
 
-        const { bg, text, label } = config[motif] || config.defectueux;
+        const { bg, text, label } = config[motif] || config.defective;
 
         return (
             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${bg} ${text}`}>
@@ -160,11 +162,11 @@ export function OutputList() {
 
         doc.setFontSize(20);
         doc.setTextColor(26, 115, 163);
-        doc.text("Liste des Sorties de Matériel", pageWidth / 2, 20, { align: "center" });
+        doc.text("Material Output List", pageWidth / 2, 20, { align: "center" });
 
         doc.setFontSize(10);
         doc.setTextColor(100);
-        doc.text(`Généré le: ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, pageWidth / 2, 28, { align: "center" });
+        doc.text(`Generated: ${new Date().toLocaleDateString('en-US')} at ${new Date().toLocaleTimeString('en-US')}`, pageWidth / 2, 28, { align: "center" });
 
         doc.setDrawColor(80, 194, 185);
         doc.setLineWidth(0.5);
@@ -197,28 +199,28 @@ export function OutputList() {
             doc.setFont(undefined, 'normal');
 
             const motifLabels = {
-                defectueux: "Défectueux",
-                perime: "Périmé",
-                vente: "Vente",
-                transfert: "Transfert",
-                utilisation: "Utilisation"
+                defective: "Defective",
+                expired: "Expired",
+                sale: "Sale",
+                transfer: "Transfer",
+                usage: "Usage"
             };
-            doc.text(`Motif: ${motifLabels[output.motifSortie] || output.motifSortie}`, margin + 3, yPosition);
+            doc.text(`Reason: ${motifLabels[output.motifSortie] || output.motifSortie}`, margin + 3, yPosition);
 
             yPosition += 8;
 
             doc.setFont(undefined, 'bold');
-            doc.text("Articles:", margin + 3, yPosition);
+            doc.text("Items:", margin + 3, yPosition);
             yPosition += 6;
 
             doc.setFont(undefined, 'normal');
             if (output.articles && output.articles.length > 0) {
                 output.articles.forEach((article) => {
-                    doc.text(`• ${article.nomMateriel} (${article.codeMateriel}) - Qté: ${article.quantite}`, margin + 5, yPosition);
+                    doc.text(`• ${article.nomMateriel} (${article.codeMateriel}) - Qty: ${article.quantite}`, margin + 5, yPosition);
                     yPosition += 5;
                 });
             } else {
-                doc.text(`  Aucun article`, margin + 5, yPosition);
+                doc.text(`  No items`, margin + 5, yPosition);
                 yPosition += 5;
             }
 
@@ -231,22 +233,25 @@ export function OutputList() {
 
         doc.setFontSize(9);
         doc.setTextColor(100);
-        doc.text(`Total: ${filteredOutputs.length} sortie(s)`, margin, pageHeight - 12);
-        doc.text("Fultang Clinic - Comptable Matière", pageWidth - margin, pageHeight - 12, { align: "right" });
+        doc.text(`Total: ${filteredOutputs.length} output(s)`, margin, pageHeight - 12);
+        doc.text("Fultang Clinic - Material Accountant", pageWidth - margin, pageHeight - 12, { align: "right" });
 
-        doc.save(`sorties_materiel_${new Date().toISOString().split('T')[0]}.pdf`);
+        doc.save(`material_outputs_${new Date().toISOString().split('T')[0]}.pdf`);
     }
 
     const filteredOutputs = getFilteredOutputs();
+    const totalPages = Math.ceil(filteredOutputs.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const currentOutputs = filteredOutputs.slice(startIndex, startIndex + itemsPerPage);
 
     if (loading) {
         return (
-            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"ComptaMatiere"}>
+            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"comptable_matiere"}>
                 <AccountantNavBar />
                 <div className="flex items-center justify-center h-96">
                     <div className="text-center">
-                        <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
-                        <p className="text-gray-600">Chargement des sorties...</p>
+                        <RefreshCw className="animate-spin text-primary-start mx-auto mb-4 w-10 h-10" />
+                        <p className="text-gray-600">Loading outputs...</p>
                     </div>
                 </div>
             </AccountantDashBoard>
@@ -256,32 +261,35 @@ export function OutputList() {
     return (
         <AccountantDashBoard
             linkList={AccountantNavLink}
-            requiredRole={"ComptaMatiere"}
+            requiredRole={"comptable_matiere"}
         >
             <AccountantNavBar />
             <div className="p-6 space-y-6">
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <FaListAlt className="text-4xl text-primary-start" />
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-800">Liste des Sorties</h1>
-                            <p className="text-gray-500">{outputs.length} sorties enregistrées</p>
+                {/* Modern gradient header */}
+                <div className="bg-gradient-to-br from-primary-end to-primary-start text-white rounded-lg p-6 shadow-lg">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div className="flex items-center gap-3">
+                            <List className="w-8 h-8" />
+                            <div>
+                                <h1 className="text-2xl font-bold">Output List</h1>
+                                <p className="text-sm opacity-90">{outputs.length} outputs registered</p>
+                            </div>
                         </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={loadData}
-                            disabled={loading}
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
-                        >
-                            <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
-                        </button>
-                        <button
-                            onClick={exportToPDF}
-                            className="flex items-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all duration-300 shadow-lg"
-                        >
-                            <FaFilePdf /> Exporter PDF
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={loadData}
+                                disabled={loading}
+                                className="flex items-center gap-2 px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-all"
+                            >
+                                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+                            </button>
+                            <button
+                                onClick={exportToPDF}
+                                className="flex items-center gap-2 px-4 py-2 bg-white text-primary-end rounded-lg hover:bg-gray-100 transition-all"
+                            >
+                                <FileText className="w-5 h-5" /> Export PDF
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -291,64 +299,64 @@ export function OutputList() {
                     </div>
                 )}
 
-                {/* Filtres */}
+                {/* Filters */}
                 <div className="bg-white rounded-lg shadow-lg p-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                <FaSearch className="inline mr-2" />
-                                Rechercher
+                            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                <Search className="w-4 h-4" />
+                                Search
                             </label>
                             <input
                                 type="text"
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
-                                placeholder="N° sortie, service, matériel, code..."
+                                placeholder="Output #, service, material, code..."
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                <FaFilter className="inline mr-2" />
-                                Motif
+                            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                <Filter className="w-4 h-4" />
+                                Reason
                             </label>
                             <select
                                 value={filterMotif}
-                                onChange={(e) => setFilterMotif(e.target.value)}
+                                onChange={(e) => { setFilterMotif(e.target.value); setCurrentPage(1); }}
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
                             >
-                                <option value="all">Tous les motifs</option>
-                                <option value="defectueux">Défectueux</option>
-                                <option value="perime">Périmé</option>
-                                <option value="vente">Vente</option>
-                                <option value="transfert">Transfert</option>
-                                <option value="utilisation">Utilisation</option>
+                                <option value="all">All reasons</option>
+                                <option value="defective">Defective</option>
+                                <option value="expired">Expired</option>
+                                <option value="sale">Sale</option>
+                                <option value="transfer">Transfer</option>
+                                <option value="usage">Usage</option>
                             </select>
                         </div>
 
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Période
+                                Period
                             </label>
                             <select
                                 value={filterPeriod}
-                                onChange={(e) => setFilterPeriod(e.target.value)}
+                                onChange={(e) => { setFilterPeriod(e.target.value); setCurrentPage(1); }}
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
                             >
-                                <option value="all">Toutes les périodes</option>
-                                <option value="today">Aujourd&apos;hui</option>
-                                <option value="week">Cette semaine</option>
-                                <option value="month">Ce mois</option>
+                                <option value="all">All periods</option>
+                                <option value="today">Today</option>
+                                <option value="week">This week</option>
+                                <option value="month">This month</option>
                             </select>
                         </div>
                     </div>
                 </div>
 
-                {/* Liste des sorties */}
+                {/* Output List */}
                 <div className="space-y-4">
-                    {filteredOutputs.length > 0 ? (
-                        filteredOutputs.map((output) => (
+                    {currentOutputs.length > 0 ? (
+                        currentOutputs.map((output) => (
                             <OutputCard
                                 key={output.id}
                                 output={output}
@@ -357,14 +365,38 @@ export function OutputList() {
                         ))
                     ) : (
                         <div className="bg-white rounded-lg shadow-lg p-12 text-center text-gray-500">
-                            <FaBoxOpen className="mx-auto text-5xl text-gray-300 mb-4" />
-                            <p>Aucune sortie trouvée</p>
+                            <PackageOpen className="mx-auto text-gray-300 mb-4 w-16 h-16" />
+                            <p className="text-lg">No outputs found</p>
+                            <p className="text-sm text-gray-400 mt-1">Try adjusting your filters</p>
                         </div>
                     )}
                 </div>
 
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="flex justify-center items-center gap-4">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Previous
+                        </button>
+                        <span className="text-gray-600 font-medium">
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            Next
+                        </button>
+                    </div>
+                )}
+
                 <div className="text-sm text-gray-600 text-right">
-                    Affichage de {filteredOutputs.length} sur {outputs.length} sorties
+                    Showing {currentOutputs.length} of {filteredOutputs.length} output(s)
                 </div>
             </div>
         </AccountantDashBoard>
@@ -391,14 +423,14 @@ function OutputCard({ output, getMotifBadge }) {
                         <div className="flex gap-2 mb-2 flex-wrap">
                             {getMotifBadge(output.motifSortie)}
                             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
-                                {totalArticles} article(s)
+                                {totalArticles} item(s)
                             </span>
                         </div>
                     </div>
                     <div className="text-right">
                         <p className="text-sm text-gray-600 flex items-center gap-1 justify-end">
-                            <FaCalendarAlt className="text-gray-400" />
-                            Date de sortie
+                            <Calendar className="text-gray-400 w-4 h-4" />
+                            Output Date
                         </p>
                         <p className="font-semibold text-gray-800">{output.dateSortie}</p>
                     </div>
@@ -407,26 +439,26 @@ function OutputCard({ output, getMotifBadge }) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                         <p className="text-sm text-gray-600 flex items-center gap-1">
-                            <FaBuilding className="text-gray-400" />
-                            Service responsable
+                            <Building2 className="text-gray-400 w-4 h-4" />
+                            Responsible Service
                         </p>
                         <p className="font-semibold text-gray-800">{output.serviceMedical}</p>
                     </div>
                     <div>
-                        <p className="text-sm text-gray-600">Date d&apos;enregistrement</p>
+                        <p className="text-sm text-gray-600">Registration Date</p>
                         <p className="font-semibold text-gray-800">{output.dateEnregistrement}</p>
                     </div>
                     <div>
-                        <p className="text-sm text-gray-600">Quantité totale</p>
-                        <p className="font-semibold text-gray-800 text-lg">{totalQuantite} unité(s)</p>
+                        <p className="text-sm text-gray-600">Total Quantity</p>
+                        <p className="font-semibold text-gray-800 text-lg">{totalQuantite} unit(s)</p>
                     </div>
                 </div>
 
                 {showDetails && output.articles && output.articles.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                         <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                            <FaBoxOpen className="text-primary-start" />
-                            Articles concernés par cette sortie:
+                            <PackageOpen className="text-primary-start w-5 h-5" />
+                            Items in this output:
                         </h4>
                         <div className="space-y-2">
                             {output.articles.map((article, index) => (
@@ -436,13 +468,13 @@ function OutputCard({ output, getMotifBadge }) {
                                         <span className="text-xs text-gray-500 font-mono ml-2">({article.codeMateriel})</span>
                                     </div>
                                     <div className="flex items-center gap-4">
-                                        <span className={`px-2 py-1 rounded text-xs ${article.typeMateriel === 'Matériel Médical'
+                                        <span className={`px-2 py-1 rounded text-xs ${article.typeMateriel === 'Medical Material'
                                             ? 'bg-red-100 text-red-700'
                                             : 'bg-blue-100 text-blue-700'
                                             }`}>
                                             {article.typeMateriel}
                                         </span>
-                                        <span className="font-bold text-gray-800">Qté: {article.quantite}</span>
+                                        <span className="font-bold text-gray-800">Qty: {article.quantite}</span>
                                     </div>
                                 </div>
                             ))}
@@ -454,8 +486,8 @@ function OutputCard({ output, getMotifBadge }) {
                     onClick={() => setShowDetails(!showDetails)}
                     className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all duration-300"
                 >
-                    <FaEye />
-                    {showDetails ? "Masquer les articles" : `Voir les ${totalArticles} article(s)`}
+                    <Eye className="w-5 h-5" />
+                    {showDetails ? "Hide items" : `View ${totalArticles} item(s)`}
                 </button>
             </div>
         </div>

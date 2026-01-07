@@ -295,7 +295,7 @@ export function PharmacyNeeds() {
     ];
 
     return (
-        <CustomDashboard linkList={pharmacyNavLink} requiredRole="Pharmacist">
+        <CustomDashboard linkList={pharmacyNavLink} requiredRole="pharmacien">
             <PharmacyNavBar />
 
             <div className="p-6">

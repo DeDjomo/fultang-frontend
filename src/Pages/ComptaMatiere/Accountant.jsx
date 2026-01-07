@@ -3,29 +3,23 @@ import { AccountantNavLink } from "./AccountantNavLink";
 import { AccountantNavBar } from "./Components/AccountantNavBar";
 import { useState, useEffect, useRef } from "react";
 import {
-  FaBoxes,
-  FaTruck,
-  FaClipboardList,
-  FaChartLine,
-  FaBoxOpen,
-  FaMedkit,
-  FaTools,
-  FaClock,
-  FaCheckCircle,
-  FaExclamationTriangle,
-  FaSpinner,
-  FaSyncAlt
-} from "react-icons/fa";
+  Package,
+  Truck,
+  ClipboardList,
+  TrendingUp,
+  PackageOpen,
+  Stethoscope,
+  Wrench,
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  RefreshCw,
+  Plus,
+  FileText,
+  Eye
+} from "lucide-react";
 import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
-import {
-  materielMedicalApi,
-  materielDurableApi,
-  sortieApi,
-  livraisonApi,
-  besoinApi,
-  ligneBesoinApi
-} from "../../services/comptabiliteMatiereApi";
 
 export function Accountant() {
   const navigate = useNavigate();
@@ -34,7 +28,7 @@ export function Accountant() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Statistiques depuis l'API
+  // Statistics from API
   const [stats, setStats] = useState({
     totalMaterial: 0,
     totalMedical: 0,
@@ -44,17 +38,21 @@ export function Accountant() {
     totalDurable: 0,
   });
 
-  // Liste des besoins en cours depuis l'API
+  // List of pending needs from API
   const [besoinsEnCours, setBesoinsEnCours] = useState([]);
 
-  // Charger les données
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 7;
+
+  // Load data
   useEffect(() => {
     loadData();
   }, []);
 
   /**
-   * 📡 CHARGEMENT DES DONNÉES (Mode "Toujours Frais")
-   * Utilisation de fetch avec cache: "no-store" pour éviter le cache navigateur.
+   * 📡 DATA LOADING (Always Fresh Mode)
+   * Using fetch with cache: "no-store" to avoid browser cache.
    */
   const loadData = async () => {
     setLoading(true);
@@ -68,7 +66,7 @@ export function Accountant() {
     const baseUrl = "http://127.0.0.1:8000/api";
 
     try {
-      console.log("🚀 Dashboard - Chargement des données fraîches...");
+      console.log("🚀 Dashboard - Loading fresh data...");
 
       const [medicauxRes, durablesRes, sortiesRes, livraisonsRes, besoinsRes] = await Promise.all([
         fetch(`${baseUrl}/materiels-medicaux/?page_size=1000`, { headers, cache: "no-store" }).then(res => res.json()),
@@ -78,15 +76,15 @@ export function Accountant() {
         fetch(`${baseUrl}/besoins/?page_size=1000`, { headers, cache: "no-store" }).then(res => res.json())
       ]);
 
-      // Extraire les résultats (gestion format paginé Django Rest Framework)
+      // Extract results (handling Django Rest Framework paginated format)
       const medicaux = medicauxRes.results || medicauxRes || [];
       const durables = durablesRes.results || durablesRes || [];
       const sorties = sortiesRes.results || sortiesRes || [];
       const livraisons = livraisonsRes.results || livraisonsRes || [];
       const besoins = besoinsRes.results || besoinsRes || [];
 
-      // 🔢 OPÉRATIONS STATISTIQUES
-      // Compter uniquement les besoins EN_COURS (à traiter par le comptable)
+      // 🔢 STATISTICAL OPERATIONS
+      // Count only EN_COURS needs (to be processed by accountant)
       const pendingCount = besoins.filter(b => b.statut === 'EN_COURS').length;
 
       setStats({
@@ -98,14 +96,14 @@ export function Accountant() {
         totalDurable: durables.length,
       });
 
-      // Récupérer UNIQUEMENT les besoins EN_COURS pour le comptable
+      // Get ONLY EN_COURS needs for the accountant
       const besoinsEnCoursFiltered = besoins.filter(b =>
         b.statut === 'EN_COURS'
-      ).slice(0, 20);
+      ).slice(0, 50);
 
       const besoinsFormates = await Promise.all(
         besoinsEnCoursFiltered.map(async (b) => {
-          // Récupérer les lignes de chaque besoin individuellement avec no-store
+          // Fetch lines for each need individually with no-store
           let description = b.motif;
           let quantiteTotal = 1;
 
@@ -119,19 +117,19 @@ export function Accountant() {
               description = lignes.map(l => l.materiel_nom).join(', ');
             }
           } catch (err) {
-            console.warn(`Erreur lignes pour besoin ${b.idBesoin}`, err);
+            console.warn(`Error fetching lines for need ${b.idBesoin}`, err);
           }
 
           return {
             id: b.idBesoin,
             code: b.code_besoin || `BES-${b.idBesoin}`,
-            departement: `Personnel #${b.idPersonnel_emetteur}`,
-            description: description || 'Non spécifié',
+            departement: `Staff #${b.idPersonnel_emetteur}`,
+            description: description || 'Not specified',
             quantite: quantiteTotal,
             priorite: mapPriorite(b.priorite),
             dateEmission: b.date_creation_besoin?.split('T')[0] || '-',
             statut: mapStatut(b.statut),
-            rawStatut: b.statut, // Conserver le statut original pour les actions
+            rawStatut: b.statut, // Keep original status for actions
           };
         })
       );
@@ -139,8 +137,8 @@ export function Accountant() {
       setBesoinsEnCours(besoinsFormates);
 
     } catch (err) {
-      console.error("❌ Erreur chargement:", err);
-      setError("Impossible de charger les données fraîches.");
+      console.error("❌ Loading error:", err);
+      setError("Unable to load fresh data.");
     } finally {
       setLoading(false);
     }
@@ -148,28 +146,28 @@ export function Accountant() {
 
   function mapPriorite(priorite) {
     const map = {
-      'HIGH': 'haute',
-      'NORMAL': 'moyenne',
-      'LOW': 'basse'
+      'HIGH': 'high',
+      'NORMAL': 'medium',
+      'LOW': 'low'
     };
-    return map[priorite] || 'moyenne';
+    return map[priorite] || 'medium';
   }
 
   function mapStatut(statut) {
     const map = {
-      'NON_TRAITE': 'en_attente',
-      'EN_COURS': 'en_cours',
-      'TRAITE': 'traite',
-      'REJETE': 'traite'
+      'NON_TRAITE': 'pending',
+      'EN_COURS': 'in_progress',
+      'TRAITE': 'processed',
+      'REJETE': 'processed'
     };
-    return map[statut] || 'en_attente';
+    return map[statut] || 'pending';
   }
 
   /**
-   * 📝 TRAITER UN BESOIN (Passer de EN_COURS à TRAITE)
+   * 📝 PROCESS A NEED (Move from EN_COURS to TRAITE)
    */
   const handleTraiterBesoin = async (besoin) => {
-    const confirmation = window.confirm(`Voulez-vous marquer le besoin ${besoin.code} comme traité ?`);
+    const confirmation = window.confirm(`Do you want to mark need ${besoin.code} as processed?`);
     if (!confirmation) return;
 
     const token = localStorage.getItem("token_key_fultang");
@@ -189,16 +187,16 @@ export function Accountant() {
       });
 
       if (!response.ok) {
-        throw new Error(`Erreur HTTP ${response.status}`);
+        throw new Error(`HTTP Error ${response.status}`);
       }
 
-      // Recharger les données
+      // Reload data
       await loadData();
-      alert(`✅ Besoin ${besoin.code} marqué comme traité avec succès !`);
+      alert(`✅ Need ${besoin.code} marked as processed successfully!`);
 
     } catch (err) {
-      console.error("Erreur lors du traitement du besoin:", err);
-      alert("❌ Erreur lors du traitement du besoin. Veuillez réessayer.");
+      console.error("Error processing need:", err);
+      alert("❌ Error processing need. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -208,45 +206,59 @@ export function Accountant() {
     besoinsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  // Pagination logic
+  const totalPages = Math.ceil(besoinsEnCours.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentNeeds = besoinsEnCours.slice(startIndex, endIndex);
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+
   const quickActions = [
     {
-      icon: FaClipboardList,
-      label: "Émettre un besoin",
-      description: "Créer une demande de matériel",
-      color: "bg-blue-500",
+      icon: ClipboardList,
+      label: "Emit Need",
+      description: "Create a material request",
+      color: "from-blue-500 to-blue-600",
       onClick: () => navigate("/compta-matiere/emit-need"),
     },
     {
-      icon: FaTruck,
-      label: "Enregistrer une livraison",
-      description: "Saisir une réception",
-      color: "bg-green-500",
+      icon: Truck,
+      label: "Register Delivery",
+      description: "Record a reception",
+      color: "from-green-500 to-green-600",
       onClick: () => navigate("/compta-matiere/register-delivery"),
     },
     {
-      icon: FaBoxOpen,
-      label: "Enregistrer une sortie",
-      description: "Enregistrer une sortie",
-      color: "bg-orange-500",
+      icon: PackageOpen,
+      label: "Register Output",
+      description: "Record an output",
+      color: "from-orange-500 to-orange-600",
       onClick: () => navigate("/compta-matiere/register-output"),
     },
     {
-      icon: FaChartLine,
-      label: "Voir les rapports",
-      description: "Consulter les statistiques",
-      color: "bg-purple-500",
+      icon: TrendingUp,
+      label: "View Reports",
+      description: "View statistics",
+      color: "from-purple-500 to-purple-600",
       onClick: () => navigate("/compta-matiere/reports"),
     },
   ];
 
   if (loading) {
     return (
-      <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"ComptaMatiere"}>
+      <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"comptable_matiere"}>
         <AccountantNavBar />
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
-            <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
-            <p className="text-gray-600">Chargement des données...</p>
+            <RefreshCw className="animate-spin text-4xl text-primary-start mx-auto mb-4 w-10 h-10" />
+            <p className="text-gray-600">Loading data...</p>
           </div>
         </div>
       </AccountantDashBoard>
@@ -256,79 +268,99 @@ export function Accountant() {
   return (
     <AccountantDashBoard
       linkList={AccountantNavLink}
-      requiredRole={"ComptaMatiere"}
+      requiredRole={"comptable_matiere"}
     >
       <AccountantNavBar />
       <div className="p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-800">Tableau de Bord - Comptable Matière</h1>
-          <button
-            onClick={loadData}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
-          >
-            <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
-          </button>
+        {/* Modern gradient header */}
+        <div className="bg-gradient-to-br from-primary-end to-primary-start text-white rounded-lg p-6 shadow-lg">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3">
+              <Package className="w-8 h-8" />
+              <div>
+                <h1 className="text-2xl font-bold">Material Accounting Dashboard</h1>
+                <p className="text-sm opacity-90">
+                  {stats.totalMaterial} material{stats.totalMaterial !== 1 ? 's' : ''} in stock
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className="flex items-center gap-2 bg-white text-primary-end px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5" />
             {error}
           </div>
         )}
 
-        {/* Statistiques principales */}
+        {/* Main Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <StatCard
-            title="Total Matériel"
+            title="Total Materials"
             value={stats.totalMaterial}
-            description="Articles en stock"
-            color="bg-blue-500"
-            icon={FaBoxes}
+            description="Items in stock"
+            color="from-blue-500 to-blue-600"
+            icon={Package}
+            onClick={() => navigate("/compta-matiere/material-list")}
+            clickable={true}
           />
           <StatCard
-            title="Matériel Médical Total"
+            title="Medical Materials"
             value={stats.totalMedical}
-            description="Équipements médicaux"
-            color="bg-yellow-500"
-            icon={FaMedkit}
+            description="Medical equipment"
+            color="from-cyan-500 to-cyan-600"
+            icon={Stethoscope}
+            onClick={() => navigate("/compta-matiere/material-list")}
+            clickable={true}
           />
           <StatCard
-            title="Sorties Totales"
+            title="Total Outputs"
             value={stats.totalOutputs}
-            description="Toutes les sorties"
-            color="bg-orange-500"
-            icon={FaBoxOpen}
+            description="All outputs"
+            color="from-orange-500 to-orange-600"
+            icon={PackageOpen}
           />
           <StatCard
-            title="Besoins en Attente"
+            title="Pending Needs"
             value={stats.pendingNeeds}
-            description="Demandes à traiter"
-            color="bg-red-500"
-            icon={FaClipboardList}
+            description="Requests to process"
+            color="from-red-500 to-red-600"
+            icon={ClipboardList}
             onClick={scrollToBesoins}
             clickable={true}
           />
           <StatCard
-            title="Livraisons"
+            title="Deliveries"
             value={stats.totalDeliveries}
-            description="Réceptions enregistrées"
-            color="bg-green-500"
-            icon={FaTruck}
+            description="Recorded receptions"
+            color="from-green-500 to-green-600"
+            icon={Truck}
           />
           <StatCard
-            title="Matériel Durable Total"
+            title="Durable Materials"
             value={stats.totalDurable}
-            description="Équipements durables"
-            color="bg-purple-500"
-            icon={FaTools}
+            description="Durable equipment"
+            color="from-purple-500 to-purple-600"
+            icon={Wrench}
+            onClick={() => navigate("/compta-matiere/material-list")}
+            clickable={true}
           />
         </div>
 
-        {/* Actions Rapides */}
+        {/* Quick Actions */}
         <div className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">
-            Actions Rapides
+          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Plus className="w-5 h-5" />
+            Quick Actions
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {quickActions.map((action, index) => (
@@ -344,63 +376,91 @@ export function Accountant() {
           </div>
         </div>
 
-        {/* Liste des besoins en cours */}
+        {/* Pending Needs List */}
         <div ref={besoinsRef} className="bg-white rounded-lg shadow-lg p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-800">
-              Liste des Besoins en Cours
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Pending Needs
             </h2>
             <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-sm font-semibold">
-              {besoinsEnCours.length} besoins
+              {besoinsEnCours.length} need{besoinsEnCours.length !== 1 ? 's' : ''}
             </span>
           </div>
           {besoinsEnCours.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">ID</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Émetteur</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Description</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Quantité</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Priorité</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Date</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Statut</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {besoinsEnCours.map((besoin) => (
-                    <tr key={besoin.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 text-sm text-gray-800 font-medium font-mono">{besoin.code}</td>
-                      <td className="px-4 py-3 text-sm text-gray-800">{besoin.departement}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{besoin.description}</td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-800 font-semibold">{besoin.quantite}</td>
-                      <td className="px-4 py-3 text-center">
-                        <PrioriteBadge priorite={besoin.priorite} />
-                      </td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-500">{besoin.dateEmission}</td>
-                      <td className="px-4 py-3 text-center">
-                        <StatutBadge statut={besoin.statut} />
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => handleTraiterBesoin(besoin)}
-                          disabled={loading}
-                          className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
-                        >
-                          {loading ? 'Traitement...' : 'Traiter'}
-                        </button>
-                      </td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">ID</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Requester</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Description</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Quantity</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Priority</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Date</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Status</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {currentNeeds.map((besoin) => (
+                      <tr key={besoin.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 text-sm text-gray-800 font-medium font-mono">{besoin.code}</td>
+                        <td className="px-4 py-3 text-sm text-gray-800">{besoin.departement}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{besoin.description}</td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-800 font-semibold">{besoin.quantite}</td>
+                        <td className="px-4 py-3 text-center">
+                          <PrioriteBadge priorite={besoin.priorite} />
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-500">{besoin.dateEmission}</td>
+                        <td className="px-4 py-3 text-center">
+                          <StatutBadge statut={besoin.statut} />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => handleTraiterBesoin(besoin)}
+                            disabled={loading}
+                            className="flex items-center gap-1 px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm font-semibold rounded-lg hover:from-green-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 mx-auto"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            Process
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-4 mt-6 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={handlePrevPage}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-gray-600 font-medium">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
-            <div className="text-center py-8 text-gray-500">
-              <FaClipboardList className="mx-auto text-4xl text-gray-300 mb-3" />
-              <p>Aucun besoin en attente</p>
+            <div className="text-center py-12 text-gray-500">
+              <ClipboardList className="mx-auto text-gray-300 mb-3 w-16 h-16" />
+              <p className="text-lg">No pending needs</p>
+              <p className="text-sm text-gray-400 mt-1">All requests have been processed</p>
             </div>
           )}
         </div>
@@ -426,7 +486,7 @@ function StatCard({ title, value, description, color, icon: Icon, onClick, click
       onClick={clickable ? onClick : undefined}
     >
       <div className="flex items-center gap-4">
-        <div className={`${color} rounded-full p-4 text-white`}>
+        <div className={`bg-gradient-to-br ${color} rounded-full p-4 text-white`}>
           <Icon className="w-6 h-6" />
         </div>
         <div>
@@ -434,7 +494,9 @@ function StatCard({ title, value, description, color, icon: Icon, onClick, click
           <p className="text-3xl font-bold text-gray-900">{value}</p>
           <p className="text-xs text-gray-500 mt-1">{description}</p>
           {clickable && (
-            <p className="text-xs text-blue-500 mt-1 font-medium">Cliquez pour voir →</p>
+            <p className="text-xs text-blue-500 mt-1 font-medium flex items-center gap-1">
+              <Eye className="w-3 h-3" /> Click to view
+            </p>
           )}
         </div>
       </div>
@@ -456,7 +518,7 @@ function QuickActionButton({ icon: Icon, label, description, color, onClick }) {
       onClick={onClick}
       className="flex flex-col items-center gap-3 p-6 rounded-lg border-2 border-gray-200 hover:border-primary-end hover:bg-gradient-to-br hover:from-gray-50 hover:to-blue-50 transition-all duration-300 group"
     >
-      <div className={`${color} rounded-full p-4 text-white group-hover:scale-110 transition-transform duration-300`}>
+      <div className={`bg-gradient-to-br ${color} rounded-full p-4 text-white group-hover:scale-110 transition-transform duration-300`}>
         <Icon className="w-8 h-8" />
       </div>
       <div className="text-center">
@@ -473,12 +535,12 @@ function PrioriteBadge({ priorite }) {
   };
 
   const config = {
-    haute: { bg: "bg-red-100", text: "text-red-700", icon: FaExclamationTriangle, label: "Haute" },
-    moyenne: { bg: "bg-yellow-100", text: "text-yellow-700", icon: FaClock, label: "Moyenne" },
-    basse: { bg: "bg-green-100", text: "text-green-700", icon: FaCheckCircle, label: "Basse" },
+    high: { bg: "bg-red-100", text: "text-red-700", icon: AlertTriangle, label: "High" },
+    medium: { bg: "bg-yellow-100", text: "text-yellow-700", icon: Clock, label: "Medium" },
+    low: { bg: "bg-green-100", text: "text-green-700", icon: CheckCircle, label: "Low" },
   };
 
-  const { bg, text, icon: PrioriteIcon, label } = config[priorite] || config.moyenne;
+  const { bg, text, icon: PrioriteIcon, label } = config[priorite] || config.medium;
 
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${bg} ${text}`}>
@@ -494,12 +556,12 @@ function StatutBadge({ statut }) {
   };
 
   const config = {
-    en_attente: { bg: "bg-orange-100", text: "text-orange-700", label: "En attente" },
-    en_cours: { bg: "bg-blue-100", text: "text-blue-700", label: "En cours" },
-    traite: { bg: "bg-green-100", text: "text-green-700", label: "Traité" },
+    pending: { bg: "bg-orange-100", text: "text-orange-700", label: "Pending" },
+    in_progress: { bg: "bg-blue-100", text: "text-blue-700", label: "In Progress" },
+    processed: { bg: "bg-green-100", text: "text-green-700", label: "Processed" },
   };
 
-  const { bg, text, label } = config[statut] || config.en_attente;
+  const { bg, text, label } = config[statut] || config.pending;
 
   return (
     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${bg} ${text}`}>

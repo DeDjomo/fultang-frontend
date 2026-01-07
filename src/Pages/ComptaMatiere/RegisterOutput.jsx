@@ -26,7 +26,8 @@ export function RegisterOutput() {
         serviceMedical: "",
         dateSortie: new Date().toISOString().split('T')[0],
         dateEnregistrement: new Date().toISOString().split('T')[0],
-        motifSortie: "DEFECTUEUX"
+        motifSortie: "DEFECTUEUX",
+        observations: ""
     });
 
     // État pour les suggestions
@@ -76,7 +77,7 @@ export function RegisterOutput() {
                 code: m.code_materiel,
                 name: m.nom_Materiel,
                 category: "MEDICAL",
-                categoryDisplay: "Matériel Médical",
+                categoryDisplay: "Medical Material",
                 quantity: m.quantite_stock,
                 prixVente: parseFloat(m.prix_vente_unitaire) || 0
             }));
@@ -86,7 +87,7 @@ export function RegisterOutput() {
                 code: m.code_materiel,
                 name: m.nom_Materiel,
                 category: "DURABLE",
-                categoryDisplay: "Matériel Durable",
+                categoryDisplay: "Durable Material",
                 quantity: m.quantite_stock,
                 prixVente: null
             }));
@@ -108,7 +109,7 @@ export function RegisterOutput() {
 
         } catch (err) {
             console.error("Erreur chargement:", err);
-            setError("Impossible de charger les données fraîches.");
+            setError("Unable to load fresh data.");
         } finally {
             setLoading(false);
         }
@@ -181,18 +182,18 @@ export function RegisterOutput() {
 
         // Validation
         if (!outputInfo.serviceMedical) {
-            setFormError("Veuillez sélectionner un service médical.");
+            setFormError("Please select a medical service.");
             return;
         }
 
         for (const item of outputItems) {
             if (!item.nomMateriel || !item.codeMateriel || !item.quantite || !item.materialId) {
-                setFormError("Veuillez remplir tous les champs pour chaque article.");
+                setFormError("Please fill all fields for each item.");
                 return;
             }
 
             if (parseInt(item.quantite) > item.stockDisponible) {
-                setFormError(`Quantité insuffisante pour "${item.nomMateriel}". Stock: ${item.stockDisponible}, Demandé: ${item.quantite}`);
+                setFormError(`Insufficient quantity for "${item.nomMateriel}". Stock: ${item.stockDisponible}, Requested: ${item.quantite}`);
                 return;
             }
         }
@@ -203,28 +204,32 @@ export function RegisterOutput() {
             // 💾 TRANSACTION DE SAUVEGARDE
             // Étape 1: Créer l'entête de la sortie
             // POST /api/sorties/
+            // Champs backend: numero_sortie, date_sortie, motif_sortie, idPersonnel
             const personnelId = parseInt(localStorage.getItem("personnel_id") || "1");
             const sortieData = {
                 numero_sortie: outputInfo.numeroSortie,
-                date_sortie: outputInfo.dateSortie,
+                date_sortie: `${outputInfo.dateSortie}T00:00:00`,
                 motif_sortie: outputInfo.motifSortie,
-                service_medical: outputInfo.serviceMedical,
-                idPersonnel: personnelId
+                idPersonnel: personnelId,
+                service_responsable: outputInfo.serviceMedical,
+                observations: outputInfo.observations || null
             };
 
             const createdSortie = await sortieApi.create(sortieData);
 
             // Étape 2: Créer les lignes de sortie et décrémenter le stock
-            // - POST /api/lignes-sortie/ (pour chaque article)
-            // - PATCH /api/materiels-.../ (mise à jour quantite_stock)
+            // Champs backend: id_sortie, id_materiel, code_materiel, nom_materiel, type_materiel, quantite, prix_unitaire, sous_total
             for (const item of outputItems) {
+                const prixUnitaire = item.typeMateriel === "MEDICAL" ?
+                    materialsDatabase.find(m => m.id === item.materialId)?.prixVente : null;
                 const ligneData = {
                     id_sortie: createdSortie.idSortie,
                     id_materiel: item.materialId,
+                    code_materiel: item.codeMateriel,
+                    nom_materiel: item.nomMateriel,
                     type_materiel: item.typeMateriel,
                     quantite: parseInt(item.quantite),
-                    prix_unitaire: item.typeMateriel === "MEDICAL" ?
-                        materialsDatabase.find(m => m.id === item.materialId)?.prixVente : null
+                    prix_unitaire: prixUnitaire
                 };
                 await ligneSortieApi.create(ligneData);
 
@@ -240,7 +245,7 @@ export function RegisterOutput() {
                 }
             }
 
-            setSuccessMessage(`Sortie enregistrée avec succès ! N° ${outputInfo.numeroSortie}`);
+            setSuccessMessage(`Output registered successfully! # ${outputInfo.numeroSortie}`);
             setTimeout(() => setSuccessMessage(""), 5000);
 
             // Réinitialiser le formulaire
@@ -253,12 +258,13 @@ export function RegisterOutput() {
                 serviceMedical: "",
                 dateSortie: new Date().toISOString().split('T')[0],
                 dateEnregistrement: new Date().toISOString().split('T')[0],
-                motifSortie: "DEFECTUEUX"
+                motifSortie: "DEFECTUEUX",
+                observations: ""
             }));
 
         } catch (err) {
             console.error("Erreur lors de l'enregistrement:", err);
-            setFormError("Erreur lors de l'enregistrement de la sortie. Veuillez réessayer.");
+            setFormError("Error registering output. Please try again.");
         } finally {
             setSubmitting(false);
         }
@@ -266,12 +272,12 @@ export function RegisterOutput() {
 
     if (loading) {
         return (
-            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"ComptaMatiere"}>
+            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"comptable_matiere"}>
                 <AccountantNavBar />
                 <div className="flex items-center justify-center h-96">
                     <div className="text-center">
                         <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
-                        <p className="text-gray-600">Chargement des données...</p>
+                        <p className="text-gray-600">Loading data...</p>
                     </div>
                 </div>
             </AccountantDashBoard>
@@ -281,21 +287,21 @@ export function RegisterOutput() {
     return (
         <AccountantDashBoard
             linkList={AccountantNavLink}
-            requiredRole={"ComptaMatiere"}
+            requiredRole={"comptable_matiere"}
         >
             <AccountantNavBar />
             <div className="p-6 space-y-6">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <FaBoxOpen className="text-4xl text-primary-start" />
-                        <h1 className="text-3xl font-bold text-gray-800">Enregistrer une Sortie</h1>
+                        <h1 className="text-3xl font-bold text-gray-800">Register Output</h1>
                     </div>
                     <button
                         onClick={loadData}
                         disabled={loading}
                         className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
                     >
-                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
+                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> Refresh
                     </button>
                 </div>
 
@@ -314,7 +320,7 @@ export function RegisterOutput() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Informations de sortie */}
                     <div className="bg-white rounded-lg shadow-lg p-6">
-                        <h2 className="text-xl font-bold text-gray-800 mb-4">Informations de Sortie</h2>
+                        <h2 className="text-xl font-bold text-gray-800 mb-4">Output Information</h2>
 
                         {formError && (
                             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
@@ -325,7 +331,7 @@ export function RegisterOutput() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Numéro de sortie
+                                    Output Number
                                 </label>
                                 <input
                                     type="text"
@@ -333,12 +339,12 @@ export function RegisterOutput() {
                                     className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 font-mono font-bold"
                                     readOnly
                                 />
-                                <p className="text-xs text-gray-500 mt-1">Généré automatiquement</p>
+                                <p className="text-xs text-gray-500 mt-1">Auto-generated</p>
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Service médical responsable *
+                                    Responsible Medical Service *
                                 </label>
                                 <select
                                     value={outputInfo.serviceMedical}
@@ -346,22 +352,22 @@ export function RegisterOutput() {
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
                                     required
                                 >
-                                    <option value="">Sélectionner un service</option>
-                                    <option value="Service Médical">Service Médical</option>
-                                    <option value="Service Cardiologie">Service Cardiologie</option>
-                                    <option value="Pharmacie">Pharmacie</option>
-                                    <option value="Laboratoire">Laboratoire</option>
+                                    <option value="">Select a service</option>
+                                    <option value="Service Médical">Medical Service</option>
+                                    <option value="Service Cardiologie">Cardiology Service</option>
+                                    <option value="Pharmacie">Pharmacy</option>
+                                    <option value="Laboratoire">Laboratory</option>
                                     <option value="Administration">Administration</option>
-                                    <option value="Bloc Opératoire">Bloc Opératoire</option>
-                                    <option value="Service Pédiatrie">Service Pédiatrie</option>
-                                    <option value="Urgences">Urgences</option>
-                                    <option value="Radiologie">Radiologie</option>
+                                    <option value="Bloc Opératoire">Operating Room</option>
+                                    <option value="Service Pédiatrie">Pediatrics Service</option>
+                                    <option value="Urgences">Emergency</option>
+                                    <option value="Radiologie">Radiology</option>
                                 </select>
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Date de sortie *
+                                    Output Date *
                                 </label>
                                 <input
                                     type="date"
@@ -382,12 +388,12 @@ export function RegisterOutput() {
                                     className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
                                     readOnly
                                 />
-                                <p className="text-xs text-gray-500 mt-1">Date du jour (automatique)</p>
+                                <p className="text-xs text-gray-500 mt-1">Today's date (automatic)</p>
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Motif de la sortie *
+                                    Output Reason *
                                 </label>
                                 <select
                                     value={outputInfo.motifSortie}
@@ -395,12 +401,25 @@ export function RegisterOutput() {
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
                                     required
                                 >
-                                    <option value="DEFECTUEUX">Défectueux</option>
-                                    <option value="PERIME">Périmé</option>
-                                    <option value="VENTE">Vente</option>
-                                    <option value="UTILISATION_SERVICE">Utilisation interne</option>
-                                    <option value="PERTE">Perte</option>
+                                    <option value="DEFECTUEUX">Defective</option>
+                                    <option value="PERIME">Expired</option>
+                                    <option value="VENTE">Sale</option>
+                                    <option value="UTILISATION_SERVICE">Internal Use</option>
+                                    <option value="PERTE">Loss</option>
                                 </select>
+                            </div>
+
+                            <div className="md:col-span-3">
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Observations
+                                </label>
+                                <textarea
+                                    value={outputInfo.observations}
+                                    onChange={(e) => setOutputInfo({ ...outputInfo, observations: e.target.value })}
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
+                                    placeholder="Optional remarks about this output..."
+                                    rows="2"
+                                />
                             </div>
                         </div>
                     </div>
@@ -408,13 +427,13 @@ export function RegisterOutput() {
                     {/* Articles en sortie */}
                     <div className="bg-white rounded-lg shadow-lg p-6">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold text-gray-800">Articles en Sortie</h2>
+                            <h2 className="text-xl font-bold text-gray-800">Output Items</h2>
                             <button
                                 type="button"
                                 onClick={addOutputItem}
                                 className="flex items-center gap-2 px-4 py-2 bg-primary-start text-white rounded-lg hover:opacity-90 transition-all duration-300"
                             >
-                                <FaPlus /> Ajouter un article
+                                <FaPlus /> Add Item
                             </button>
                         </div>
 
@@ -436,7 +455,7 @@ export function RegisterOutput() {
                         <div className="mt-4 p-3 bg-primary-end/10 rounded-lg">
                             <p className="text-sm text-primary-start flex items-center gap-2">
                                 <FaCheckCircle />
-                                Total: {outputItems.length} article(s) en sortie
+                                Total: {outputItems.length} item(s) in output
                             </p>
                         </div>
                     </div>
@@ -453,7 +472,7 @@ export function RegisterOutput() {
                             }}
                             className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all duration-300"
                         >
-                            Annuler
+                            Cancel
                         </button>
                         <button
                             type="submit"
@@ -461,7 +480,7 @@ export function RegisterOutput() {
                             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all duration-300 disabled:opacity-50"
                         >
                             {submitting ? <FaSpinner className="animate-spin" /> : <FaSave />}
-                            Enregistrer la sortie
+                            Register Output
                         </button>
                     </div>
                 </form>
@@ -488,7 +507,7 @@ function OutputItemRow({ item, suggestions, onUpdate, onNameChange, onSelectMate
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="relative">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Nom Matériel *
+                        Material Name *
                     </label>
                     <input
                         type="text"
@@ -497,7 +516,7 @@ function OutputItemRow({ item, suggestions, onUpdate, onNameChange, onSelectMate
                         onFocus={() => setShowSuggestions(true)}
                         onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end"
-                        placeholder="Tapez pour rechercher..."
+                        placeholder="Type to search..."
                         required
                     />
                     {showSuggestions && suggestions.length > 0 && (
@@ -521,7 +540,7 @@ function OutputItemRow({ item, suggestions, onUpdate, onNameChange, onSelectMate
 
                 <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Code Matériel
+                        Material Code
                     </label>
                     <input
                         type="text"
@@ -534,11 +553,11 @@ function OutputItemRow({ item, suggestions, onUpdate, onNameChange, onSelectMate
 
                 <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Type Matériel
+                        Material Type
                     </label>
                     <input
                         type="text"
-                        value={item.typeMateriel === "MEDICAL" ? "Matériel Médical" : item.typeMateriel === "DURABLE" ? "Matériel Durable" : ""}
+                        value={item.typeMateriel === "MEDICAL" ? "Medical Material" : item.typeMateriel === "DURABLE" ? "Durable Material" : ""}
                         className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100"
                         placeholder="Auto"
                         readOnly
@@ -547,7 +566,7 @@ function OutputItemRow({ item, suggestions, onUpdate, onNameChange, onSelectMate
 
                 <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Quantité * {item.stockDisponible > 0 && <span className="text-xs text-gray-500">(Stock: {item.stockDisponible})</span>}
+                        Quantity * {item.stockDisponible > 0 && <span className="text-xs text-gray-500">(Stock: {item.stockDisponible})</span>}
                     </label>
                     <input
                         type="number"

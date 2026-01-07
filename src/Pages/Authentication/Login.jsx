@@ -125,13 +125,17 @@ export function LoginPage() {
                 navigate(appRouterPaths.pharmacistDashboard);
                 break;
             case 'comptable':
+                console.log('Redirection vers: Accountant Page');
+                navigate(appRouterPaths.accountantPage);
+                break;
+            case 'comptable_matiere':
                 console.log('Redirection vers: Compta Matière Dashboard');
                 navigate(appRouterPaths.comptaMatiereDashboard);
                 break;
             case 'directeur':
             case 'directrice':
-                console.log('Redirection vers: Admin Home (Director)');
-                navigate(appRouterPaths.adminHomePage);
+                console.log('Redirection vers: Director Dashboard');
+                navigate(appRouterPaths.directorDashboard);
                 break;
             default:
                 console.warn('Rôle non reconnu:', normalizedRole);

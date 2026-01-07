@@ -185,7 +185,8 @@ export function PharmacistDailySales() {
             const sortieData = {
                 numero_sortie: generateSaleId(),
                 motif_sortie: "VENTE",
-                idPersonnel: personnelId
+                idPersonnel: personnelId,
+                service_responsable: "Pharmacie"
             };
 
             const sortieRes = await fetch(`${baseUrl}/sorties/`, {

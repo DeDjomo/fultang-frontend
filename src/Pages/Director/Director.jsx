@@ -294,7 +294,7 @@ export function Director() {
 
     if (loading) {
         return (
-            <DirectorDashBoard linkList={DirectorNavLink} requiredRole={"Director"}>
+            <DirectorDashBoard linkList={DirectorNavLink} requiredRole={"directeur"}>
                 <DirectorNavBar />
                 <div className="flex items-center justify-center h-96">
                     <div className="text-center">
@@ -309,7 +309,7 @@ export function Director() {
     return (
         <DirectorDashBoard
             linkList={DirectorNavLink}
-            requiredRole={"Director"}
+            requiredRole={"directeur"}
         >
             <DirectorNavBar />
             <div className="p-6 space-y-6">

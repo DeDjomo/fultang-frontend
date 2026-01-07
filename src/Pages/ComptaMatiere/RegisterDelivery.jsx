@@ -21,11 +21,13 @@ export function RegisterDelivery() {
             type: "Matériel Médical",
             quantityOrdered: "",
             quantityReceived: "",
+            quantityNonCompliant: "",
             unitPrice: "",
             justification: "",
+            expirationDate: "",
             // Champs pour nouveau matériel médical
             prixVente: "",
-            unite: "boîte",
+            unite: "BOITE",
             seuilAlerte: "10",
             // Champs pour nouveau matériel durable
             localisation: "",
@@ -106,7 +108,7 @@ export function RegisterDelivery() {
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
-                category: "Matériel Médical",
+                category: "Medical Material",
                 quantity: m.quantite_stock,
                 prixAchat: parseFloat(m.prix_achat_unitaire) || 0
             }));
@@ -115,7 +117,7 @@ export function RegisterDelivery() {
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
-                category: "Matériel Durable",
+                category: "Durable Material",
                 quantity: m.quantite_stock,
                 prixAchat: parseFloat(m.prix_achat_unitaire) || 0
             }));
@@ -125,7 +127,7 @@ export function RegisterDelivery() {
 
         } catch (err) {
             console.error("Erreur chargement:", err);
-            setError(`Impossible de charger le catalogue matériel: ${err.message}`);
+            setError(`Unable to load material catalog: ${err.message}`);
         } finally {
             setLoading(false);
         }
@@ -133,7 +135,7 @@ export function RegisterDelivery() {
 
     // Générer un code automatique pour nouveau matériel
     function generateMaterialCode(type) {
-        const prefix = type === "Matériel Médical" ? "MED" : "DUR";
+        const prefix = type === "Medical Material" ? "MED" : "DUR";
         const existingCodes = materialsDatabase
             .filter(m => m.code && m.code.startsWith(prefix))
             .map(m => parseInt(m.code.split('-')[1]) || 0);
@@ -150,13 +152,15 @@ export function RegisterDelivery() {
             isNewMaterial: false,
             material: "",
             materialCode: "",
-            type: "Matériel Médical",
+            type: "Medical Material",
             quantityOrdered: "",
             quantityReceived: "",
+            quantityNonCompliant: "",
             unitPrice: "",
             justification: "",
+            expirationDate: "",
             prixVente: "",
-            unite: "boîte",
+            unite: "BOITE",
             seuilAlerte: "10",
             localisation: "",
             numeroSerie: "",
@@ -215,29 +219,29 @@ export function RegisterDelivery() {
             if (item.isNewMaterial) {
                 // Validation pour nouveau matériel
                 if (!item.material.trim()) {
-                    return "Veuillez saisir le nom du nouveau matériel.";
+                    return "Please enter the name of the new material.";
                 }
-                if (item.type === "Matériel Médical") {
+                if (item.type === "Medical Material") {
                     if (!item.prixVente || !item.unite) {
-                        return "Pour un nouveau matériel médical, le prix de vente et l'unité sont obligatoires.";
+                        return "For a new medical material, sale price and unit are required.";
                     }
                 } else {
                     if (!item.localisation.trim()) {
-                        return "Pour un nouveau matériel durable, la localisation est obligatoire.";
+                        return "For a new durable material, location is required.";
                     }
                 }
             } else {
                 // Validation pour matériel existant
                 if (!item.materialCode) {
-                    return "Veuillez sélectionner un matériel existant ou cocher 'Nouveau matériel'.";
+                    return "Please select an existing material or check 'New material'.";
                 }
             }
 
             if (!item.quantityReceived || parseInt(item.quantityReceived) <= 0) {
-                return "La quantité reçue doit être supérieure à 0.";
+                return "Received quantity must be greater than 0.";
             }
             if (!item.unitPrice || parseFloat(item.unitPrice) <= 0) {
-                return "Le prix unitaire doit être supérieur à 0.";
+                return "Unit price must be greater than 0.";
             }
         }
         return null;
@@ -264,14 +268,13 @@ export function RegisterDelivery() {
             setLoading(true); // Réutiliser loading state ou créer submitting state
 
             // 1. Créer la livraison (Entête)
-            const personnelId = parseInt(localStorage.getItem("personnel_id") || "1");
+            // Champs backend: bon_livraison_numero, nom_fournisseur, contact_fournisseur, date_reception, montant_total
             const deliveryData = {
-                fournisseur: deliveryInfo.supplier,
-                numero_bon_livraison: deliveryInfo.deliveryNoteNumber,
-                date_livraison: deliveryInfo.deliveryDate,
-                date_reception: deliveryInfo.receptionDate,
-                montant_total: calculateTotal(),
-                idPersonnel: personnelId
+                bon_livraison_numero: deliveryInfo.deliveryNoteNumber,
+                nom_fournisseur: deliveryInfo.supplier,
+                contact_fournisseur: deliveryInfo.supplierContact || "+237 000 000 000",
+                date_reception: `${deliveryInfo.receptionDate}T00:00:00`,
+                montant_total: calculateTotal()
             };
 
             const livRes = await fetch(`${baseUrl}/livraisons/`, {
@@ -280,7 +283,11 @@ export function RegisterDelivery() {
                 body: JSON.stringify(deliveryData)
             });
 
-            if (!livRes.ok) throw new Error("Erreur création livraison");
+            if (!livRes.ok) {
+                const errorData = await livRes.json().catch(() => ({}));
+                console.error("Erreur création livraison:", errorData);
+                throw new Error(`Error creating delivery: ${JSON.stringify(errorData)}`);
+            }
             const createdDelivery = await livRes.json();
             const idLivraison = createdDelivery.idLivraison;
 
@@ -288,26 +295,28 @@ export function RegisterDelivery() {
             for (const item of deliveryItems) {
                 let materialId = null;
 
+                // Calculer la quantité conforme (reçue - non conforme)
+                const quantiteConforme = parseInt(item.quantityReceived) - (parseInt(item.quantityNonCompliant) || 0);
+                const quantiteNonConforme = parseInt(item.quantityNonCompliant) || 0;
+
                 if (item.isNewMaterial) {
-                    // A. Créer le nouveau matériel
-                    const isMedical = item.type === "Matériel Médical";
+                    // A. Créer le nouveau matériel avec SEULEMENT la quantité conforme
+                    const isMedical = item.type === "Medical Material";
+                    // Champs backend MaterielMedicalCreateSerializer: code_materiel, nom_Materiel, prix_achat_unitaire, quantite_stock, categorie, unite_mesure, prix_vente_unitaire
+                    // Champs backend MaterielDurableCreateSerializer: code_materiel, nom_Materiel, prix_achat_unitaire, quantite_stock, Etat, localisation
                     const newMatData = {
-                        code_materiel: item.materialCode,
+                        code_materiel: item.materialCode || `MAT-${Date.now()}`,
                         nom_Materiel: item.material,
-                        quantite_stock: parseInt(item.quantityReceived),
-                        prix_achat_unitaire: parseFloat(item.unitPrice),
-                        description: item.description || "",
-                        // Champs spécifiques
+                        quantite_stock: quantiteConforme, // SEULEMENT la quantité conforme
+                        prix_achat_unitaire: parseFloat(item.unitPrice) || 1,
+                        // Champs spécifiques selon le type
                         ...(isMedical ? {
-                            prix_vente_unitaire: parseFloat(item.prixVente),
-                            unite_mesure: item.unite,
-                            seuil_alerte: parseInt(item.seuilAlerte) || 10,
-                            date_peremption: null // Pas géré dans formulaire actuel
+                            categorie: "MEDICAMENT", // Valeur par défaut
+                            unite_mesure: item.unite || "UNITE",
+                            prix_vente_unitaire: parseFloat(item.prixVente) || (parseFloat(item.unitPrice) || 1) * 1.2
                         } : {
-                            localisation: item.localisation,
-                            numero_serie: item.numeroSerie,
-                            duree_garantie: parseInt(item.dureeGarantie) || 0,
-                            etat: 'bon'
+                            Etat: "BON", // Valeur par défaut pour l'état
+                            localisation: item.localisation || item.emplacement || "Stock principal"
                         })
                     };
 
@@ -318,51 +327,69 @@ export function RegisterDelivery() {
                         body: JSON.stringify(newMatData)
                     });
 
-                    if (!matRes.ok) throw new Error(`Erreur création matériel ${item.material}`);
+                    if (!matRes.ok) {
+                        const errorData = await matRes.json().catch(() => ({}));
+                        console.error("Erreur création matériel:", errorData);
+                        throw new Error(`Error creating material ${item.material}: ${JSON.stringify(errorData)}`);
+                    }
                     const createdMat = await matRes.json();
                     materialId = createdMat.idMateriel || createdMat.materiel_ptr_id;
 
                 } else {
                     // B. Matériel existant : Récupérer son ID via le code
                     const existingMat = materialsDatabase.find(m => m.code === item.materialCode);
-                    if (!existingMat) throw new Error(`Matériel introuvable ${item.materialCode}`);
+                    if (!existingMat) throw new Error(`Material not found ${item.materialCode}`);
                     materialId = existingMat.id;
 
-                    // Mettre à jour le stock (PATCH)
-                    const endpoint = existingMat.category === "Matériel Médical"
+                    // Mettre à jour le stock avec SEULEMENT la quantité conforme
+                    const endpoint = existingMat.category === "Medical Material"
                         ? `/materiels-medicaux/${materialId}/`
                         : `/materiels-durables/${materialId}/`;
 
-                    const newQuantity = (existingMat.quantity || 0) + parseInt(item.quantityReceived);
+                    const newQuantity = (existingMat.quantity || 0) + quantiteConforme; // SEULEMENT quantité conforme
 
-                    await fetch(`${baseUrl}${endpoint}`, {
+                    const patchRes = await fetch(`${baseUrl}${endpoint}`, {
                         method: 'PATCH',
                         headers,
                         body: JSON.stringify({ quantite_stock: newQuantity })
                     });
+
+                    if (!patchRes.ok) {
+                        const errorData = await patchRes.json().catch(() => ({}));
+                        console.error("Erreur mise à jour stock:", errorData);
+                        // Continue quand même pour créer la ligne de livraison
+                    }
                 }
 
-                // 3. Créer la ligne de livraison
+                // 3. Créer la ligne de livraison (TOUJOURS, même si le stock échoue)
+                // Champs backend: id_livraison, type_materiel, materiel, quantite_conforme, quantite_non_conforme, prix_unitaire_achat, date_peremption
                 if (materialId) {
+                    const isMedical = item.type === "Medical Material";
                     const ligneData = {
                         id_livraison: idLivraison,
-                        id_materiel: materialId,
-                        quantite_recu: parseInt(item.quantityReceived),
-                        prix_unitaire: parseFloat(item.unitPrice),
-                        ecart_accuse: false, // Par défaut
-                        commentaire_ecart: item.justification || ""
+                        type_materiel: isMedical ? "MEDICAL" : "DURABLE",
+                        materiel: materialId,
+                        quantite_conforme: quantiteConforme,
+                        quantite_non_conforme: quantiteNonConforme,
+                        prix_unitaire_achat: parseFloat(item.unitPrice) || 1,
+                        date_peremption: item.expirationDate || null
                     };
 
-                    await fetch(`${baseUrl}/lignes-livraison/`, {
+                    const ligneRes = await fetch(`${baseUrl}/lignes-livraison/`, {
                         method: 'POST',
                         headers,
                         body: JSON.stringify(ligneData)
                     });
+
+                    if (!ligneRes.ok) {
+                        const errorData = await ligneRes.json().catch(() => ({}));
+                        console.error("Erreur création ligne livraison:", errorData);
+                    }
                 }
             }
 
             // Succès
-            alert(`Livraison enregistrée avec succès ! (N° ${deliveryInfo.deliveryNoteNumber})`);
+            alert(`Delivery registered successfully! (# ${deliveryInfo.deliveryNoteNumber})`);
 
             // Recharger les données pour mettre à jour les stocks affichés
             await loadData();
@@ -381,11 +408,13 @@ export function RegisterDelivery() {
                 isNewMaterial: false,
                 material: "",
                 materialCode: "",
-                type: "Matériel Médical",
+                type: "Medical Material",
                 quantityOrdered: "",
                 quantityReceived: "",
+                quantityNonCompliant: "",
                 unitPrice: "",
                 justification: "",
+                expirationDate: "",
                 prixVente: "",
                 unite: "boîte",
                 seuilAlerte: "10",
@@ -398,7 +427,7 @@ export function RegisterDelivery() {
 
         } catch (err) {
             console.error("Erreur enregistrement:", err);
-            setFormError("Erreur lors de l'enregistrement de la livraison. Détails console.");
+            setFormError("Error registering delivery. Check console for details.");
         } finally {
             setLoading(false);
         }
@@ -407,14 +436,14 @@ export function RegisterDelivery() {
     return (
         <AccountantDashBoard
             linkList={AccountantNavLink}
-            requiredRole={"ComptaMatiere"}
+            requiredRole={"comptable_matiere"}
         >
             <AccountantNavBar />
             <div className="p-6 space-y-6">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <FaTruck className="text-4xl text-blue-500" />
-                        <h1 className="text-3xl font-bold text-gray-800">Enregistrer une Livraison</h1>
+                        <h1 className="text-3xl font-bold text-gray-800">Register Delivery</h1>
                     </div>
                 </div>
 
@@ -422,13 +451,13 @@ export function RegisterDelivery() {
                     <div className="p-4 bg-red-100 border border-red-300 rounded-lg flex items-start gap-3 mb-4">
                         <FaExclamationTriangle className="text-red-600 mt-0.5" />
                         <div>
-                            <p className="font-bold text-red-800">Erreur de chargement</p>
+                            <p className="font-bold text-red-800">Loading Error</p>
                             <p className="text-sm text-red-700">{error}</p>
                             <button
                                 onClick={loadData}
                                 className="mt-2 text-sm text-red-800 underline hover:text-red-900"
                             >
-                                Réessayer
+                                Retry
                             </button>
                         </div>
                     </div>
@@ -444,25 +473,25 @@ export function RegisterDelivery() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Informations de livraison */}
                     <div className="bg-white rounded-lg shadow-lg p-6">
-                        <h2 className="text-xl font-bold text-gray-800 mb-4">Informations de Livraison</h2>
+                        <h2 className="text-xl font-bold text-gray-800 mb-4">Delivery Information</h2>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Fournisseur *
+                                    Supplier *
                                 </label>
                                 <input
                                     type="text"
                                     value={deliveryInfo.supplier}
                                     onChange={(e) => setDeliveryInfo({ ...deliveryInfo, supplier: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                    placeholder="Nom du fournisseur"
+                                    placeholder="Supplier name"
                                     required
                                 />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    N° de bon de livraison *
+                                    Delivery Note # *
                                 </label>
                                 <input
                                     type="text"
@@ -476,33 +505,33 @@ export function RegisterDelivery() {
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Contact fournisseur
+                                    Supplier Contact
                                 </label>
                                 <input
                                     type="text"
                                     value={deliveryInfo.supplierContact}
                                     onChange={(e) => setDeliveryInfo({ ...deliveryInfo, supplierContact: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                    placeholder="Téléphone ou email"
+                                    placeholder="Phone or email"
                                 />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Date de création *
+                                    Creation Date *
                                 </label>
                                 <input
                                     type="date"
                                     value={deliveryInfo.deliveryDate}
                                     className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed text-gray-600"
                                     disabled
-                                    title="Date de création automatique (non modifiable)"
+                                    title="Automatic creation date (not editable)"
                                 />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Date de réception *
+                                    Reception Date *
                                 </label>
                                 <input
                                     type="date"
@@ -515,7 +544,7 @@ export function RegisterDelivery() {
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Montant Total
+                                    Total Amount
                                 </label>
                                 <div className="w-full p-3 border border-gray-300 rounded-lg bg-green-50">
                                     <span className="font-bold text-green-600 text-lg">
@@ -529,13 +558,13 @@ export function RegisterDelivery() {
                     {/* Articles livrés */}
                     <div className="bg-white rounded-lg shadow-lg p-6">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold text-gray-800">Articles Livrés</h2>
+                            <h2 className="text-xl font-bold text-gray-800">Delivered Items</h2>
                             <button
                                 type="button"
                                 onClick={addDeliveryItem}
                                 className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all duration-300"
                             >
-                                <FaPlus /> Ajouter un article
+                                <FaPlus /> Add Item
                             </button>
                         </div>
 
@@ -556,12 +585,12 @@ export function RegisterDelivery() {
                         <div className="mt-6 pt-4 border-t-2 border-gray-300">
                             <div className="flex justify-between items-center">
                                 <div className="text-sm text-gray-600">
-                                    <span className="font-semibold">{deliveryItems.length}</span> article(s) |
-                                    <span className="text-green-600 ml-2">{deliveryItems.filter(i => !i.isNewMaterial).length} existant(s)</span> |
-                                    <span className="text-blue-600 ml-2">{deliveryItems.filter(i => i.isNewMaterial).length} nouveau(x)</span>
+                                    <span className="font-semibold">{deliveryItems.length}</span> item(s) |
+                                    <span className="text-green-600 ml-2">{deliveryItems.filter(i => !i.isNewMaterial).length} existing</span> |
+                                    <span className="text-blue-600 ml-2">{deliveryItems.filter(i => i.isNewMaterial).length} new</span>
                                 </div>
                                 <div>
-                                    <span className="text-xl font-bold text-gray-700 mr-4">Montant Total:</span>
+                                    <span className="text-xl font-bold text-gray-700 mr-4">Total Amount:</span>
                                     <span className="text-2xl font-bold text-green-600">
                                         {calculateTotal().toLocaleString('fr-FR')} FCFA
                                     </span>
@@ -576,13 +605,13 @@ export function RegisterDelivery() {
                             type="button"
                             className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all duration-300"
                         >
-                            Annuler
+                            Cancel
                         </button>
                         <button
                             type="submit"
                             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all duration-300"
                         >
-                            <FaSave /> Enregistrer la livraison
+                            <FaSave /> Register Delivery
                         </button>
                     </div>
                 </form>
@@ -612,22 +641,22 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
                         className="w-5 h-5 text-blue-500 rounded focus:ring-blue-500"
                     />
                     <span className="font-semibold text-gray-700">
-                        {item.isNewMaterial ? '🆕 Nouveau matériel' : 'Matériel existant'}
+                        {item.isNewMaterial ? '🆕 New Material' : 'Existing Material'}
                     </span>
                 </label>
                 {item.isNewMaterial && (
                     <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                        Code auto: {item.materialCode}
+                        Auto code: {item.materialCode}
                     </span>
                 )}
             </div>
 
             {/* Ligne principale */}
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-4 mb-4">
                 {/* Matériel */}
                 <div className="md:col-span-2">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        {item.isNewMaterial ? 'Nom du nouveau matériel *' : 'Matériel existant *'}
+                        {item.isNewMaterial ? 'New material name *' : 'Existing material *'}
                     </label>
                     {item.isNewMaterial ? (
                         <input
@@ -635,7 +664,7 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
                             value={item.material}
                             onChange={(e) => onUpdate(item.id, 'material', e.target.value)}
                             className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                            placeholder="Nom du matériel"
+                            placeholder="Material name"
                             required
                         />
                     ) : (
@@ -645,7 +674,7 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
                             className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                             required
                         >
-                            <option value="">Sélectionner un matériel</option>
+                            <option value="">Select a material</option>
                             {materialsDatabase.map(m => (
                                 <option key={m.code} value={m.code}>
                                     {m.name} ({m.code}) - Stock: {m.quantity}
@@ -664,28 +693,41 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         disabled={!item.isNewMaterial}
                     >
-                        <option value="Matériel Médical">Matériel Médical</option>
-                        <option value="Matériel Durable">Matériel Durable</option>
+                        <option value="Medical Material">Medical Material</option>
+                        <option value="Durable Material">Durable Material</option>
                     </select>
                 </div>
 
-                {/* Qté Reçue */}
+                {/* Qté Reçue (Conforme) */}
                 <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Qté Reçue *</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Qty Compliant *</label>
                     <input
                         type="number"
                         value={item.quantityReceived}
                         onChange={(e) => onUpdate(item.id, 'quantityReceived', e.target.value)}
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         placeholder="0"
-                        min="1"
+                        min="0"
                         required
+                    />
+                </div>
+
+                {/* Qté Non Conforme */}
+                <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Qty Non-Compliant</label>
+                    <input
+                        type="number"
+                        value={item.quantityNonCompliant}
+                        onChange={(e) => onUpdate(item.id, 'quantityNonCompliant', e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                        placeholder="0"
+                        min="0"
                     />
                 </div>
 
                 {/* Prix Unitaire */}
                 <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Prix Unit. *</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Unit Price *</label>
                     <input
                         type="number"
                         value={item.unitPrice}
@@ -711,12 +753,27 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
                 </div>
             </div>
 
+            {/* Date de péremption pour matériels médicaux (disponible pour tous, nouveaux ou existants) */}
+            {item.type === "Medical Material" && (
+                <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Expiration Date (optional for medical materials)
+                    </label>
+                    <input
+                        type="date"
+                        value={item.expirationDate}
+                        onChange={(e) => onUpdate(item.id, 'expirationDate', e.target.value)}
+                        className="w-full md:w-1/3 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
+                    />
+                </div>
+            )}
+
             {/* Champs supplémentaires pour nouveau matériel */}
             {item.isNewMaterial && (
                 <div className="border-t border-gray-300 pt-4 mt-4">
                     <h4 className="text-sm font-bold text-blue-700 mb-3 flex items-center gap-2">
                         <FaCheckCircle />
-                        Informations complémentaires pour le nouveau matériel
+                        Additional information for the new material
                     </h4>
 
                     {/* Champs communs */}
@@ -732,13 +789,13 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">Emplacement</label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1">Location</label>
                             <input
                                 type="text"
                                 value={item.emplacement}
                                 onChange={(e) => onUpdate(item.id, 'emplacement', e.target.value)}
                                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                placeholder="Stockage A, Pharmacie..."
+                                placeholder="Storage A, Pharmacy..."
                             />
                         </div>
                         <div>
@@ -754,12 +811,12 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
                     </div>
 
                     {/* Champs spécifiques Matériel Médical */}
-                    {item.type === "Matériel Médical" && (
+                    {item.type === "Medical Material" && (
                         <div className="bg-red-50 p-3 rounded-lg">
-                            <h5 className="text-sm font-semibold text-red-700 mb-2">Attributs Matériel Médical</h5>
+                            <h5 className="text-sm font-semibold text-red-700 mb-2">Medical Material Attributes</h5>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Prix Vente *</label>
+                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Sale Price *</label>
                                     <input
                                         type="number"
                                         value={item.prixVente}
@@ -770,21 +827,38 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Unité *</label>
-                                    <select
+                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Unit *</label>
+                                    <input
+                                        type="text"
+                                        list="unit-options"
                                         value={item.unite}
                                         onChange={(e) => onUpdate(item.id, 'unite', e.target.value)}
                                         className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                                    >
-                                        <option value="boîte">Boîte</option>
-                                        <option value="flacon">Flacon</option>
-                                        <option value="unité">Unité</option>
-                                        <option value="sachet">Sachet</option>
-                                        <option value="tube">Tube</option>
-                                    </select>
+                                        placeholder="e.g. Boite, Sachet..."
+                                    />
+                                    <datalist id="unit-options">
+                                        <option value="Boite" />
+                                        <option value="Flacon" />
+                                        <option value="Sachet" />
+                                        <option value="Plaquette" />
+                                        <option value="Tube" />
+                                        <option value="Ampoule" />
+                                        <option value="Kit" />
+                                        <option value="Paquet" />
+                                        <option value="Rouleau" />
+                                        <option value="Dose" />
+                                        <option value="Carton" />
+                                        <option value="Gramme" />
+                                        <option value="Kilogramme" />
+                                        <option value="Litre" />
+                                        <option value="Millilitre" />
+                                        <option value="Unité" />
+                                        <option value="Comprimé" />
+                                        <option value="Gélule" />
+                                    </datalist>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Seuil Alerte</label>
+                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Alert Threshold</label>
                                     <input
                                         type="number"
                                         value={item.seuilAlerte}
@@ -798,23 +872,23 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
                     )}
 
                     {/* Champs spécifiques Matériel Durable */}
-                    {item.type === "Matériel Durable" && (
+                    {item.type === "Durable Material" && (
                         <div className="bg-blue-50 p-3 rounded-lg">
-                            <h5 className="text-sm font-semibold text-blue-700 mb-2">Attributs Matériel Durable</h5>
+                            <h5 className="text-sm font-semibold text-blue-700 mb-2">Durable Material Attributes</h5>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Localisation *</label>
+                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Location *</label>
                                     <input
                                         type="text"
                                         value={item.localisation}
                                         onChange={(e) => onUpdate(item.id, 'localisation', e.target.value)}
                                         className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                                        placeholder="Bureau, Salle..."
+                                        placeholder="Office, Room..."
                                         required
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-700 mb-1">N° Série</label>
+                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Serial #</label>
                                     <input
                                         type="text"
                                         value={item.numeroSerie}
@@ -824,7 +898,7 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Garantie (mois)</label>
+                                    <label className="block text-xs font-semibold text-gray-700 mb-1">Warranty (months)</label>
                                     <input
                                         type="number"
                                         value={item.dureeGarantie}
@@ -842,13 +916,13 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
             {/* Justification pour matériel existant */}
             {!item.isNewMaterial && (
                 <div className="mt-3">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Justification (si écart)</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Justification (if discrepancy)</label>
                     <input
                         type="text"
                         value={item.justification}
                         onChange={(e) => onUpdate(item.id, 'justification', e.target.value)}
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Justification si quantité reçue différente de commandée..."
+                        placeholder="Justification if received quantity differs from ordered..."
                     />
                 </div>
             )}

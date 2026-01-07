@@ -52,7 +52,7 @@ export function PharmacistHome() {
                 code: m.code_materiel,
                 name: m.nom_Materiel,
                 quantity: m.quantite_stock,
-                seuil: 20, // Seuil par défaut
+                seuil: m.seuil_alerte || 10, // Utiliser le seuil du modèle ou 10 par défaut
                 prixVente: parseFloat(m.prix_vente_unitaire) || 0
             }));
             setMedications(medicationsList);

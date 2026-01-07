@@ -18,6 +18,7 @@ import {
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
 import { rapportApi } from "../../services/comptabiliteMatiereApi";
+import { getAllPersonnel } from "../../services/personnelApi";
 
 export function DirectorReports() {
     const [loading, setLoading] = useState(true);
@@ -40,6 +41,9 @@ export function DirectorReports() {
     const [sentReports, setSentReports] = useState([]);
     const [receivedReports, setReceivedReports] = useState([]);
 
+    // Liste du personnel pour le sélecteur de destinataire
+    const [personnelList, setPersonnelList] = useState([]);
+
     // État pour le modal de détails
     const [selectedReport, setSelectedReport] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -49,21 +53,39 @@ export function DirectorReports() {
         loadData();
     }, []);
 
+    // Helper function pour obtenir le nom du personnel
+    function getPersonnelName(id) {
+        const person = personnelList.find(p => p.idpersonnel === id || p.id === id);
+        if (person) {
+            return `${person.nom || ''} ${person.prenom || ''} (${person.role || person.poste || 'N/A'})`;
+        }
+        return `Personnel #${id}`;
+    }
+
     async function loadData() {
         try {
             setLoading(true);
             setError(null);
 
-            const rapportsData = await rapportApi.getAll();
+            // Charger les rapports et le personnel en parallèle
+            const [rapportsData, personnelData] = await Promise.all([
+                rapportApi.getAll(),
+                getAllPersonnel()
+            ]);
+
+            // Stocker la liste du personnel
+            const personnel = personnelData.results || personnelData || [];
+            setPersonnelList(personnel);
+
             const rapports = rapportsData.results || rapportsData;
 
             // Filtrer les rapports envoyés par le directeur
             const sent = rapports.filter(r => r.expediteur === currentUserId);
-            setSentReports(sent.map(formatReport));
+            setSentReports(sent.map(r => formatReport(r, getPersonnelNameFromList(personnel))));
 
             // Filtrer les rapports reçus par le directeur
             const received = rapports.filter(r => r.destinataire === currentUserId);
-            setReceivedReports(received.map(r => ({ ...formatReport(r), isRead: r.est_lu })));
+            setReceivedReports(received.map(r => ({ ...formatReport(r, getPersonnelNameFromList(personnel)), isRead: r.est_lu })));
 
         } catch (err) {
             console.error("Erreur lors du chargement des rapports:", err);
@@ -73,7 +95,18 @@ export function DirectorReports() {
         }
     }
 
-    function formatReport(r) {
+    // Helper avec liste passée en paramètre (pour éviter problème de référence)
+    function getPersonnelNameFromList(list) {
+        return (id) => {
+            const person = list.find(p => p.idpersonnel === id || p.id === id);
+            if (person) {
+                return `${person.nom || ''} ${person.prenom || ''}`;
+            }
+            return `Personnel #${id}`;
+        };
+    }
+
+    function formatReport(r, getPersonnelName = (id) => `Personnel #${id}`) {
         return {
             id: r.code_rapport || `RPT-${r.idRapport}`,
             idRapport: r.idRapport,
@@ -81,11 +114,11 @@ export function DirectorReports() {
             corps: r.corps,
             dateEnvoi: r.date_creation?.split('T')[0] || new Date().toISOString().split('T')[0],
             expediteur: r.expediteur,
-            expediteurName: `Personnel #${r.expediteur}`,
+            expediteurName: getPersonnelName(r.expediteur),
             destinataire: r.destinataire,
-            destinataireName: `Personnel #${r.destinataire}`,
+            destinataireName: getPersonnelName(r.destinataire),
             type: r.type_rapport,
-            concerneName: `Personnel #${r.destinataire}`,
+            concerneName: getPersonnelName(r.destinataire),
             concerne: r.destinataire
         };
     }
@@ -112,10 +145,9 @@ export function DirectorReports() {
                 objet: reportForm.objet,
                 corps: reportForm.corps,
                 type_rapport: "GENERAL",
+                id_personnel: currentUserId,
                 expediteur: currentUserId,
-                destinataire: parseInt(reportForm.destinataire),
-                date_creation: now.toISOString().split('T')[0],
-                est_lu: false
+                destinataire: parseInt(reportForm.destinataire)
             };
 
             await rapportApi.create(newReportData);
@@ -312,7 +344,7 @@ export function DirectorReports() {
 
     if (loading) {
         return (
-            <DirectorDashBoard linkList={DirectorNavLink} requiredRole={"Director"}>
+            <DirectorDashBoard linkList={DirectorNavLink} requiredRole={"directeur"}>
                 <DirectorNavBar />
                 <div className="flex items-center justify-center h-96">
                     <div className="text-center">
@@ -327,7 +359,7 @@ export function DirectorReports() {
     return (
         <DirectorDashBoard
             linkList={DirectorNavLink}
-            requiredRole={"Director"}
+            requiredRole={"directeur"}
         >
             <DirectorNavBar />
             <div className="p-6 space-y-6">
@@ -382,18 +414,24 @@ export function DirectorReports() {
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    ID Destinataire *
+                                    Destinataire *
                                 </label>
-                                <input
-                                    type="number"
+                                <select
                                     value={reportForm.destinataire}
                                     onChange={(e) => setReportForm({ ...reportForm, destinataire: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
-                                    placeholder="Saisir l'ID du destinataire (ex: 1, 2, 3...)"
                                     required
-                                    min="1"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">ID du personnel destinataire</p>
+                                >
+                                    <option value="">-- Sélectionner un destinataire --</option>
+                                    {personnelList
+                                        .filter(p => (p.idpersonnel || p.id) !== currentUserId)
+                                        .map(p => (
+                                            <option key={p.idpersonnel || p.id} value={p.idpersonnel || p.id}>
+                                                {p.nom} {p.prenom} ({p.role || p.poste || 'N/A'})
+                                            </option>
+                                        ))
+                                    }
+                                </select>
                             </div>
                         </div>
                         <div>
