@@ -9,10 +9,7 @@ export const AppRoutesPaths = {
     welcomePage: "/",
     loginPage: "/login",
     forgottenPasswordPage: "/forgotten-password",
-    pharmacyPage: "/pharmacy",
-    pharmacyHistoryPage: "/pharmacy/history",
-    pharmacyReportsPage: "/pharmacy/reports",
-    pharmacyNeedsPage: "/pharmacy/needs",
+
     doctorPage: "/doctor/waiting-room",
     laboratoryAssistantPage: "/laboratory-assistant/home",
     receptionistPage: "/receptionist/patients",
@@ -61,7 +58,7 @@ export const AppRoutesPaths = {
     doctorPatientMedicalFolderPage: "/doctor/patients/medical-folder/:id",
     financialContributions: "/accountant/financial-contributions",
     financialReportsAccountant: "/accountant/financial-reports",
-    PharmacyMedication: "/pharmacyMedication",
+
     createFactureAccountant: "/accountant/create-facture",
 
     laboratoryPatientList: "/laboratory-assistant/patient-list",
@@ -81,7 +78,28 @@ export const AppRoutesPaths = {
     financialAccountantBudgets: "/accountant-financial/budgets",
     financialAccountantReports: "/accountant-financial/reports",
     financialAccountPayroll: "/accountant-financial/payroll-journal",
-    financialAccountantCostAnalytic: "/accountant-financial/cost-analytic"
+    financialAccountantCostAnalytic: "/accountant-financial/cost-analytic",
 
+    // ComptaMatiere (Comptable Matière) routes
+    comptaMatiereDashboard: "/compta-matiere/dashboard",
+    comptaMatiereEmitNeed: "/compta-matiere/emit-need",
+    comptaMatiereRegisterDelivery: "/compta-matiere/register-delivery",
+    comptaMatiereRegisterOutput: "/compta-matiere/register-output",
+    comptaMatiereReports: "/compta-matiere/reports",
+    comptaMatiereMaterialList: "/compta-matiere/material-list",
+    comptaMatiereOutputList: "/compta-matiere/output-list",
+    comptaMatiereInventoryArchives: "/compta-matiere/inventory-archives",
+
+    // Director routes
+    directorDashboard: "/director/dashboard",
+    directorReports: "/director/reports",
+
+    // Pharmacist routes
+    pharmacistDashboard: "/pharmacist/dashboard",
+    pharmacistMedicationList: "/pharmacist/medication-list",
+    pharmacistEmitNeed: "/pharmacist/emit-need",
+    pharmacistDailySales: "/pharmacist/daily-sales",
+    pharmacistInventory: "/pharmacist/inventory",
+    pharmacistReports: "/pharmacist/reports"
 
 }

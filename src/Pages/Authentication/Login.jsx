@@ -71,37 +71,72 @@ export function LoginPage() {
     }
 
     const navigateToRole = (role) => {
-        switch (role) {
+        // Debug: afficher toutes les informations
+        console.log('=== DEBUG NAVIGATION ===');
+        console.log('Rôle reçu:', role);
+        console.log('Type du rôle:', typeof role);
+        console.log('userData complet:', userData);
+        console.log('========================');
+
+        // Vérifier si le rôle existe et n'est pas vide
+        if (!role || role.trim() === '') {
+            console.error('Rôle manquant ou vide pour cet utilisateur');
+            setIsLoginErrorPresent(true);
+            setLoginError("Votre compte n'a pas de rôle assigné. Veuillez contacter l'administrateur.");
+            return;
+        }
+
+        // Normaliser le rôle (minuscules, sans espaces)
+        const normalizedRole = role.toLowerCase().trim();
+        console.log('Rôle normalisé:', normalizedRole);
+
+        switch (normalizedRole) {
             case 'admin':
+                console.log('Redirection vers: Admin Home');
                 navigate(appRouterPaths.adminHomePage);
                 break;
             case 'receptioniste':
+            case 'réceptionniste':
+                console.log('Redirection vers: Receptionist Page');
                 navigate(appRouterPaths.receptionistPage);
                 break;
             case 'infirmier':
+            case 'infirmière':
+                console.log('Redirection vers: Nurse Page');
                 navigate(appRouterPaths.nursePage);
                 break;
             case 'medecin':
+            case 'médecin':
+                console.log('Redirection vers: Doctor Page');
                 navigate(appRouterPaths.doctorPage);
                 break;
             case 'caissier':
+            case 'caissière':
+                console.log('Redirection vers: Cashier Page');
                 navigate(appRouterPaths.cashierPage);
                 break;
             case 'laborantin':
+                console.log('Redirection vers: Laboratory Assistant Page');
                 navigate(appRouterPaths.laboratoryAssistantPage);
                 break;
             case 'pharmacien':
-                navigate(appRouterPaths.pharmacyPage);
+            case 'pharmacienne':
+                console.log('Redirection vers: Pharmacist Dashboard');
+                navigate(appRouterPaths.pharmacistDashboard);
                 break;
             case 'comptable':
-                navigate(appRouterPaths.accountantPage);
+                console.log('Redirection vers: Compta Matière Dashboard');
+                navigate(appRouterPaths.comptaMatiereDashboard);
                 break;
             case 'directeur':
-                navigate(appRouterPaths.adminHomePage);
+            case 'directrice':
+                console.log('Redirection vers: Director Dashboard');
+                navigate(appRouterPaths.directorDashboard);
                 break;
             default:
-                console.warn('Role non reconnu:', role);
-                alert(`Connexion réussie mais redirection non configurée pour le rôle: ${role}`);
+                console.warn('Rôle non reconnu:', normalizedRole);
+                setIsLoginErrorPresent(true);
+                setLoginError(`Connexion réussie mais redirection non configurée pour le rôle: "${role}". Rôles disponibles: admin, receptioniste, infirmier, medecin, caissier, laborantin, pharmacien, comptable, directeur. Veuillez contacter l'administrateur.`);
         }
     }
 
