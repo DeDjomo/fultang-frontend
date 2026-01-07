@@ -14,7 +14,9 @@ import {
   FaCheckCircle,
   FaExclamationTriangle,
   FaSpinner,
-  FaSyncAlt
+  FaSyncAlt,
+  FaEye,
+  FaTimes
 } from "react-icons/fa";
 import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
@@ -47,6 +49,12 @@ export function Accountant() {
   // Liste des besoins en cours depuis l'API
   const [besoinsEnCours, setBesoinsEnCours] = useState([]);
 
+  // États pour la modal de détails du besoin
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedBesoin, setSelectedBesoin] = useState(null);
+  const [lignesBesoin, setLignesBesoin] = useState([]);
+  const [loadingLignes, setLoadingLignes] = useState(false);
+
   // Charger les données
   useEffect(() => {
     loadData();
@@ -60,30 +68,23 @@ export function Accountant() {
     setLoading(true);
     setError(null);
 
-    const token = localStorage.getItem("token_key_fultang");
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    };
-    const baseUrl = "http://127.0.0.1:8000/api";
-
     try {
       console.log("🚀 Dashboard - Chargement des données fraîches...");
 
-      const [medicauxRes, durablesRes, sortiesRes, livraisonsRes, besoinsRes] = await Promise.all([
-        fetch(`${baseUrl}/materiels-medicaux/?page_size=1000`, { headers, cache: "no-store" }).then(res => res.json()),
-        fetch(`${baseUrl}/materiels-durables/?page_size=1000`, { headers, cache: "no-store" }).then(res => res.json()),
-        fetch(`${baseUrl}/sorties/?page_size=1000`, { headers, cache: "no-store" }).then(res => res.json()),
-        fetch(`${baseUrl}/livraisons/?page_size=1000`, { headers, cache: "no-store" }).then(res => res.json()),
-        fetch(`${baseUrl}/besoins/?page_size=1000`, { headers, cache: "no-store" }).then(res => res.json())
+      const [medicauxData, durablesData, sortiesData, livraisonsData, besoinsData] = await Promise.all([
+        materielMedicalApi.getAll(),
+        materielDurableApi.getAll(),
+        sortieApi.getAll(),
+        livraisonApi.getAll(),
+        besoinApi.getAll()
       ]);
 
       // Extraire les résultats (gestion format paginé Django Rest Framework)
-      const medicaux = medicauxRes.results || medicauxRes || [];
-      const durables = durablesRes.results || durablesRes || [];
-      const sorties = sortiesRes.results || sortiesRes || [];
-      const livraisons = livraisonsRes.results || livraisonsRes || [];
-      const besoins = besoinsRes.results || besoinsRes || [];
+      const medicaux = Array.isArray(medicauxData) ? medicauxData : (medicauxData.results || []);
+      const durables = Array.isArray(durablesData) ? durablesData : (durablesData.results || []);
+      const sorties = Array.isArray(sortiesData) ? sortiesData : (sortiesData.results || []);
+      const livraisons = Array.isArray(livraisonsData) ? livraisonsData : (livraisonsData.results || []);
+      const besoins = Array.isArray(besoinsData) ? besoinsData : (besoinsData.results || []);
 
       // 🔢 OPÉRATIONS STATISTIQUES
       // Compter uniquement les besoins EN_COURS (à traiter par le comptable)
@@ -105,14 +106,13 @@ export function Accountant() {
 
       const besoinsFormates = await Promise.all(
         besoinsEnCoursFiltered.map(async (b) => {
-          // Récupérer les lignes de chaque besoin individuellement avec no-store
+          // Récupérer les lignes de chaque besoin individuellement
           let description = b.motif;
           let quantiteTotal = 1;
 
           try {
-            const lignesRes = await fetch(`${baseUrl}/lignes-besoin/?besoin=${b.idBesoin}&page_size=1000`, { headers, cache: "no-store" });
-            const lignesData = await lignesRes.json();
-            const lignes = lignesData.results || lignesData || [];
+            const lignesData = await ligneBesoinApi.getByBesoin(b.idBesoin);
+            const lignes = Array.isArray(lignesData) ? lignesData : (lignesData.results || []);
 
             if (lignes.length > 0) {
               quantiteTotal = lignes.reduce((sum, l) => sum + (l.quantite_demandee || 0), 0);
@@ -172,25 +172,10 @@ export function Accountant() {
     const confirmation = window.confirm(`Voulez-vous marquer le besoin ${besoin.code} comme traité ?`);
     if (!confirmation) return;
 
-    const token = localStorage.getItem("token_key_fultang");
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    };
-    const baseUrl = "http://127.0.0.1:8000/api";
-
     try {
       setLoading(true);
 
-      const response = await fetch(`${baseUrl}/besoins/${besoin.id}/`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ statut: 'TRAITE' })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erreur HTTP ${response.status}`);
-      }
+      await besoinApi.traiter(besoin.id);
 
       // Recharger les données
       await loadData();
@@ -206,6 +191,34 @@ export function Accountant() {
 
   const scrollToBesoins = () => {
     besoinsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  // Fonction pour voir les détails d'un besoin
+  const viewBesoinDetails = async (besoin) => {
+    setSelectedBesoin(besoin);
+    setShowDetailModal(true);
+    setLoadingLignes(true);
+    setLignesBesoin([]);
+
+    try {
+      console.log("📦 Chargement des lignes pour besoin ID:", besoin.id);
+      const lignes = await ligneBesoinApi.getByBesoin(besoin.id);
+      console.log("📦 Réponse API lignes-besoin:", lignes);
+
+      const lignesList = (Array.isArray(lignes) ? lignes : (lignes.results || [])).map(l => ({
+        id: l.id_ligne_besoin || l.idLigneBesoin,
+        materiel: l.materiel_nom,
+        quantite: l.quantite_demandee,
+        priorite: l.priorite,
+        description: l.description_justification
+      }));
+      console.log("📦 Lignes mappées:", lignesList);
+      setLignesBesoin(lignesList);
+    } catch (err) {
+      console.error("❌ Erreur lors du chargement des lignes:", err);
+    } finally {
+      setLoadingLignes(false);
+    }
   };
 
   const quickActions = [
@@ -285,6 +298,7 @@ export function Accountant() {
             description="Articles en stock"
             color="bg-blue-500"
             icon={FaBoxes}
+            clickable={false}
           />
           <StatCard
             title="Matériel Médical Total"
@@ -292,6 +306,7 @@ export function Accountant() {
             description="Équipements médicaux"
             color="bg-yellow-500"
             icon={FaMedkit}
+            clickable={false}
           />
           <StatCard
             title="Sorties Totales"
@@ -299,6 +314,7 @@ export function Accountant() {
             description="Toutes les sorties"
             color="bg-orange-500"
             icon={FaBoxOpen}
+            clickable={false}
           />
           <StatCard
             title="Besoins en Attente"
@@ -315,6 +331,7 @@ export function Accountant() {
             description="Réceptions enregistrées"
             color="bg-green-500"
             icon={FaTruck}
+            clickable={false}
           />
           <StatCard
             title="Matériel Durable Total"
@@ -322,6 +339,7 @@ export function Accountant() {
             description="Équipements durables"
             color="bg-purple-500"
             icon={FaTools}
+            clickable={false}
           />
         </div>
 
@@ -384,13 +402,22 @@ export function Accountant() {
                         <StatutBadge statut={besoin.statut} />
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => handleTraiterBesoin(besoin)}
-                          disabled={loading}
-                          className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
-                        >
-                          {loading ? 'Traitement...' : 'Traiter'}
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => viewBesoinDetails(besoin)}
+                            className="px-2 py-2 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600 transition-all duration-300"
+                            title="Voir les détails"
+                          >
+                            <FaEye />
+                          </button>
+                          <button
+                            onClick={() => handleTraiterBesoin(besoin)}
+                            disabled={loading}
+                            className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                          >
+                            {loading ? 'Traitement...' : 'Valider'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -405,6 +432,92 @@ export function Accountant() {
           )}
         </div>
       </div>
+
+      {/* Modal de détails du besoin */}
+      {showDetailModal && selectedBesoin && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-t-xl">
+              <h3 className="text-xl font-bold">Détails du Besoin {selectedBesoin.code}</h3>
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="text-white hover:text-gray-200 text-2xl"
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-500">Émetteur</p>
+                  <p className="font-semibold text-gray-800">{selectedBesoin.departement}</p>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-500">Date d'émission</p>
+                  <p className="font-semibold text-gray-800">{selectedBesoin.dateEmission}</p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-500">Motif / Description</p>
+                <p className="font-semibold text-gray-800">{selectedBesoin.description}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-500">Priorité</p>
+                  <div className="mt-1"><PrioriteBadge priorite={selectedBesoin.priorite} /></div>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-500">Statut</p>
+                  <div className="mt-1"><StatutBadge statut={selectedBesoin.statut} /></div>
+                </div>
+              </div>
+
+              {/* Liste des articles demandés */}
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-700 font-semibold mb-3 flex items-center gap-2">
+                  <FaClipboardList /> Articles demandés
+                </p>
+                {loadingLignes ? (
+                  <div className="flex items-center justify-center py-4">
+                    <FaSpinner className="animate-spin text-blue-500 text-2xl" />
+                    <span className="ml-2 text-gray-600">Chargement...</span>
+                  </div>
+                ) : lignesBesoin.length > 0 ? (
+                  <div className="space-y-2">
+                    {lignesBesoin.map((ligne, idx) => (
+                      <div key={idx} className="bg-white p-3 rounded-lg border flex justify-between items-center">
+                        <div>
+                          <p className="font-medium text-gray-800">{ligne.materiel}</p>
+                          {ligne.description && (
+                            <p className="text-xs text-gray-500">{ligne.description}</p>
+                          )}
+                        </div>
+                        <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">
+                          x{ligne.quantite}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-500 py-4">Aucun article trouvé pour ce besoin</p>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AccountantDashBoard>
   );
 }

@@ -57,30 +57,23 @@ export function MaterialList() {
         setLoading(true);
         setError(null);
 
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
-
         try {
-            console.log("🚀 MaterialList - Chargement données fraîches...");
+            console.log("🚀 MaterialList - Chargement données via Service API...");
 
-            // Récupérer les données en parallèle
-            const [medicauxRes, durablesRes] = await Promise.all([
-                fetch(`${baseUrl}/materiels-medicaux/`, { headers, cache: "no-store" }).then(res => res.json()),
-                fetch(`${baseUrl}/materiels-durables/`, { headers, cache: "no-store" }).then(res => res.json())
+            // Récupérer les données en parallèle via le service
+            const [medicauxData, durablesData] = await Promise.all([
+                materielMedicalApi.getAll(),
+                materielDurableApi.getAll()
             ]);
 
-            // Extraire les résultats
-            const medicauxData = medicauxRes.results || medicauxRes || [];
-            const durablesData = durablesRes.results || durablesRes || [];
+            // Note: materielMedicalApi.getAll() utilise fetchAllPages qui retourne un tableau aggrégé
+            const medicauxResults = Array.isArray(medicauxData) ? medicauxData : (medicauxData.results || []);
+            const durablesResults = Array.isArray(durablesData) ? durablesData : (durablesData.results || []);
 
-            console.log(`📦 Reçu: ${medicauxData.length} médicaux, ${durablesData.length} durables`);
+            console.log(`📦 Reçu: ${medicauxResults.length} médicaux, ${durablesResults.length} durables`);
 
             // 🔄 NORMALISATION DES DONNÉES
-            const medicaux = medicauxData.map(m => ({
+            const medicaux = medicauxResults.map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
@@ -95,7 +88,7 @@ export function MaterialList() {
                 dateEnregistrement: m.date_derniere_modification?.split('T')[0] || '-'
             }));
 
-            const durables = durablesData.map(m => ({
+            const durables = durablesResults.map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,

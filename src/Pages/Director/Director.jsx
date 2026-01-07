@@ -16,7 +16,7 @@ import {
     FaTimes
 } from "react-icons/fa";
 import PropTypes from "prop-types";
-import { ligneBesoinApi } from "../../services/comptabiliteMatiereApi";
+import { ligneBesoinApi, besoinApi } from "../../services/comptabiliteMatiereApi";
 
 export function Director() {
     const [loading, setLoading] = useState(true);
@@ -51,21 +51,12 @@ export function Director() {
     }, []);
 
     async function loadData() {
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
-
         try {
             setLoading(true);
             setError(null);
 
-            const response = await fetch(`${baseUrl}/besoins/`, { headers, cache: "no-store" });
-            const besoinsData = await response.json();
-
-            const besoinsList = (besoinsData.results || besoinsData || []).map(b => ({
+            const besoinsData = await besoinApi.getAll();
+            const besoinsList = (Array.isArray(besoinsData) ? besoinsData : (besoinsData.results || [])).map(b => ({
                 id: b.idBesoin,
                 code: b.code_besoin || `BES-${b.idBesoin}`,
                 motif: b.motif,
@@ -166,17 +157,22 @@ export function Director() {
         // Charger les lignes de besoin si pas encore chargées
         if (!lignesBesoins[besoin.id]) {
             try {
+                console.log("📦 Chargement des lignes pour besoin ID:", besoin.id);
                 const lignes = await ligneBesoinApi.getByBesoin(besoin.id);
-                const lignesList = (lignes.results || lignes).map(l => ({
-                    id: l.idLigneBesoin,
+                console.log("📦 Réponse API lignes-besoin:", lignes);
+
+                const lignesList = (Array.isArray(lignes) ? lignes : (lignes.results || [])).map(l => ({
+                    id: l.id_ligne_besoin || l.idLigneBesoin,
                     materiel: l.materiel_nom,
                     quantite: l.quantite_demandee,
                     priorite: l.priorite,
                     description: l.description_justification
                 }));
+                console.log("📦 Lignes mappées:", lignesList);
                 setLignesBesoins(prev => ({ ...prev, [besoin.id]: lignesList }));
             } catch (err) {
-                console.error("Erreur lors du chargement des lignes:", err);
+                console.error("❌ Erreur lors du chargement des lignes:", err);
+                console.error("❌ Détails:", err.response?.data);
             }
         }
     }
@@ -209,30 +205,14 @@ export function Director() {
     async function executeApprove() {
         if (!confirmBesoin) return;
 
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
-
         try {
             setActionLoading(true);
 
-            // Changer le statut à EN_COURS
-            const response = await fetch(`${baseUrl}/besoins/${confirmBesoin.id}/`, {
-                method: 'PATCH',
-                headers,
-                cache: "no-store",
-                body: JSON.stringify({
-                    statut: 'EN_COURS',
-                    date_traitement_directeur: new Date().toISOString()
-                })
+            // Changer le statut à EN_COURS via le service API
+            await besoinApi.patch(confirmBesoin.id, {
+                statut: 'EN_COURS',
+                date_traitement_directeur: new Date().toISOString()
             });
-
-            if (!response.ok) {
-                throw new Error(`Erreur HTTP ${response.status}`);
-            }
 
             setSuccessMessage(`✅ Besoin ${confirmBesoin.code} validé et passé en cours !`);
             setTimeout(() => setSuccessMessage(""), 3000);
@@ -252,30 +232,14 @@ export function Director() {
     async function executeReject() {
         if (!confirmBesoin) return;
 
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
-
         try {
             setActionLoading(true);
 
-            const response = await fetch(`${baseUrl}/besoins/${confirmBesoin.id}/`, {
-                method: 'PATCH',
-                headers,
-                cache: "no-store",
-                body: JSON.stringify({
-                    statut: 'REJETE',
-                    commentaire_directeur: rejectComment || 'Rejeté par le directeur',
-                    date_traitement_directeur: new Date().toISOString()
-                })
+            await besoinApi.patch(confirmBesoin.id, {
+                statut: 'REJETE',
+                commentaire_directeur: rejectComment || 'Rejeté par le directeur',
+                date_traitement_directeur: new Date().toISOString()
             });
-
-            if (!response.ok) {
-                throw new Error(`Erreur HTTP ${response.status}`);
-            }
 
             setSuccessMessage(`⛔ Besoin ${confirmBesoin.code} rejeté.`);
             setTimeout(() => setSuccessMessage(""), 3000);
@@ -744,8 +708,8 @@ export function Director() {
                                 onClick={confirmAction === 'approve' ? executeApprove : executeReject}
                                 disabled={actionLoading}
                                 className={`flex-1 px-4 py-3 text-white rounded-lg transition-all font-semibold disabled:opacity-50 flex items-center justify-center gap-2 ${confirmAction === 'approve'
-                                        ? 'bg-green-500 hover:bg-green-600'
-                                        : 'bg-red-500 hover:bg-red-600'
+                                    ? 'bg-green-500 hover:bg-green-600'
+                                    : 'bg-red-500 hover:bg-red-600'
                                     }`}
                             >
                                 {actionLoading ? (

@@ -44,7 +44,7 @@ export function DirectorNavBar() {
                         <Tooltip placement={"top"} title={"Profile"}>
                             <button className="ml-3 flex">
                                 <p className="font-bold text-secondary text-xl mt-2">
-                                    {"Hello " + userData?.username + "!"}
+                                    {"Hello " + (userData?.username || userData?.nom || "Directeur") + "!"}
                                 </p>
                                 <img
                                     src={userIcon}

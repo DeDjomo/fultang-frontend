@@ -45,25 +45,18 @@ export function PharmacistDailySales() {
     }, []);
 
     async function loadData() {
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
-
         try {
             setLoading(true);
             setError(null);
 
             // Charger les deux en parallèle
-            const [materielsRes, sortiesRes] = await Promise.all([
-                fetch(`${baseUrl}/materiels-medicaux/`, { headers, cache: "no-store" }).then(res => res.json()),
-                fetch(`${baseUrl}/sorties/`, { headers, cache: "no-store" }).then(res => res.json())
+            const [materielsData, sortiesData] = await Promise.all([
+                materielMedicalApi.getAll(),
+                sortieApi.getAll()
             ]);
 
             // 1. Matériels disponibles
-            const materiels = materielsRes.results || materielsRes || [];
+            const materiels = Array.isArray(materielsData) ? materielsData : (materielsData.results || []);
             const medicationsList = materiels.map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
@@ -73,10 +66,10 @@ export function PharmacistDailySales() {
             setMedicationsDatabase(medicationsList);
 
             // 2. Ventes du jour
-            const sortiesData = sortiesRes.results || sortiesRes || [];
+            const sorties = Array.isArray(sortiesData) ? sortiesData : (sortiesData.results || []);
             const today = new Date().toISOString().split('T')[0];
 
-            const ventesAujourdHui = sortiesData.filter(s => {
+            const ventesAujourdHui = sorties.filter(s => {
                 const sortieDate = s.date_sortie?.split('T')[0] || '';
                 return sortieDate === today && s.motif_sortie === 'VENTE';
             }).map(s => ({
@@ -91,7 +84,7 @@ export function PharmacistDailySales() {
 
         } catch (err) {
             console.error("Erreur chargement données:", err);
-            setError("Impossible de charger les données fraîches.");
+            setError("Impossible de charger les données.");
         } finally {
             setLoading(false);
         }
@@ -167,13 +160,6 @@ export function PharmacistDailySales() {
             }
         }
 
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
-
         try {
             setSubmitting(true);
             setError(null);
@@ -184,42 +170,30 @@ export function PharmacistDailySales() {
             // 1. Créer la sortie (vente)
             const sortieData = {
                 numero_sortie: generateSaleId(),
+                date_sortie: new Date().toISOString(),
                 motif_sortie: "VENTE",
                 idPersonnel: personnelId
             };
 
-            const sortieRes = await fetch(`${baseUrl}/sorties/`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(sortieData)
-            });
-
-            if (!sortieRes.ok) throw new Error("Erreur lors de la création de la vente");
-            const newSortie = await sortieRes.json();
+            const newSortie = await sortieApi.create(sortieData);
             const idSortie = newSortie.idSortie;
 
             // 2. Créer les lignes de sortie et décrémenter stock
             for (const article of saleForm.articles) {
                 // A. Ligne Sortie
-                await fetch(`${baseUrl}/lignes-sortie/`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({
-                        id_sortie: idSortie,
-                        id_materiel: article.materialId,
-                        type_materiel: "MEDICAL",
-                        quantite: parseInt(article.quantity)
-                    })
+                await ligneSortieApi.create({
+                    id_sortie: idSortie,
+                    id_materiel: article.materialId,
+                    code_materiel: article.materialCode,
+                    nom_materiel: article.materialName,
+                    type_materiel: "MEDICAL",
+                    quantite: parseInt(article.quantity)
                 });
 
                 // B. Mettre à jour le stock du matériel (PATCH)
                 const newStock = article.stockDisponible - parseInt(article.quantity);
-                await fetch(`${baseUrl}/materiels-medicaux/${article.materialId}/`, {
-                    method: 'PATCH',
-                    headers,
-                    body: JSON.stringify({
-                        quantite_stock: newStock
-                    })
+                await materielMedicalApi.patch(article.materialId, {
+                    quantite_stock: newStock
                 });
             }
 

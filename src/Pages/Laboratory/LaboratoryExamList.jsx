@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Search, Plus, Edit2, Trash2, Calculator, Building, Package, Users, Banknote, TrendingDown, TrendingUp, Eye, ChevronDown, ChevronUp } from "lucide-react"; // Ajout ChevronDown/Up pour la cohérence si besoin futur
-import {AccountantNavBar} from "../../Accountant/Components/AccountantNavBar.jsx";
-import {AccountantDashBoard} from "../../Accountant/Components/AccountantDashboard.jsx";
-import {FinancialAccountantNavLink} from "../NavLink.js";
+import { AccountantNavBar } from "../ComptaMatiere/Components/AccountantNavBar";
+import { AccountantDashBoard } from "../ComptaMatiere/Components/AccountantDashboard";
+import { laboratoryNavLink as FinancialAccountantNavLink } from "./LaboratoryNavLink.js";
 
 // Simulez vos couleurs de thème si elles ne sont pas dans Tailwind par défaut
 // Exemple : primary-end -> blue-700, primary-start -> blue-500
@@ -132,7 +132,7 @@ export function ChartOfAccounts() {
                             <label className="block text-sm font-medium text-gray-700 mb-1">Classe</label>
                             <select
                                 value={formData.class}
-                                onChange={(e) => setFormData({...formData, class: e.target.value})}
+                                onChange={(e) => setFormData({ ...formData, class: e.target.value })}
                                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${themeColors.focusRing} focus:border-${themeColors.primaryEnd} transition-colors duration-300`}
                             >
                                 <option value="">Sélectionner une classe</option>
@@ -148,7 +148,7 @@ export function ChartOfAccounts() {
                             <input
                                 type="text"
                                 value={formData.code}
-                                onChange={(e) => setFormData({...formData, code: e.target.value})}
+                                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${themeColors.focusRing} focus:border-${themeColors.primaryEnd} transition-colors duration-300`}
                                 placeholder="Ex: 2154"
                             />
@@ -158,7 +158,7 @@ export function ChartOfAccounts() {
                             <input
                                 type="text"
                                 value={formData.label}
-                                onChange={(e) => setFormData({...formData, label: e.target.value})}
+                                onChange={(e) => setFormData({ ...formData, label: e.target.value })}
                                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${themeColors.focusRing} focus:border-${themeColors.primaryEnd} transition-colors duration-300`}
                                 placeholder="Ex: Équipements de radiologie"
                             />
@@ -167,7 +167,7 @@ export function ChartOfAccounts() {
                             <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
                             <select
                                 value={formData.type}
-                                onChange={(e) => setFormData({...formData, type: e.target.value})}
+                                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${themeColors.focusRing} focus:border-${themeColors.primaryEnd} transition-colors duration-300`}
                             >
                                 <option value="">Sélectionner un type</option>
@@ -182,7 +182,7 @@ export function ChartOfAccounts() {
                                 <input
                                     type="checkbox"
                                     checked={formData.isActive}
-                                    onChange={(e) => setFormData({...formData, isActive: e.target.checked})}
+                                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                                     className={`mr-2 h-4 w-4 text-${themeColors.primaryEnd} border-gray-300 rounded ${themeColors.focusRing}`}
                                 />
                                 Compte actif
@@ -308,86 +308,85 @@ export function ChartOfAccounts() {
                         <div className="overflow-x-auto bg-white rounded-xl shadow-xl">
                             <table className="w-full">
                                 <thead className={`bg-${themeColors.primaryEnd}`}>
-                                <tr>
-                                    <th className="px-5 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider rounded-tl-xl">Code / Statut</th>
-                                    <th className="px-5 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Libellé</th>
-                                    <th className="px-5 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Classe</th>
-                                    <th className="px-5 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider">Type</th>
-                                    <th className="px-5 py-4 text-right text-xs font-semibold text-white uppercase tracking-wider">Solde</th>
-                                    <th className="px-5 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider">Dernière Util.</th>
-                                    <th className="px-5 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider rounded-tr-xl">Actions</th>
-                                </tr>
+                                    <tr>
+                                        <th className="px-5 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider rounded-tl-xl">Code / Statut</th>
+                                        <th className="px-5 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Libellé</th>
+                                        <th className="px-5 py-4 text-left text-xs font-semibold text-white uppercase tracking-wider">Classe</th>
+                                        <th className="px-5 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider">Type</th>
+                                        <th className="px-5 py-4 text-right text-xs font-semibold text-white uppercase tracking-wider">Solde</th>
+                                        <th className="px-5 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider">Dernière Util.</th>
+                                        <th className="px-5 py-4 text-center text-xs font-semibold text-white uppercase tracking-wider rounded-tr-xl">Actions</th>
+                                    </tr>
                                 </thead>
                                 <tbody>
-                                {filteredAccounts.map((account, index) => (
-                                    <tr key={account.id} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors duration-200 ${index === filteredAccounts.length - 1 ? 'border-b-0' : ''}`}>
-                                        <td className={`px-5 py-4 whitespace-nowrap border-l-4 border-${themeColors.primaryStart}`}>
-                                            <div className="text-sm font-semibold text-gray-900">{account.code}</div>
-                                            <div className={`text-xs font-medium ${account.isActive ? 'text-green-600' : 'text-red-600'}`}>
-                                                {account.isActive ? 'Actif' : 'Inactif'}
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <div className="text-sm text-gray-900 font-medium">{account.label}</div>
-                                        </td>
-                                        <td className="px-5 py-4 whitespace-nowrap">
-                                            <div className="flex items-center">
-                                                <div className={`${getClassColor(account.class)} mr-2`}>
-                                                    {getClassIcon(account.class)}
+                                    {filteredAccounts.map((account, index) => (
+                                        <tr key={account.id} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors duration-200 ${index === filteredAccounts.length - 1 ? 'border-b-0' : ''}`}>
+                                            <td className={`px-5 py-4 whitespace-nowrap border-l-4 border-${themeColors.primaryStart}`}>
+                                                <div className="text-sm font-semibold text-gray-900">{account.code}</div>
+                                                <div className={`text-xs font-medium ${account.isActive ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {account.isActive ? 'Actif' : 'Inactif'}
                                                 </div>
-                                                <div>
-                                                    <div className="text-sm text-gray-900">Cl. {account.class}</div>
-                                                    <div className="text-xs text-gray-500">{ohadaClasses[account.class]?.name}</div>
+                                            </td>
+                                            <td className="px-5 py-4">
+                                                <div className="text-sm text-gray-900 font-medium">{account.label}</div>
+                                            </td>
+                                            <td className="px-5 py-4 whitespace-nowrap">
+                                                <div className="flex items-center">
+                                                    <div className={`${getClassColor(account.class)} mr-2`}>
+                                                        {getClassIcon(account.class)}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm text-gray-900">Cl. {account.class}</div>
+                                                        <div className="text-xs text-gray-500">{ohadaClasses[account.class]?.name}</div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-5 py-4 whitespace-nowrap text-center">
-                                                <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                    account.type === 'Actif' ? 'bg-green-100 text-green-800' :
-                                                        account.type === 'Passif' ? `bg-${themeColors.primaryStart} bg-opacity-10 text-${themeColors.primaryEnd}` : // Example for Passif
-                                                            account.type === 'Charge' ? 'bg-red-100 text-red-800' :
-                                                                'bg-emerald-100 text-emerald-800' // Produit
-                                                }`}>
+                                            </td>
+                                            <td className="px-5 py-4 whitespace-nowrap text-center">
+                                                <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${account.type === 'Actif' ? 'bg-green-100 text-green-800' :
+                                                    account.type === 'Passif' ? `bg-${themeColors.primaryStart} bg-opacity-10 text-${themeColors.primaryEnd}` : // Example for Passif
+                                                        account.type === 'Charge' ? 'bg-red-100 text-red-800' :
+                                                            'bg-emerald-100 text-emerald-800' // Produit
+                                                    }`}>
                                                     {account.type}
                                                 </span>
-                                        </td>
-                                        <td className="px-5 py-4 whitespace-nowrap text-right">
-                                            <div className="text-sm text-gray-900 font-semibold">{formatAmount(account.balance)}</div>
-                                        </td>
-                                        <td className="px-5 py-4 whitespace-nowrap text-center">
-                                            <div className="text-sm text-gray-600">{formatDate(account.lastUsed)}</div>
-                                        </td>
-                                        <td className="px-5 py-4 whitespace-nowrap text-center">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button
-                                                    onClick={() => console.log("Voir détails:", account.id)}
-                                                    className={`text-${themeColors.primaryStart} hover:text-${themeColors.primaryEnd} transition-colors duration-200`}
-                                                    title="Voir détails"
-                                                >
-                                                    <Eye className="h-5 w-5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => setEditingAccount(account)}
-                                                    className="text-yellow-500 hover:text-yellow-600 transition-colors duration-200"
-                                                    title="Modifier"
-                                                >
-                                                    <Edit2 className="h-5 w-5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        if (confirm("Êtes-vous sûr de vouloir supprimer ce compte ?")) {
-                                                            console.log("Supprimer:", account.id);
-                                                        }
-                                                    }}
-                                                    className="text-red-500 hover:text-red-600 transition-colors duration-200"
-                                                    title="Supprimer"
-                                                >
-                                                    <Trash2 className="h-5 w-5" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                            </td>
+                                            <td className="px-5 py-4 whitespace-nowrap text-right">
+                                                <div className="text-sm text-gray-900 font-semibold">{formatAmount(account.balance)}</div>
+                                            </td>
+                                            <td className="px-5 py-4 whitespace-nowrap text-center">
+                                                <div className="text-sm text-gray-600">{formatDate(account.lastUsed)}</div>
+                                            </td>
+                                            <td className="px-5 py-4 whitespace-nowrap text-center">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button
+                                                        onClick={() => console.log("Voir détails:", account.id)}
+                                                        className={`text-${themeColors.primaryStart} hover:text-${themeColors.primaryEnd} transition-colors duration-200`}
+                                                        title="Voir détails"
+                                                    >
+                                                        <Eye className="h-5 w-5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setEditingAccount(account)}
+                                                        className="text-yellow-500 hover:text-yellow-600 transition-colors duration-200"
+                                                        title="Modifier"
+                                                    >
+                                                        <Edit2 className="h-5 w-5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            if (confirm("Êtes-vous sûr de vouloir supprimer ce compte ?")) {
+                                                                console.log("Supprimer:", account.id);
+                                                            }
+                                                        }}
+                                                        className="text-red-500 hover:text-red-600 transition-colors duration-200"
+                                                        title="Supprimer"
+                                                    >
+                                                        <Trash2 className="h-5 w-5" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>

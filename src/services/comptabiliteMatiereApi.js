@@ -108,6 +108,10 @@ export const materielDurableApi = {
         const response = await apiClient.put(`/api/materiels-durables/${id}/`, data);
         return response.data;
     },
+    patch: async (id, data) => {
+        const response = await apiClient.patch(`/api/materiels-durables/${id}/`, data);
+        return response.data;
+    },
     delete: async (id) => {
         const response = await apiClient.delete(`/api/materiels-durables/${id}/`);
         return response.data;
@@ -222,7 +226,7 @@ export const ligneSortieApi = {
         return response.data;
     },
     getBySortie: async (sortieId) => {
-        const response = await apiClient.get(`/api/lignes-sortie/?id_sortie=${sortieId}`);
+        const response = await apiClient.get(`/api/lignes-sortie/?sortie=${sortieId}`);
         return response.data;
     },
     create: async (data) => {
@@ -261,7 +265,7 @@ export const rapportApi = {
         return response.data;
     },
     marquerLu: async (id) => {
-        const response = await apiClient.patch(`/api/rapports/${id}/`, { est_lu: true, statut: "lu" });
+        const response = await apiClient.post(`/api/rapports/${id}/mark-read/`);
         return response.data;
     },
     delete: async (id) => {
@@ -289,6 +293,25 @@ export const besoinApi = {
         const response = await apiClient.put(`/api/besoins/${id}/`, data);
         return response.data;
     },
+    patch: async (id, data) => {
+        const response = await apiClient.patch(`/api/besoins/${id}/`, data);
+        return response.data;
+    },
+    valider: async (id, data = {}) => {
+        const response = await apiClient.patch(`/api/besoins/${id}/`, { ...data, statut: "EN_COURS" });
+        return response.data;
+    },
+    rejeter: async (id, commentaire) => {
+        const response = await apiClient.patch(`/api/besoins/${id}/`, {
+            statut: "REJETE",
+            commentaire_directeur: commentaire
+        });
+        return response.data;
+    },
+    traiter: async (id, data = {}) => {
+        const response = await apiClient.patch(`/api/besoins/${id}/`, { ...data, statut: "TRAITE" });
+        return response.data;
+    },
     delete: async (id) => {
         const response = await apiClient.delete(`/api/besoins/${id}/`);
         return response.data;
@@ -304,7 +327,7 @@ export const ligneBesoinApi = {
         return response.data;
     },
     getByBesoin: async (besoinId) => {
-        const response = await apiClient.get(`/api/lignes-besoin/?id_besoin=${besoinId}`);
+        const response = await apiClient.get(`/api/lignes-besoin/?besoin=${besoinId}`);
         return response.data;
     },
     create: async (data) => {
@@ -350,7 +373,7 @@ export const ligneLivraisonApi = {
         return await fetchAllPages("/api/lignes-livraison/");
     },
     getByLivraison: async (livraisonId) => {
-        const response = await apiClient.get(`/api/lignes-livraison/?id_livraison=${livraisonId}`);
+        const response = await apiClient.get(`/api/lignes-livraison/?livraison=${livraisonId}`);
         return response.data;
     },
     create: async (data) => {
@@ -400,5 +423,20 @@ export async function getPharmacistDashboardStats() {
         throw error;
     }
 }
+
+// ============================================
+// PERSONNEL
+// URL Backend: GET /api/personnel/
+// Opération: Récupération de la liste du personnel
+// ============================================
+export const personnelApi = {
+    getAll: async () => {
+        return await fetchAllPages("/api/personnel/");
+    },
+    getById: async (id) => {
+        const response = await apiClient.get(`/api/personnel/${id}/`);
+        return response.data;
+    }
+};
 
 export default apiClient;

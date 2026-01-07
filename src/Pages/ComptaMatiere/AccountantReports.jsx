@@ -17,7 +17,7 @@ import {
 } from "react-icons/fa";
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
-import { rapportApi } from "../../services/comptabiliteMatiereApi";
+import { rapportApi, personnelApi } from "../../services/comptabiliteMatiereApi";
 
 export function AccountantReports() {
     const [loading, setLoading] = useState(true);
@@ -32,8 +32,29 @@ export function AccountantReports() {
         corps: ""
     });
 
-    // ID du comptable connecté
-    const currentUserId = parseInt(localStorage.getItem("personnel_id") || "1");
+    // Récupérer l'ID du comptable connecté (avec fallback sur user_data_fultang)
+    const getCurrentUserId = () => {
+        const storedId = localStorage.getItem("personnel_id");
+        if (storedId) return parseInt(storedId);
+
+        // Fallback: récupérer depuis user_data_fultang
+        const userData = localStorage.getItem("user_data_fultang");
+        if (userData) {
+            try {
+                const parsed = JSON.parse(userData);
+                if (parsed.id) {
+                    // Sauvegarder pour les prochaines fois
+                    localStorage.setItem("personnel_id", String(parsed.id));
+                    return parsed.id;
+                }
+            } catch (e) {
+                console.error("Erreur parsing user_data_fultang:", e);
+            }
+        }
+        return 1; // Valeur par défaut si rien n'est trouvé
+    };
+
+    const currentUserId = getCurrentUserId();
     const currentUserName = localStorage.getItem("user_name") || "Comptable Matière";
 
     // Rapports depuis l'API
@@ -43,6 +64,9 @@ export function AccountantReports() {
     // État pour le modal de détails
     const [selectedReport, setSelectedReport] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
+
+    // Liste du personnel pour sélection destinataire
+    const [personnelList, setPersonnelList] = useState([]);
 
     // Charger les données
     useEffect(() => {
@@ -54,16 +78,35 @@ export function AccountantReports() {
             setLoading(true);
             setError(null);
 
-            const rapportsData = await rapportApi.getAll();
+            // Charger rapports et personnel en parallèle
+            const [rapportsData, personnelData] = await Promise.all([
+                rapportApi.getAll(),
+                personnelApi.getAll()
+            ]);
+
             const rapports = rapportsData.results || rapportsData;
+
+            // Stocker la liste du personnel
+            const personnels = personnelData.results || personnelData || [];
+            setPersonnelList(personnels);
+
+            // Debug: afficher les infos de filtrage
+            console.log("📊 DEBUG RAPPORTS:");
+            console.log("   - currentUserId:", currentUserId);
+            console.log("   - Total rapports:", rapports.length);
+            rapports.forEach(r => {
+                console.log(`   - Rapport ${r.code_rapport}: expediteur=${r.expediteur}, destinataire=${r.destinataire}`);
+            });
 
             // Filtrer les rapports envoyés par le comptable
             const sent = rapports.filter(r => r.expediteur === currentUserId);
-            setSentReports(sent.map(formatReport));
+            setSentReports(sent.map(r => formatReport(r, personnels)));
+            console.log("   - Rapports envoyés (expediteur === currentUserId):", sent.length);
 
             // Filtrer les rapports reçus par le comptable
             const received = rapports.filter(r => r.destinataire === currentUserId);
-            setReceivedReports(received.map(r => ({ ...formatReport(r), isRead: r.est_lu })));
+            setReceivedReports(received.map(r => ({ ...formatReport(r, personnels), isRead: r.est_lu })));
+            console.log("   - Rapports reçus (destinataire === currentUserId):", received.length);
 
         } catch (err) {
             console.error("Erreur lors du chargement des rapports:", err);
@@ -73,20 +116,24 @@ export function AccountantReports() {
         }
     }
 
-    function formatReport(r) {
+    function formatReport(r, personnels = []) {
+        const expediteurInfo = personnels.find(p => p.id === r.expediteur);
+        const destinataireInfo = personnels.find(p => p.id === r.destinataire);
+
         return {
-            id: r.code_rapport || `RPT-${r.idRapport}`,
-            idRapport: r.idRapport,
+            id: r.code_rapport || `RPT-${r.id}`,
+            idRapport: r.id,  // C'est 'id' retourné par le backend
             objet: r.objet,
             corps: r.corps,
             dateEnvoi: r.date_creation?.split('T')[0] || new Date().toISOString().split('T')[0],
             expediteur: r.expediteur,
-            expediteurName: `Personnel #${r.expediteur}`,
+            expediteurName: expediteurInfo ? `${expediteurInfo.nom} ${expediteurInfo.prenom}` : `Personnel #${r.expediteur}`,
             destinataire: r.destinataire,
-            destinataireName: `Personnel #${r.destinataire}`,
+            destinataireName: destinataireInfo ? `${destinataireInfo.nom} ${destinataireInfo.prenom}` : `Personnel #${r.destinataire}`,
             type: r.type_rapport,
-            concerneName: `Personnel #${r.destinataire}`,
-            concerne: r.destinataire
+            concerneName: destinataireInfo ? `${destinataireInfo.nom} ${destinataireInfo.prenom}` : `Personnel #${r.destinataire}`,
+            concerne: r.destinataire,
+            isRead: r.est_lu === true
         };
     }
 
@@ -102,10 +149,11 @@ export function AccountantReports() {
             setSubmitting(true);
             setError(null);
 
+            // Générer un code unique qui respecte max_length=20 du backend
             const now = new Date();
-            const year = now.getFullYear();
-            const existingCount = sentReports.length + receivedReports.length;
-            const codeRapport = `RPT-${year}-${String(existingCount + 1).padStart(3, '0')}`;
+            const timestamp = now.getTime().toString(36).toUpperCase();
+            const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+            const codeRapport = `RPT-${timestamp}-${random}`.substring(0, 20);
 
             const newReportData = {
                 code_rapport: codeRapport,
@@ -113,10 +161,10 @@ export function AccountantReports() {
                 corps: reportForm.corps,
                 type_rapport: "GENERAL",
                 expediteur: currentUserId,
-                destinataire: parseInt(reportForm.destinataire),
-                date_creation: now.toISOString().split('T')[0],
-                est_lu: false
+                destinataire: parseInt(reportForm.destinataire)
             };
+
+            console.log("📤 Envoi du rapport:", newReportData);
 
             await rapportApi.create(newReportData);
 
@@ -140,7 +188,7 @@ export function AccountantReports() {
         // Si c'est un rapport reçu et non lu, le marquer comme lu
         if (isReceived && !report.isRead && report.idRapport) {
             try {
-                await rapportApi.patch(report.idRapport, { est_lu: true });
+                await rapportApi.marquerLu(report.idRapport);
                 setReceivedReports(prev => prev.map(r =>
                     r.id === report.id ? { ...r, isRead: true } : r
                 ));
@@ -382,18 +430,22 @@ export function AccountantReports() {
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    ID Destinataire *
+                                    Destinataire *
                                 </label>
-                                <input
-                                    type="number"
+                                <select
                                     value={reportForm.destinataire}
                                     onChange={(e) => setReportForm({ ...reportForm, destinataire: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
-                                    placeholder="Saisir l'ID du destinataire (ex: 1, 2, 3...)"
                                     required
-                                    min="1"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">ID du personnel destinataire</p>
+                                >
+                                    <option value="">Sélectionner un destinataire</option>
+                                    {personnelList.map(p => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.nom} {p.prenom} - {p.poste || 'N/A'}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">Sélectionnez le personnel destinataire</p>
                             </div>
                         </div>
                         <div>

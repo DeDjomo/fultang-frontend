@@ -88,6 +88,7 @@ export function AppRoute() {
     const ComptaMatiereReports = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/AccountantReports.jsx")).AccountantReports }));
     const ComptaMatiereMaterialList = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/MaterialList.jsx")).MaterialList }));
     const ComptaMatiereOutputList = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/OutputList.jsx")).OutputList }));
+    const ComptaMatiereInventoryArchives = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/AccountantInventoryArchives.jsx")).default }));
 
     // Director components
     const DirectorDashboard = React.lazy(async () => ({ default: (await import("../Pages/Director/Director.jsx")).Director }));
@@ -188,6 +189,7 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.comptaMatiereReports} element={<ComptaMatiereReports />} />
                 <Route path={AppRoutesPaths.comptaMatiereMaterialList} element={<ComptaMatiereMaterialList />} />
                 <Route path={AppRoutesPaths.comptaMatiereOutputList} element={<ComptaMatiereOutputList />} />
+                <Route path={AppRoutesPaths.comptaMatiereInventoryArchives} element={<ComptaMatiereInventoryArchives />} />
 
                 {/* Director Routes */}
                 <Route path={AppRoutesPaths.directorDashboard} element={<DirectorDashboard />} />

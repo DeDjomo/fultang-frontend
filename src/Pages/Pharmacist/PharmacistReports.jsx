@@ -19,6 +19,7 @@ import {
 } from "react-icons/fa";
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
+import { personnelApi, rapportApi } from "../../services/comptabiliteMatiereApi";
 
 export function PharmacistReports() {
     const [loading, setLoading] = useState(true);
@@ -42,8 +43,32 @@ export function PharmacistReports() {
     const [selectedReport, setSelectedReport] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
 
-    // Récupérer l'ID du personnel connecté
-    const currentUserId = parseInt(localStorage.getItem("personnel_id") || "1");
+    // Liste du personnel pour sélection destinataire
+    const [personnelList, setPersonnelList] = useState([]);
+
+    // Récupérer l'ID du personnel connecté (avec fallback sur user_data_fultang)
+    const getCurrentUserId = () => {
+        const storedId = localStorage.getItem("personnel_id");
+        if (storedId) return parseInt(storedId);
+
+        // Fallback: récupérer depuis user_data_fultang
+        const userData = localStorage.getItem("user_data_fultang");
+        if (userData) {
+            try {
+                const parsed = JSON.parse(userData);
+                if (parsed.id) {
+                    // Sauvegarder pour les prochaines fois
+                    localStorage.setItem("personnel_id", String(parsed.id));
+                    return parsed.id;
+                }
+            } catch (e) {
+                console.error("Erreur parsing user_data_fultang:", e);
+            }
+        }
+        return 1; // Valeur par défaut si rien n'est trouvé
+    };
+
+    const currentUserId = getCurrentUserId();
     const currentUserName = localStorage.getItem("user_name") || "Pharmacien";
 
     // Charger les données
@@ -53,39 +78,38 @@ export function PharmacistReports() {
     }, []);
 
     async function loadData() {
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
-
         try {
             setLoading(true);
             setError(null);
 
-            // Charger tous les rapports avec fetch
-            const rapportsRes = await fetch(`${baseUrl}/rapports/`, { headers, cache: "no-store" });
+            // Charger rapports et personnel en parallèle
+            const [rapportsData, personnelData] = await Promise.all([
+                rapportApi.getAll(),
+                personnelApi.getAll()
+            ]);
 
-            if (!rapportsRes.ok) {
-                throw new Error(`Erreur HTTP ${rapportsRes.status}: ${rapportsRes.statusText}`);
-            }
-
-            const rapportsData = await rapportsRes.json();
             const rapports = Array.isArray(rapportsData) ? rapportsData : (rapportsData.results || []);
 
-            console.log("📊 Rapports chargés:", rapports.length, "rapports");
-            console.log("👤 Current User ID:", currentUserId);
+            // Stocker la liste du personnel
+            const personnels = Array.isArray(personnelData) ? personnelData : (personnelData.results || []);
+            setPersonnelList(personnels);
+
+            console.log("📊 DEBUG RAPPORTS PHARMACIEN:");
+            console.log("   - currentUserId:", currentUserId);
+            console.log("   - Total rapports:", rapports.length);
+            rapports.forEach(r => {
+                console.log(`   - Rapport ${r.code_rapport}: expediteur=${r.expediteur}, destinataire=${r.destinataire}`);
+            });
 
             // Filtrer les rapports envoyés par le pharmacien
             const sent = rapports.filter(r => r.expediteur === currentUserId);
-            setSentReports(sent.map(formatReport));
-            console.log("📤 Rapports envoyés:", sent.length);
+            setSentReports(sent.map(r => formatReport(r, personnels)));
+            console.log("   - Rapports envoyés (expediteur === currentUserId):", sent.length);
 
             // Filtrer les rapports reçus par le pharmacien
             const received = rapports.filter(r => r.destinataire === currentUserId);
-            setReceivedReports(received.map(r => ({ ...formatReport(r), isRead: r.est_lu })));
-            console.log("📥 Rapports reçus:", received.length);
+            setReceivedReports(received.map(r => ({ ...formatReport(r, personnels), isRead: r.est_lu })));
+            console.log("   - Rapports reçus (destinataire === currentUserId):", received.length);
 
         } catch (err) {
             console.error("❌ Erreur lors du chargement des rapports:", err);
@@ -95,17 +119,23 @@ export function PharmacistReports() {
         }
     }
 
-    function formatReport(r) {
+    function formatReport(r, personnels = []) {
+        const expediteurInfo = personnels.find(p => p.id === r.expediteur);
+        const destinataireInfo = personnels.find(p => p.id === r.destinataire);
+
         return {
-            id: r.code_rapport || `RPT-${r.idRapport}`,
-            idRapport: r.idRapport,
+            id: r.code_rapport || `RPT-${r.id}`,
+            idRapport: r.id,  // C'est 'id' retourné par le backend, pas 'idRapport'
             objet: r.objet,
             corps: r.corps,
             dateEnvoi: r.date_creation?.split('T')[0] || new Date().toISOString().split('T')[0],
             expediteur: r.expediteur,
+            expediteurName: expediteurInfo ? `${expediteurInfo.nom} ${expediteurInfo.prenom}` : `Personnel #${r.expediteur}`,
             destinataire: r.destinataire,
+            destinataireName: destinataireInfo ? `${destinataireInfo.nom} ${destinataireInfo.prenom}` : `Personnel #${r.destinataire}`,
             type: r.type_rapport,
-            archiveAssociee: r.archive_associee
+            archiveAssociee: r.archive_associee,
+            isRead: r.est_lu === true  // Champ pour savoir si le rapport a été lu
         };
     }
 
@@ -136,18 +166,18 @@ export function PharmacistReports() {
             return;
         }
 
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
-
         try {
             setSubmitting(true);
             setError(null);
 
+            // Générer un code unique qui respecte max_length=20 du backend
+            const now = new Date();
+            const timestamp = now.getTime().toString(36).toUpperCase();
+            const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+            const codeRapport = `RPT-${timestamp}-${random}`.substring(0, 20);
+
             const reportData = {
+                code_rapport: codeRapport,
                 objet: reportForm.objet,
                 corps: reportForm.corps,
                 expediteur: currentUserId,
@@ -156,15 +186,9 @@ export function PharmacistReports() {
                 archive_associee: pendingInventoryData?.archiveDbId || null
             };
 
-            const response = await fetch(`${baseUrl}/rapports/`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(reportData)
-            });
+            console.log("📤 Envoi du rapport:", reportData);
 
-            if (!response.ok) {
-                throw new Error(`Erreur HTTP ${response.status}`);
-            }
+            await rapportApi.create(reportData);
 
             // Nettoyer les données d'inventaire en attente
             localStorage.removeItem('pending_inventory_report');
@@ -186,30 +210,24 @@ export function PharmacistReports() {
     }
 
     async function viewReportDetails(report, isReceived = false) {
+        console.log("📋 viewReportDetails appelé:", { report, isReceived, idRapport: report.idRapport, isRead: report.isRead });
         setSelectedReport({ ...report, isReceived });
         setShowDetailModal(true);
 
-        // Marquer comme lu si c'est un rapport reçu
+        // Marquer comme lu si c'est un rapport reçu et non encore lu
         if (isReceived && !report.isRead && report.idRapport) {
-            const token = localStorage.getItem("token_key_fultang");
-            const headers = {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            };
-            const baseUrl = "http://127.0.0.1:8000/api";
-
+            console.log("📝 Tentative de marquer comme lu - idRapport:", report.idRapport);
             try {
-                await fetch(`${baseUrl}/rapports/${report.idRapport}/`, {
-                    method: 'PATCH',
-                    headers,
-                    body: JSON.stringify({ est_lu: true })
-                });
+                await rapportApi.marquerLu(report.idRapport);
+                console.log("✅ Rapport marqué comme lu avec succès");
                 setReceivedReports(receivedReports.map(r =>
                     r.id === report.id ? { ...r, isRead: true } : r
                 ));
             } catch (err) {
-                console.error("Erreur lors du marquage comme lu:", err);
+                console.error("❌ Erreur lors du marquage comme lu:", err.response?.data || err.message);
             }
+        } else {
+            console.log("ℹ️ Pas de marquage:", { isReceived, isRead: report.isRead, hasId: !!report.idRapport });
         }
     }
 
@@ -380,15 +398,20 @@ export function PharmacistReports() {
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Destinataire (ID Personnel)
+                                    Destinataire
                                 </label>
-                                <input
-                                    type="number"
+                                <select
                                     value={reportForm.destinataire}
                                     onChange={(e) => setReportForm({ ...reportForm, destinataire: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
-                                    placeholder="ID du destinataire (optionnel)"
-                                />
+                                >
+                                    <option value="">Sélectionner un destinataire (optionnel)</option>
+                                    {personnelList.map(p => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.nom} {p.prenom} - {p.poste || 'N/A'}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
                         <div>

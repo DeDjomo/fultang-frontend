@@ -4,7 +4,7 @@ import { PharmacistNavBar } from "./Components/PharmacistNavBar";
 import { useState, useEffect } from "react";
 import { FaPlus, FaTrash, FaSave, FaSpinner, FaCheckCircle } from "react-icons/fa";
 import PropTypes from "prop-types";
-import { besoinApi, ligneBesoinApi, materielMedicalApi } from "../../services/comptabiliteMatiereApi";
+import { besoinApi, ligneBesoinApi, materielMedicalApi, materielDurableApi } from "../../services/comptabiliteMatiereApi";
 
 export function PharmacistEmitNeed() {
     const [loading, setLoading] = useState(false);
@@ -13,13 +13,18 @@ export function PharmacistEmitNeed() {
     const [error, setError] = useState(null);
     const [materiels, setMateriels] = useState([]);
 
+    // L'emetteur est automatiquement le personnel connecté
+    const personnelId = parseInt(localStorage.getItem("personnel_id") || "1");
+    const personnelName = localStorage.getItem("user_name") || "Pharmacien";
+
     const [needItems, setNeedItems] = useState([
         { id: 1, material: "", quantity: "", priority: "NORMAL", description: "" }
     ]);
 
     const [needInfo, setNeedInfo] = useState({
         motif: "",
-        urgency: "NORMAL"
+        // Le département est le service du pharmacien connecté
+        departement: "Pharmacie"
     });
 
     // Charger la liste des matériels pour les suggestions
@@ -30,8 +35,14 @@ export function PharmacistEmitNeed() {
     async function loadMateriels() {
         try {
             setLoading(true);
-            const data = await materielMedicalApi.getAll();
-            setMateriels(data.results || data);
+            // Charger matériels médicaux et durables
+            const [medicaux, durables] = await Promise.all([
+                materielMedicalApi.getAll(),
+                materielDurableApi.getAll()
+            ]);
+            const medData = medicaux.results || medicaux || [];
+            const durData = durables.results || durables || [];
+            setMateriels([...medData, ...durData]);
         } catch (err) {
             console.error("Erreur lors du chargement des matériels:", err);
         } finally {
@@ -81,10 +92,14 @@ export function PharmacistEmitNeed() {
             setSubmitting(true);
             setError(null);
 
-            // Récupérer l'ID du personnel connecté (utiliser 1 par défaut pour le test)
-            const personnelId = parseInt(localStorage.getItem("personnel_id") || "1");
-
-            // Créer le besoin
+            // ============================================
+            // CRÉATION DU BESOIN (TABLE: besoin)
+            // Champs requis selon BD:
+            // - idPersonnel_emetteur (FK vers Personnel)
+            // - motif (TextField)
+            // - statut (ENUM: NON_TRAITE par défaut)
+            // - date_creation_besoin (DateTime, auto)
+            // ============================================
             const besoinData = {
                 motif: needInfo.motif,
                 idPersonnel_emetteur: personnelId,
@@ -93,7 +108,15 @@ export function PharmacistEmitNeed() {
 
             const newBesoin = await besoinApi.create(besoinData);
 
-            // Créer les lignes de besoin
+            // ============================================
+            // CRÉATION DES LIGNES DE BESOIN (TABLE: ligne_besoin)
+            // Champs requis selon BD:
+            // - id_besoin (FK vers Besoin)
+            // - materiel_nom (CharField)
+            // - quantite_demandee (PositiveInt)
+            // - priorite (ENUM: LOW/NORMAL/HIGH)
+            // - description_justification (TextField, nullable)
+            // ============================================
             for (const item of needItems) {
                 await ligneBesoinApi.create({
                     id_besoin: newBesoin.idBesoin,
@@ -106,7 +129,7 @@ export function PharmacistEmitNeed() {
 
             // Réinitialiser le formulaire
             setNeedItems([{ id: Date.now(), material: "", quantity: "", priority: "NORMAL", description: "" }]);
-            setNeedInfo({ motif: "", urgency: "NORMAL" });
+            setNeedInfo({ motif: "", departement: "Pharmacie" });
 
             setSuccessMessage("Besoin envoyé avec succès ! Le directeur sera notifié.");
             setTimeout(() => setSuccessMessage(""), 5000);
@@ -148,6 +171,35 @@ export function PharmacistEmitNeed() {
                     <div className="bg-white rounded-lg shadow-lg p-6">
                         <h2 className="text-xl font-bold text-gray-800 mb-4">Informations Générales</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Émetteur (automatique) */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Émis par
+                                </label>
+                                <input
+                                    type="text"
+                                    value={personnelName}
+                                    className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                                    readOnly
+                                />
+                                <p className="text-xs text-gray-500 mt-1">ID Personnel: {personnelId}</p>
+                            </div>
+
+                            {/* Département (automatique) */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Département
+                                </label>
+                                <input
+                                    type="text"
+                                    value={needInfo.departement}
+                                    className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                                    readOnly
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Rempli automatiquement</p>
+                            </div>
+
+                            {/* Motif du besoin */}
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                                     Motif du besoin *
@@ -162,6 +214,7 @@ export function PharmacistEmitNeed() {
                                 />
                             </div>
 
+                            {/* Date de demande (automatique) */}
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                                     Date de demande
@@ -172,21 +225,6 @@ export function PharmacistEmitNeed() {
                                     className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100"
                                     readOnly
                                 />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Urgence globale
-                                </label>
-                                <select
-                                    value={needInfo.urgency}
-                                    onChange={(e) => setNeedInfo({ ...needInfo, urgency: e.target.value })}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                >
-                                    <option value="LOW">Basse</option>
-                                    <option value="NORMAL">Normale</option>
-                                    <option value="HIGH">Haute</option>
-                                </select>
                             </div>
                         </div>
                     </div>
@@ -225,7 +263,7 @@ export function PharmacistEmitNeed() {
                             type="button"
                             onClick={() => {
                                 setNeedItems([{ id: Date.now(), material: "", quantity: "", priority: "NORMAL", description: "" }]);
-                                setNeedInfo({ motif: "", urgency: "NORMAL" });
+                                setNeedInfo({ motif: "", departement: "Pharmacie" });
                             }}
                             className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all duration-300"
                         >
@@ -264,7 +302,7 @@ function NeedItemRow({ item, index, materiels, onUpdate, onRemove, canRemove }) 
 
         if (value.length >= 2) {
             const filtered = materiels.filter(m =>
-                m.nom_Materiel.toLowerCase().includes(value.toLowerCase())
+                m.nom_Materiel?.toLowerCase().includes(value.toLowerCase())
             ).slice(0, 5);
             setSuggestions(filtered);
             setShowSuggestions(true);
@@ -281,9 +319,10 @@ function NeedItemRow({ item, index, materiels, onUpdate, onRemove, canRemove }) 
     return (
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {/* materiel_nom - Nom du matériel demandé */}
                 <div className="md:col-span-2 relative">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Matériel *
+                        Matériel * <span className="text-xs text-gray-400">(materiel_nom)</span>
                     </label>
                     <input
                         type="text"
@@ -295,10 +334,10 @@ function NeedItemRow({ item, index, materiels, onUpdate, onRemove, canRemove }) 
                         required
                     />
                     {showSuggestions && suggestions.length > 0 && (
-                        <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 shadow-lg">
+                        <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 shadow-lg max-h-48 overflow-y-auto">
                             {suggestions.map(m => (
                                 <div
-                                    key={m.idMateriel}
+                                    key={m.idMateriel || m.materiel_ptr_id}
                                     className="p-2 hover:bg-gray-100 cursor-pointer"
                                     onClick={() => selectSuggestion(m)}
                                 >
@@ -310,9 +349,10 @@ function NeedItemRow({ item, index, materiels, onUpdate, onRemove, canRemove }) 
                     )}
                 </div>
 
+                {/* quantite_demandee */}
                 <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Quantité *
+                        Quantité * <span className="text-xs text-gray-400">(quantite_demandee)</span>
                     </label>
                     <input
                         type="number"
@@ -325,9 +365,10 @@ function NeedItemRow({ item, index, materiels, onUpdate, onRemove, canRemove }) 
                     />
                 </div>
 
+                {/* priorite - ENUM: LOW/NORMAL/HIGH */}
                 <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Priorité
+                        Priorité <span className="text-xs text-gray-400">(priorite)</span>
                     </label>
                     <select
                         value={item.priority}
@@ -353,9 +394,10 @@ function NeedItemRow({ item, index, materiels, onUpdate, onRemove, canRemove }) 
                 </div>
             </div>
 
+            {/* description_justification */}
             <div className="mt-3">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Description / Justification
+                    Description / Justification <span className="text-xs text-gray-400">(description_justification)</span>
                 </label>
                 <textarea
                     value={item.description}

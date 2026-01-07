@@ -7,6 +7,7 @@ import {
   FaChartLine,
   FaBoxes,
   FaListAlt,
+  FaArchive,
 } from "react-icons/fa";
 
 export const AccountantNavLink = [
@@ -36,6 +37,13 @@ export const AccountantNavLink = [
     link: appRoutes.comptaMatiereRegisterOutput,
     icon: FaBoxOpen,
     description: "Enregistrer la sortie de matériel"
+  },
+
+  {
+    name: "Consulter Inventaire",
+    link: appRoutes.comptaMatiereInventoryArchives,
+    icon: FaArchive,
+    description: "Voir les inventaires terminés"
   },
 
   {

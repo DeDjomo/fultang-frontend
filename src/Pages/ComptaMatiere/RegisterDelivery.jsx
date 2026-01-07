@@ -4,6 +4,9 @@ import { AccountantNavBar } from "./Components/AccountantNavBar";
 import { useState, useEffect } from "react";
 import { FaPlus, FaTrash, FaSave, FaTruck, FaExclamationTriangle, FaCheckCircle } from "react-icons/fa";
 import PropTypes from "prop-types";
+import {
+    livraisonApi, ligneLivraisonApi, materielMedicalApi, materielDurableApi, sortieApi, ligneSortieApi
+} from "../../services/comptabiliteMatiereApi";
 
 export function RegisterDelivery() {
     const [loading, setLoading] = useState(true);
@@ -19,10 +22,11 @@ export function RegisterDelivery() {
             material: "",
             materialCode: "",
             type: "Matériel Médical",
-            quantityOrdered: "",
-            quantityReceived: "",
+            quantityConforme: "",
+            quantityNonConforme: "0",
             unitPrice: "",
             justification: "",
+            datePeremption: "",
             // Champs pour nouveau matériel médical
             prixVente: "",
             unite: "boîte",
@@ -47,6 +51,7 @@ export function RegisterDelivery() {
     });
 
     const [formError, setFormError] = useState("");
+    const [successMessage, setSuccessMessage] = useState("");
 
     // Charger les données au montage
     useEffect(() => {
@@ -54,55 +59,25 @@ export function RegisterDelivery() {
     }, []);
 
     /**
-     * 📡 CHARGEMENT DES DONNÉES (Mode "Toujours Frais")
+     * 📡 CHARGEMENT DES DONNÉES
      */
     async function loadData() {
         setLoading(true);
         setError(null);
 
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
-
-        const fetchJson = async (url) => {
-            const res = await fetch(url, { headers, cache: "no-store" });
-            if (!res.ok) {
-                // Tenter de lire le corps pour avoir des détails si c'est du JSON
-                try {
-                    const errBody = await res.json();
-                    throw new Error(errBody.detail || `Erreur HTTP ${res.status}`);
-                } catch (e) {
-                    throw new Error(`Erreur HTTP ${res.status} lors de l'appel à ${url}`);
-                }
-            }
-            return res.json();
-        };
-
         try {
             console.log("Chargement des données RegisterDelivery...");
-            // Charger les deux catalogues en parallèle
-            const [medicauxRes, durablesRes] = await Promise.all([
-                fetchJson(`${baseUrl}/materiels-medicaux/`),
-                fetchJson(`${baseUrl}/materiels-durables/`)
+            // Charger les deux catalogues en parallèle via les services
+            const [medicauxData, durablesData] = await Promise.all([
+                materielMedicalApi.getAll(),
+                materielDurableApi.getAll()
             ]);
 
-            let medicauxData = medicauxRes.results || medicauxRes || [];
-            if (!Array.isArray(medicauxData)) {
-                console.warn("API Materiels Médicaux a renvoyé un format inattendu (pas un tableau):", medicauxData);
-                medicauxData = [];
-            }
-
-            let durablesData = durablesRes.results || durablesRes || [];
-            if (!Array.isArray(durablesData)) {
-                console.warn("API Materiels Durables a renvoyé un format inattendu (pas un tableau):", durablesData);
-                durablesData = [];
-            }
+            const medicauxRaw = Array.isArray(medicauxData) ? medicauxData : (medicauxData.results || []);
+            const durablesRaw = Array.isArray(durablesData) ? durablesData : (durablesData.results || []);
 
             // Normalisation
-            const medicaux = medicauxData.map(m => ({
+            const medicaux = medicauxRaw.map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
@@ -111,7 +86,7 @@ export function RegisterDelivery() {
                 prixAchat: parseFloat(m.prix_achat_unitaire) || 0
             }));
 
-            const durables = durablesData.map(m => ({
+            const durables = durablesRaw.map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
@@ -151,10 +126,11 @@ export function RegisterDelivery() {
             material: "",
             materialCode: "",
             type: "Matériel Médical",
-            quantityOrdered: "",
-            quantityReceived: "",
+            quantityConforme: "",
+            quantityNonConforme: "0",
             unitPrice: "",
             justification: "",
+            datePeremption: "",
             prixVente: "",
             unite: "boîte",
             seuilAlerte: "10",
@@ -204,9 +180,20 @@ export function RegisterDelivery() {
 
     function calculateTotal() {
         return deliveryItems.reduce((total, item) => {
-            const quantity = parseFloat(item.quantityReceived) || 0;
-            const price = parseFloat(item.unitPrice) || 0;
-            return total + (quantity * price);
+            const quantityConforme = parseFloat(item.quantityConforme) || 0;
+            const quantityNonConforme = parseFloat(item.quantityNonConforme) || 0;
+
+            // Pour matériel existant, utiliser le prix de la base de données
+            let price = 0;
+            if (item.isNewMaterial) {
+                price = parseFloat(item.unitPrice) || 0;
+            } else {
+                const existingMat = materialsDatabase.find(m => m.code === item.materialCode);
+                price = existingMat?.prixAchat || 0;
+            }
+
+            // Le total est basé sur toutes les quantités reçues (conformes + non conformes)
+            return total + ((quantityConforme + quantityNonConforme) * price);
         }, 0);
     }
 
@@ -233,11 +220,16 @@ export function RegisterDelivery() {
                 }
             }
 
-            if (!item.quantityReceived || parseInt(item.quantityReceived) <= 0) {
-                return "La quantité reçue doit être supérieure à 0.";
+            if (!item.quantityConforme || parseInt(item.quantityConforme) < 0) {
+                return "La quantité conforme doit être un nombre positif ou nul.";
             }
-            if (!item.unitPrice || parseFloat(item.unitPrice) <= 0) {
-                return "Le prix unitaire doit être supérieur à 0.";
+            if (parseInt(item.quantityConforme) === 0 && parseInt(item.quantityNonConforme || 0) === 0) {
+                return "Au moins une quantité (conforme ou non conforme) doit être supérieure à 0.";
+            }
+
+            // Vérifier le prix unitaire UNIQUEMENT pour les nouveaux matériels
+            if (item.isNewMaterial && (!item.unitPrice || parseFloat(item.unitPrice) <= 0)) {
+                return "Le prix unitaire doit être supérieur à 0 pour les nouveaux matériels.";
             }
         }
         return null;
@@ -253,36 +245,20 @@ export function RegisterDelivery() {
             return;
         }
 
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
+        // Variable pour rollback si nécessaire
+        let createdLivraisonId = null;
 
         try {
-            setLoading(true); // Réutiliser loading state ou créer submitting state
+            setLoading(true);
 
-            // 1. Créer la livraison (Entête)
-            const personnelId = parseInt(localStorage.getItem("personnel_id") || "1");
-            const deliveryData = {
-                fournisseur: deliveryInfo.supplier,
-                numero_bon_livraison: deliveryInfo.deliveryNoteNumber,
-                date_livraison: deliveryInfo.deliveryDate,
-                date_reception: deliveryInfo.receptionDate,
-                montant_total: calculateTotal(),
-                idPersonnel: personnelId
-            };
+            // Map pour tracker les IDs des matériaux traités (nouveaux ou existants)
+            const materialIdsMap = {};
+            const materialErrors = [];
 
-            const livRes = await fetch(`${baseUrl}/livraisons/`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(deliveryData)
-            });
-
-            if (!livRes.ok) throw new Error("Erreur création livraison");
-            const createdDelivery = await livRes.json();
-            const idLivraison = createdDelivery.idLivraison;
+            // ===========================================
+            // ÉTAPE 1: Créer/Valider tous les matériels D'ABORD
+            // (Avant de créer la livraison pour éviter de bloquer le numéro)
+            // ===========================================
 
             // 2. Traiter chaque article
             for (const item of deliveryItems) {
@@ -291,78 +267,233 @@ export function RegisterDelivery() {
                 if (item.isNewMaterial) {
                     // A. Créer le nouveau matériel
                     const isMedical = item.type === "Matériel Médical";
-                    const newMatData = {
+
+                    // Mapping des unités de mesure vers les valeurs backend
+                    const uniteMapping = {
+                        'boîte': 'BOITE', 'boite': 'BOITE', 'BOITE': 'BOITE',
+                        'flacon': 'FLACON', 'FLACON': 'FLACON',
+                        'unité': 'UNITE', 'unite': 'UNITE', 'UNITE': 'UNITE',
+                        'plaquette': 'PLAQUETTE', 'PLAQUETTE': 'PLAQUETTE'
+                    };
+                    const uniteBackend = uniteMapping[item.unite] || 'UNITE';
+
+                    // Ne garder que les champs acceptés par le serializer backend
+                    const newMatData = isMedical ? {
+                        // Champs MaterielMedicalCreateSerializer
                         code_materiel: item.materialCode,
                         nom_Materiel: item.material,
-                        quantite_stock: parseInt(item.quantityReceived),
-                        prix_achat_unitaire: parseFloat(item.unitPrice),
-                        description: item.description || "",
-                        // Champs spécifiques
-                        ...(isMedical ? {
-                            prix_vente_unitaire: parseFloat(item.prixVente),
-                            unite_mesure: item.unite,
-                            seuil_alerte: parseInt(item.seuilAlerte) || 10,
-                            date_peremption: null // Pas géré dans formulaire actuel
-                        } : {
-                            localisation: item.localisation,
-                            numero_serie: item.numeroSerie,
-                            duree_garantie: parseInt(item.dureeGarantie) || 0,
-                            etat: 'bon'
-                        })
+                        quantite_stock: parseInt(item.quantityConforme) || 0,
+                        prix_achat_unitaire: parseFloat(item.unitPrice) || 0,
+                        categorie: item.categorie || "MEDICAMENT",
+                        unite_mesure: uniteBackend,
+                        prix_vente_unitaire: parseFloat(item.prixVente) || parseFloat(item.unitPrice) + 100 // Par défaut: prix achat + 100
+                    } : {
+                        // Champs MaterielDurableCreateSerializer
+                        code_materiel: item.materialCode,
+                        nom_Materiel: item.material,
+                        quantite_stock: parseInt(item.quantityConforme) || 0,
+                        prix_achat_unitaire: parseFloat(item.unitPrice) || 0,
+                        Etat: 'EN_BON_ETAT', // Valeurs valides: EN_BON_ETAT, EN_REPARATION
+                        localisation: item.localisation || "Non spécifié"
                     };
 
-                    const endpoint = isMedical ? '/materiels-medicaux/' : '/materiels-durables/';
-                    const matRes = await fetch(`${baseUrl}${endpoint}`, {
-                        method: 'POST',
-                        headers,
-                        body: JSON.stringify(newMatData)
-                    });
+                    console.log("📦 Création nouveau matériel:", isMedical ? "MEDICAL" : "DURABLE", newMatData);
 
-                    if (!matRes.ok) throw new Error(`Erreur création matériel ${item.material}`);
-                    const createdMat = await matRes.json();
-                    materialId = createdMat.idMateriel || createdMat.materiel_ptr_id;
+                    const api = isMedical ? materielMedicalApi : materielDurableApi;
+                    try {
+                        const createdMat = await api.create(newMatData);
+                        materialId = createdMat.idMateriel || createdMat.materiel_ptr_id;
+                    } catch (matErr) {
+                        const errData = matErr.response?.data;
+                        console.error(`❌ Erreur matériel ${item.material}:`, errData);
+
+                        // Vérifier si c'est une erreur de doublon (code existe déjà)
+                        if (errData?.code_materiel &&
+                            (Array.isArray(errData.code_materiel) && errData.code_materiel.some(e =>
+                                e.includes("existe déjà") || e.includes("already exists") || e.includes("unique")
+                            ))) {
+                            materialErrors.push(`⚠️ "${item.material}" existe déjà dans la base ! Décochez "Nouveau matériel" et sélectionnez-le dans la liste.`);
+                        }
+                        // Vérifier si c'est une erreur de prix de vente (plusieurs formats possibles)
+                        else if (errData?.prix_vente_unitaire ||
+                            errData?.non_field_errors?.some(e => e.includes("prix")) ||
+                            (typeof errData === 'string' && errData.includes("prix"))) {
+                            const prixVente = item.prixVente || (parseFloat(item.unitPrice) + 100);
+                            materialErrors.push(`⚠️ "${item.material}": Le prix de vente (${prixVente} FCFA) doit être supérieur au prix d'achat (${item.unitPrice} FCFA).`);
+                        }
+                        // Erreur générique avec détails
+                        else {
+                            let errDetail = "";
+                            if (errData) {
+                                if (typeof errData === 'object') {
+                                    // Formater l'objet d'erreur de manière lisible
+                                    const errorParts = [];
+                                    for (const [field, errors] of Object.entries(errData)) {
+                                        const errorList = Array.isArray(errors) ? errors.join(", ") : String(errors);
+                                        errorParts.push(`${field}: ${errorList}`);
+                                    }
+                                    errDetail = errorParts.join(" | ");
+                                } else {
+                                    errDetail = String(errData);
+                                }
+                            } else {
+                                errDetail = matErr.message;
+                            }
+                            materialErrors.push(`❌ "${item.material}": ${errDetail}`);
+                        }
+                        continue;
+                    }
 
                 } else {
                     // B. Matériel existant : Récupérer son ID via le code
                     const existingMat = materialsDatabase.find(m => m.code === item.materialCode);
-                    if (!existingMat) throw new Error(`Matériel introuvable ${item.materialCode}`);
+                    if (!existingMat) {
+                        materialErrors.push(`Matériel introuvable: ${item.materialCode}`);
+                        continue;
+                    }
                     materialId = existingMat.id;
 
                     // Mettre à jour le stock (PATCH)
-                    const endpoint = existingMat.category === "Matériel Médical"
-                        ? `/materiels-medicaux/${materialId}/`
-                        : `/materiels-durables/${materialId}/`;
-
-                    const newQuantity = (existingMat.quantity || 0) + parseInt(item.quantityReceived);
-
-                    await fetch(`${baseUrl}${endpoint}`, {
-                        method: 'PATCH',
-                        headers,
-                        body: JSON.stringify({ quantite_stock: newQuantity })
-                    });
+                    try {
+                        const api = existingMat.category === "Matériel Médical" ? materielMedicalApi : materielDurableApi;
+                        const newQuantity = (existingMat.quantity || 0) + parseInt(item.quantityConforme);
+                        await api.patch(materialId, { quantite_stock: newQuantity });
+                    } catch (patchErr) {
+                        materialErrors.push(`Stock "${item.material}": ${patchErr.message}`);
+                        continue;
+                    }
                 }
 
-                // 3. Créer la ligne de livraison
+                // Mémoriser l'ID pour usage ultérieur
                 if (materialId) {
-                    const ligneData = {
-                        id_livraison: idLivraison,
-                        id_materiel: materialId,
-                        quantite_recu: parseInt(item.quantityReceived),
-                        prix_unitaire: parseFloat(item.unitPrice),
-                        ecart_accuse: false, // Par défaut
-                        commentaire_ecart: item.justification || ""
-                    };
-
-                    await fetch(`${baseUrl}/lignes-livraison/`, {
-                        method: 'POST',
-                        headers,
-                        body: JSON.stringify(ligneData)
-                    });
+                    materialIdsMap[item.materialCode] = materialId;
                 }
             }
 
+            // Si AU MOINS UN matériel a échoué, afficher les erreurs et arrêter
+            // La livraison ne sera pas créée tant que tous les matériels ne sont pas OK
+            if (materialErrors.length > 0) {
+                throw new Error("Impossible d'enregistrer la livraison. Corrigez les erreurs suivantes :\n\n" + materialErrors.join("\n"));
+            }
+
+            // Vérifier que TOUS les matériels ont été traités correctement
+            const processedCount = Object.keys(materialIdsMap).length;
+            const expectedCount = deliveryItems.length;
+            if (processedCount !== expectedCount) {
+                // Trouver les articles non traités pour un meilleur message d'erreur
+                const untreatedItems = deliveryItems
+                    .filter(item => !materialIdsMap[item.materialCode])
+                    .map(item => item.material || item.materialCode);
+
+                throw new Error(`Certains matériels n'ont pas pu être validés (${processedCount}/${expectedCount}):\n${untreatedItems.join(", ")}`);
+            }
+
+            // ===========================================
+            // ÉTAPE 2: Créer la livraison (APRÈS les matériels)
+            // ===========================================
+            const deliveryData = {
+                bon_livraison_numero: deliveryInfo.deliveryNoteNumber,
+                nom_fournisseur: deliveryInfo.supplier,
+                contact_fournisseur: deliveryInfo.supplierContact || "",
+                date_reception: `${deliveryInfo.receptionDate}T00:00:00`,
+                montant_total: calculateTotal()
+            };
+
+            const createdDelivery = await livraisonApi.create(deliveryData);
+            createdLivraisonId = createdDelivery.idLivraison;
+            console.log("✅ Livraison créée:", createdLivraisonId);
+
+            // ===========================================
+            // ÉTAPE 3: Créer les lignes de livraison
+            // ===========================================
+            for (const item of deliveryItems) {
+                const materialId = materialIdsMap[item.materialCode];
+
+                if (materialId) {
+                    const isMedical = item.type === "Matériel Médical";
+
+                    // Pour matériel existant, récupérer le prix de la base de données
+                    let prixUnitaire = parseFloat(item.unitPrice) || 0;
+                    if (!item.isNewMaterial) {
+                        const existingMat = materialsDatabase.find(m => m.code === item.materialCode);
+                        prixUnitaire = existingMat?.prixAchat || 0;
+                    }
+
+                    const ligneData = {
+                        id_livraison: createdLivraisonId,
+                        type_materiel: isMedical ? "MEDICAL" : "DURABLE",
+                        materiel: materialId,
+                        code_materiel: item.materialCode,
+                        nom_materiel: item.material,
+                        quantite_conforme: parseInt(item.quantityConforme) || 0,
+                        quantite_non_conforme: parseInt(item.quantityNonConforme) || 0,
+                        prix_unitaire_achat: prixUnitaire,
+                        date_peremption: item.datePeremption || null
+                    };
+
+                    console.log("📝 Création ligne livraison:", ligneData);
+                    await ligneLivraisonApi.create(ligneData);
+                }
+            }
+
+            // ===========================================
+            // ÉTAPE 4: Créer sortie pour matériels non conformes
+            // ===========================================
+            const itemsNonConformes = deliveryItems.filter(item =>
+                parseInt(item.quantityNonConforme) > 0 && materialIdsMap[item.materialCode]
+            );
+
+            if (itemsNonConformes.length > 0) {
+                const personnelId = parseInt(localStorage.getItem("personnel_id") || "1");
+
+                const numeroSortieNonConf = `SOR-NC-${Date.now()}`;
+
+                const sortieData = {
+                    numero_sortie: numeroSortieNonConf,
+                    date_sortie: new Date().toISOString(),
+                    motif_sortie: "DEFECTUEUX",
+                    idPersonnel: personnelId
+                };
+
+                const createdSortie = await sortieApi.create(sortieData);
+                const idSortie = createdSortie.idSortie;
+
+                for (const item of itemsNonConformes) {
+                    const materialId = materialIdsMap[item.materialCode];
+
+                    if (materialId) {
+                        const isMedical = item.type === "Matériel Médical";
+                        const ligneSortieData = {
+                            id_sortie: idSortie,
+                            id_materiel: materialId,
+                            code_materiel: item.materialCode,
+                            nom_materiel: item.material,
+                            type_materiel: isMedical ? "MEDICAL" : "DURABLE",
+                            quantite: parseInt(item.quantityNonConforme)
+                        };
+
+                        console.log("📦 Création ligne sortie (non conforme):", ligneSortieData);
+                        await ligneSortieApi.create(ligneSortieData);
+                    }
+                }
+                console.log(`✅ Sortie créée pour ${itemsNonConformes.length} article(s) non conforme(s) - N° ${numeroSortieNonConf}`);
+            }
+
             // Succès
-            alert(`Livraison enregistrée avec succès ! (N° ${deliveryInfo.deliveryNoteNumber})`);
+            let message = `✅ Livraison enregistrée avec succès ! (N° ${deliveryInfo.deliveryNoteNumber})`;
+
+            // Avertir sur les matériels qui ont échoué
+            if (materialErrors.length > 0) {
+                message += ` ⚠️ ${materialErrors.length} matériel(s) non traités.`;
+            }
+
+            const msgNonConf = itemsNonConformes.length > 0
+                ? ` + ${itemsNonConformes.length} article(s) non conforme(s) en sortie défectueuse.`
+                : "";
+
+            setSuccessMessage(message + msgNonConf);
+            // Auto-fermeture après 8 secondes
+            setTimeout(() => setSuccessMessage(""), 8000);
 
             // Recharger les données pour mettre à jour les stocks affichés
             await loadData();
@@ -382,10 +513,11 @@ export function RegisterDelivery() {
                 material: "",
                 materialCode: "",
                 type: "Matériel Médical",
-                quantityOrdered: "",
-                quantityReceived: "",
+                quantityConforme: "",
+                quantityNonConforme: "0",
                 unitPrice: "",
                 justification: "",
+                datePeremption: "",
                 prixVente: "",
                 unite: "boîte",
                 seuilAlerte: "10",
@@ -398,7 +530,38 @@ export function RegisterDelivery() {
 
         } catch (err) {
             console.error("Erreur enregistrement:", err);
-            setFormError("Erreur lors de l'enregistrement de la livraison. Détails console.");
+            console.error("❌ Détails de l'erreur backend:", err.response?.data);
+
+            // ROLLBACK: Supprimer la livraison si elle a été créée
+            if (createdLivraisonId) {
+                try {
+                    await livraisonApi.delete(createdLivraisonId);
+                    console.log("🔄 Rollback: Livraison supprimée, numéro à nouveau disponible");
+                } catch (rollbackErr) {
+                    console.error("Erreur rollback:", rollbackErr);
+                }
+            }
+
+            // Formater le message d'erreur de manière lisible
+            let errorMessage = "";
+            if (err.response?.data) {
+                // Si c'est un objet JSON, le formater proprement
+                const data = err.response.data;
+                if (typeof data === 'object') {
+                    // Traiter les erreurs de validation Django
+                    const lines = [];
+                    for (const [field, errors] of Object.entries(data)) {
+                        const errorList = Array.isArray(errors) ? errors.join(", ") : errors;
+                        lines.push(`• ${field}: ${errorList}`);
+                    }
+                    errorMessage = lines.join("\n");
+                } else {
+                    errorMessage = String(data);
+                }
+            } else {
+                errorMessage = err.message;
+            }
+            setFormError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -435,9 +598,35 @@ export function RegisterDelivery() {
                 )}
 
                 {formError && (
-                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-                        <FaExclamationTriangle className="text-red-500 mt-0.5" />
-                        <p className="text-sm text-red-700">{formError}</p>
+                    <div className="p-4 bg-red-50 border border-red-300 rounded-lg flex items-start justify-between shadow-lg">
+                        <div className="flex items-start gap-3">
+                            <FaExclamationTriangle className="text-red-500 mt-0.5 flex-shrink-0" />
+                            <div>
+                                <p className="font-semibold text-red-800">Erreur</p>
+                                <p className="text-sm text-red-700 mt-1 whitespace-pre-wrap">{formError}</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setFormError("")}
+                            className="text-red-500 hover:text-red-700 font-bold text-xl ml-4"
+                        >
+                            ×
+                        </button>
+                    </div>
+                )}
+
+                {successMessage && (
+                    <div className="p-4 bg-green-50 border border-green-300 rounded-lg flex items-center justify-between shadow-lg animate-pulse">
+                        <div className="flex items-center gap-3">
+                            <FaCheckCircle className="text-green-600 text-xl" />
+                            <p className="text-green-800 font-medium">{successMessage}</p>
+                        </div>
+                        <button
+                            onClick={() => setSuccessMessage("")}
+                            className="text-green-600 hover:text-green-800 font-bold text-xl"
+                        >
+                            ×
+                        </button>
                     </div>
                 )}
 
@@ -575,14 +764,28 @@ export function RegisterDelivery() {
                         <button
                             type="button"
                             className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all duration-300"
+                            disabled={loading}
                         >
                             Annuler
                         </button>
                         <button
                             type="submit"
-                            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all duration-300"
+                            disabled={loading}
+                            className={`flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg transition-all duration-300 ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`}
                         >
-                            <FaSave /> Enregistrer la livraison
+                            {loading ? (
+                                <>
+                                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Enregistrement en cours...
+                                </>
+                            ) : (
+                                <>
+                                    <FaSave /> Enregistrer la livraison
+                                </>
+                            )}
                         </button>
                     </div>
                 </form>
@@ -623,7 +826,7 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
             </div>
 
             {/* Ligne principale */}
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-4 mb-4">
                 {/* Matériel */}
                 <div className="md:col-span-2">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -662,40 +865,64 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
                         value={item.type}
                         onChange={(e) => onUpdate(item.id, 'type', e.target.value)}
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        disabled={!item.isNewMaterial}
                     >
                         <option value="Matériel Médical">Matériel Médical</option>
                         <option value="Matériel Durable">Matériel Durable</option>
                     </select>
                 </div>
 
-                {/* Qté Reçue */}
+                {/* Qté Conforme */}
                 <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Qté Reçue *</label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Qté Conforme *</label>
                     <input
                         type="number"
-                        value={item.quantityReceived}
-                        onChange={(e) => onUpdate(item.id, 'quantityReceived', e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="0"
-                        min="1"
-                        required
-                    />
-                </div>
-
-                {/* Prix Unitaire */}
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Prix Unit. *</label>
-                    <input
-                        type="number"
-                        value={item.unitPrice}
-                        onChange={(e) => onUpdate(item.id, 'unitPrice', e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        value={item.quantityConforme}
+                        onChange={(e) => onUpdate(item.id, 'quantityConforme', e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
                         placeholder="0"
                         min="0"
                         required
                     />
                 </div>
+
+                {/* Qté Non Conforme */}
+                <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Qté Non Conf.</label>
+                    <input
+                        type="number"
+                        value={item.quantityNonConforme}
+                        onChange={(e) => onUpdate(item.id, 'quantityNonConforme', e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                        placeholder="0"
+                        min="0"
+                    />
+                </div>
+
+                {/* Prix Unitaire - seulement pour nouveaux matériels */}
+                {item.isNewMaterial ? (
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Prix Unit. *</label>
+                        <input
+                            type="number"
+                            value={item.unitPrice}
+                            onChange={(e) => onUpdate(item.id, 'unitPrice', e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="0"
+                            min="0"
+                            required
+                        />
+                    </div>
+                ) : (
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Prix Unit.</label>
+                        <div className="w-full p-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600">
+                            {(() => {
+                                const mat = materialsDatabase.find(m => m.code === item.materialCode);
+                                return mat ? `${mat.prixAchat?.toLocaleString('fr-FR') || 'N/A'} FCFA` : 'Sélectionner un matériel';
+                            })()}
+                        </div>
+                    </div>
+                )}
 
                 {/* Bouton supprimer */}
                 <div className="flex items-end">
@@ -719,8 +946,8 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
                         Informations complémentaires pour le nouveau matériel
                     </h4>
 
-                    {/* Champs communs */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    {/* Champs communs (Description + Date péremption + Justification) */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
                             <input
@@ -731,14 +958,26 @@ function DeliveryItemRow({ item, materialsDatabase, onUpdate, onRemove, canRemov
                                 placeholder="Description..."
                             />
                         </div>
+                        {/* Emplacement uniquement pour Matériel Médical */}
+                        {item.type === "Matériel Médical" && (
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Emplacement</label>
+                                <input
+                                    type="text"
+                                    value={item.emplacement}
+                                    onChange={(e) => onUpdate(item.id, 'emplacement', e.target.value)}
+                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Stockage A, Pharmacie..."
+                                />
+                            </div>
+                        )}
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">Emplacement</label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1">Date de péremption</label>
                             <input
-                                type="text"
-                                value={item.emplacement}
-                                onChange={(e) => onUpdate(item.id, 'emplacement', e.target.value)}
+                                type="date"
+                                value={item.datePeremption}
+                                onChange={(e) => onUpdate(item.id, 'datePeremption', e.target.value)}
                                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                placeholder="Stockage A, Pharmacie..."
                             />
                         </div>
                         <div>

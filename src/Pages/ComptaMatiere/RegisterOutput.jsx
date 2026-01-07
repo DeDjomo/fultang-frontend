@@ -23,14 +23,13 @@ export function RegisterOutput() {
     // Informations de sortie
     const [outputInfo, setOutputInfo] = useState({
         numeroSortie: "",
-        serviceMedical: "",
+        serviceMedical: "Comptabilité", // Service fixe pour le comptable matière
         dateSortie: new Date().toISOString().split('T')[0],
         dateEnregistrement: new Date().toISOString().split('T')[0],
         motifSortie: "DEFECTUEUX"
     });
 
-    // État pour les suggestions
-    const [activeSuggestions, setActiveSuggestions] = useState({});
+    // États
     const [formError, setFormError] = useState("");
 
     // Charger les données au montage
@@ -51,27 +50,17 @@ export function RegisterOutput() {
      * - GET /api/sorties/ (pour calculer le dernier ID)
      */
     async function loadData() {
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
-
         try {
             setLoading(true);
             setError(null);
 
-            // Charger les matériels médicaux et durables en parallèle (cache désactivé)
-            const [medicauxRes, durablesRes] = await Promise.all([
-                fetch(`${baseUrl}/materiels-medicaux/`, { headers, cache: "no-store" }).then(res => res.json()),
-                fetch(`${baseUrl}/materiels-durables/`, { headers, cache: "no-store" }).then(res => res.json())
+            // Charger les matériels médicaux et durables en parallèle
+            const [medicauxData, durablesData] = await Promise.all([
+                materielMedicalApi.getAll(),
+                materielDurableApi.getAll()
             ]);
 
-            const medicauxData = medicauxRes.results || medicauxRes || [];
-            const durablesData = durablesRes.results || durablesRes || [];
-
-            const medicaux = medicauxData.map(m => ({
+            const medicaux = (medicauxData.results || medicauxData || []).map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
@@ -81,7 +70,7 @@ export function RegisterOutput() {
                 prixVente: parseFloat(m.prix_vente_unitaire) || 0
             }));
 
-            const durables = durablesData.map(m => ({
+            const durables = (durablesData.results || durablesData || []).map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
@@ -95,10 +84,8 @@ export function RegisterOutput() {
 
             // Générer le numéro de sortie
             // Récupérer toutes les sorties pour trouver le dernier numéro
-            // Note: Optimisation possible -> Endpoint dédié backend 'next-number'
-            const sortiesRes = await fetch(`${baseUrl}/sorties/`, { headers, cache: "no-store" });
-            const sortiesData = await sortiesRes.json();
-            const sorties = sortiesData.results || sortiesData || [];
+            const sortiesData = await sortieApi.getAll();
+            const sorties = Array.isArray(sortiesData) ? sortiesData : (sortiesData.results || []);
 
             const year = new Date().getFullYear();
             const count = sorties.filter(s => s.numero_sortie?.includes(`SOR-${year}`)).length + 1;
@@ -108,7 +95,7 @@ export function RegisterOutput() {
 
         } catch (err) {
             console.error("Erreur chargement:", err);
-            setError("Impossible de charger les données fraîches.");
+            setError("Impossible de charger les données.");
         } finally {
             setLoading(false);
         }
@@ -139,25 +126,6 @@ export function RegisterOutput() {
         ));
     }
 
-    function handleNameChange(itemId, name) {
-        updateOutputItem(itemId, 'nomMateriel', name);
-
-        if (name.length > 0) {
-            const filteredSuggestions = materialsDatabase.filter(m =>
-                m.name.toLowerCase().includes(name.toLowerCase())
-            );
-            setActiveSuggestions(prev => ({
-                ...prev,
-                [itemId]: filteredSuggestions
-            }));
-        } else {
-            setActiveSuggestions(prev => ({
-                ...prev,
-                [itemId]: []
-            }));
-        }
-    }
-
     function selectMaterial(itemId, material) {
         setOutputItems(outputItems.map(item =>
             item.id === itemId ? {
@@ -169,10 +137,6 @@ export function RegisterOutput() {
                 stockDisponible: material.quantity
             } : item
         ));
-        setActiveSuggestions(prev => ({
-            ...prev,
-            [itemId]: []
-        }));
     }
 
     async function handleSubmit(e) {
@@ -208,7 +172,8 @@ export function RegisterOutput() {
                 numero_sortie: outputInfo.numeroSortie,
                 date_sortie: outputInfo.dateSortie,
                 motif_sortie: outputInfo.motifSortie,
-                service_medical: outputInfo.serviceMedical,
+                // Note: service_medical n'existe pas dans le modèle backend Sortie
+                // Le service est identifié via idPersonnel (personnel connecté)
                 idPersonnel: personnelId
             };
 
@@ -221,11 +186,15 @@ export function RegisterOutput() {
                 const ligneData = {
                     id_sortie: createdSortie.idSortie,
                     id_materiel: item.materialId,
+                    code_materiel: item.codeMateriel,
+                    nom_materiel: item.nomMateriel,
                     type_materiel: item.typeMateriel,
                     quantite: parseInt(item.quantite),
                     prix_unitaire: item.typeMateriel === "MEDICAL" ?
                         materialsDatabase.find(m => m.id === item.materialId)?.prixVente : null
                 };
+
+                console.log("📝 Création ligne sortie:", ligneData);
                 await ligneSortieApi.create(ligneData);
 
                 // Mettre à jour le stock
@@ -258,7 +227,11 @@ export function RegisterOutput() {
 
         } catch (err) {
             console.error("Erreur lors de l'enregistrement:", err);
-            setFormError("Erreur lors de l'enregistrement de la sortie. Veuillez réessayer.");
+            console.error("❌ Détails erreur backend:", err.response?.data);
+            const backendError = err.response?.data
+                ? JSON.stringify(err.response.data, null, 2)
+                : err.message;
+            setFormError("Erreur: " + backendError);
         } finally {
             setSubmitting(false);
         }
@@ -338,25 +311,15 @@ export function RegisterOutput() {
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Service médical responsable *
+                                    Service responsable
                                 </label>
-                                <select
+                                <input
+                                    type="text"
                                     value={outputInfo.serviceMedical}
-                                    onChange={(e) => setOutputInfo({ ...outputInfo, serviceMedical: e.target.value })}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
-                                    required
-                                >
-                                    <option value="">Sélectionner un service</option>
-                                    <option value="Service Médical">Service Médical</option>
-                                    <option value="Service Cardiologie">Service Cardiologie</option>
-                                    <option value="Pharmacie">Pharmacie</option>
-                                    <option value="Laboratoire">Laboratoire</option>
-                                    <option value="Administration">Administration</option>
-                                    <option value="Bloc Opératoire">Bloc Opératoire</option>
-                                    <option value="Service Pédiatrie">Service Pédiatrie</option>
-                                    <option value="Urgences">Urgences</option>
-                                    <option value="Radiologie">Radiologie</option>
-                                </select>
+                                    className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 font-semibold"
+                                    readOnly
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Service défini automatiquement</p>
                             </div>
 
                             <div>
@@ -423,10 +386,9 @@ export function RegisterOutput() {
                                 <OutputItemRow
                                     key={item.id}
                                     item={item}
-                                    suggestions={activeSuggestions[item.id] || []}
-                                    onUpdate={updateOutputItem}
-                                    onNameChange={handleNameChange}
+                                    materialsDatabase={materialsDatabase}
                                     onSelectMaterial={selectMaterial}
+                                    onUpdate={updateOutputItem}
                                     onRemove={removeOutputItem}
                                     canRemove={outputItems.length > 1}
                                 />
@@ -470,53 +432,49 @@ export function RegisterOutput() {
     );
 }
 
-function OutputItemRow({ item, suggestions, onUpdate, onNameChange, onSelectMaterial, onRemove, canRemove }) {
+function OutputItemRow({ item, materialsDatabase, onSelectMaterial, onUpdate, onRemove, canRemove }) {
     OutputItemRow.propTypes = {
         item: PropTypes.object.isRequired,
-        suggestions: PropTypes.array.isRequired,
-        onUpdate: PropTypes.func.isRequired,
-        onNameChange: PropTypes.func.isRequired,
+        materialsDatabase: PropTypes.array.isRequired,
         onSelectMaterial: PropTypes.func.isRequired,
+        onUpdate: PropTypes.func.isRequired,
         onRemove: PropTypes.func.isRequired,
         canRemove: PropTypes.bool.isRequired
     };
 
-    const [showSuggestions, setShowSuggestions] = useState(false);
+    // Gérer la sélection d'un matériel via le select
+    function handleMaterialSelect(e) {
+        const materialId = parseInt(e.target.value);
+        if (materialId) {
+            const material = materialsDatabase.find(m => m.id === materialId);
+            if (material) {
+                onSelectMaterial(item.id, material);
+            }
+        }
+    }
 
     return (
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div className="relative">
+                <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                         Nom Matériel *
                     </label>
-                    <input
-                        type="text"
-                        value={item.nomMateriel}
-                        onChange={(e) => onNameChange(item.id, e.target.value)}
-                        onFocus={() => setShowSuggestions(true)}
-                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                    <select
+                        value={item.materialId || ""}
+                        onChange={handleMaterialSelect}
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end"
-                        placeholder="Tapez pour rechercher..."
                         required
-                    />
-                    {showSuggestions && suggestions.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                            {suggestions.map((material) => (
-                                <div
-                                    key={material.id}
-                                    onClick={() => onSelectMaterial(item.id, material)}
-                                    className="p-2 hover:bg-primary-end/10 cursor-pointer border-b border-gray-100 last:border-b-0"
-                                >
-                                    <div className="font-semibold text-gray-800 text-sm">{material.name}</div>
-                                    <div className="text-xs text-gray-500 flex justify-between">
-                                        <span className="font-mono">{material.code}</span>
-                                        <span>Stock: {material.quantity}</span>
-                                    </div>
-                                </div>
+                    >
+                        <option value="">Sélectionner un matériel</option>
+                        {[...materialsDatabase]
+                            .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+                            .map((material) => (
+                                <option key={material.id} value={material.id}>
+                                    {material.name} ({material.code}) - Stock: {material.quantity}
+                                </option>
                             ))}
-                        </div>
-                    )}
+                    </select>
                 </div>
 
                 <div>

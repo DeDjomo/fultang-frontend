@@ -130,8 +130,8 @@ export function LoginPage() {
                 break;
             case 'directeur':
             case 'directrice':
-                console.log('Redirection vers: Admin Home (Director)');
-                navigate(appRouterPaths.adminHomePage);
+                console.log('Redirection vers: Director Dashboard');
+                navigate(appRouterPaths.directorDashboard);
                 break;
             default:
                 console.warn('Rôle non reconnu:', normalizedRole);

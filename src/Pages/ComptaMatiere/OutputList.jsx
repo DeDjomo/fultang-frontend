@@ -34,33 +34,24 @@ export function OutputList() {
     }, []);
 
     async function loadData() {
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
-
         try {
             setLoading(true);
             setError(null);
 
-            // 1. Charger les sorties
-            const sortiesRes = await fetch(`${baseUrl}/sorties/`, { headers, cache: "no-store" });
-            const sortiesData = await sortiesRes.json();
-            const sorties = (sortiesData.results || sortiesData || []);
+            // 1. Charger les sorties via le service API
+            const sortiesData = await sortieApi.getAll();
+            const sorties = Array.isArray(sortiesData) ? sortiesData : (sortiesData.results || []);
 
-            // 2. Pour chaque sortie, charger ses lignes (N+1 optimisation possible backend, mais ici frontend-side)
+            // 2. Pour chaque sortie, charger ses lignes (N+1 optimisation possible backend, mais ici frontend-side via service)
             const outputsWithLines = await Promise.all(
                 sorties.map(async (s) => {
                     try {
-                        const lignesRes = await fetch(`${baseUrl}/lignes-sortie/?id_sortie=${s.idSortie}`, { headers, cache: "no-store" });
-                        const lignesData = await lignesRes.json();
-                        const lignesRaw = lignesData.results || lignesData || [];
+                        const lignesData = await ligneSortieApi.getBySortie(s.idSortie);
+                        const lignesRaw = Array.isArray(lignesData) ? lignesData : (lignesData.results || []);
 
                         const lignes = lignesRaw.map(l => ({
-                            nomMateriel: l.materiel_nom || `Matériel #${l.id_materiel}`,
-                            codeMateriel: l.materiel_code || "",
+                            nomMateriel: l.nom_materiel || `Matériel #${l.id_materiel}`,
+                            codeMateriel: l.code_materiel || "",
                             typeMateriel: l.type_materiel === "MEDICAL" ? "Matériel Médical" : "Matériel Durable",
                             quantite: l.quantite
                         }));
@@ -93,7 +84,7 @@ export function OutputList() {
 
         } catch (err) {
             console.error("Erreur chargement sorties:", err);
-            setError("Impossible de charger les sorties fraîches.");
+            setError("Impossible de charger les sorties.");
         } finally {
             setLoading(false);
         }

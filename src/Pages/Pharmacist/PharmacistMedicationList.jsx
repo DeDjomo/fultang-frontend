@@ -39,19 +39,11 @@ export function PharmacistMedicationList() {
     }, []);
 
     async function loadData() {
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
-
         try {
             setLoading(true);
             setError(null);
 
-            const response = await fetch(`${baseUrl}/materiels-medicaux/`, { headers, cache: "no-store" });
-            const data = await response.json();
+            const data = await materielMedicalApi.getAll();
 
             const materiels = (data.results || data || []).map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
@@ -69,7 +61,7 @@ export function PharmacistMedicationList() {
 
         } catch (err) {
             console.error("Erreur chargement données:", err);
-            setError("Impossible de charger les données fraîches.");
+            setError("Impossible de charger les données.");
         } finally {
             setLoading(false);
         }

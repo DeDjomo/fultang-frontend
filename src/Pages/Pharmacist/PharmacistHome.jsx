@@ -28,40 +28,33 @@ export function PharmacistHome() {
     }, []);
 
     async function loadData() {
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = "http://127.0.0.1:8000/api";
-
         try {
             setLoading(true);
             setError(null);
 
             // Charger en parallèle
-            const [materielsRes, sortiesRes] = await Promise.all([
-                fetch(`${baseUrl}/materiels-medicaux/`, { headers, cache: "no-store" }).then(res => res.json()),
-                fetch(`${baseUrl}/sorties/`, { headers, cache: "no-store" }).then(res => res.json())
+            const [materielsData, sortiesData] = await Promise.all([
+                materielMedicalApi.getAll(),
+                sortieApi.getAll()
             ]);
 
             // 1. Traiter Matériels
-            const materielsData = materielsRes.results || materielsRes || [];
-            const medicationsList = materielsData.map(m => ({
+            const materiels = Array.isArray(materielsData) ? materielsData : (materielsData.results || []);
+            const medicationsList = materiels.map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
                 quantity: m.quantite_stock,
-                seuil: 20, // Seuil par défaut
+                seuil: m.seuil_alerte || 20, // Utiliser seuil_alerte depuis la BD
                 prixVente: parseFloat(m.prix_vente_unitaire) || 0
             }));
             setMedications(medicationsList);
 
             // 2. Traiter Ventes du jour
-            const sortiesData = sortiesRes.results || sortiesRes || [];
+            const sorties = Array.isArray(sortiesData) ? sortiesData : (sortiesData.results || []);
             const today = new Date().toISOString().split('T')[0];
 
-            const ventesAujourdHui = sortiesData.filter(s => {
+            const ventesAujourdHui = sorties.filter(s => {
                 const sortieDate = s.date_sortie?.split('T')[0] || '';
                 return sortieDate === today && s.motif_sortie === 'VENTE';
             }).map(s => ({
@@ -75,7 +68,7 @@ export function PharmacistHome() {
 
         } catch (err) {
             console.error("Erreur chargement données:", err);
-            setError("Impossible de charger les données fraîches.");
+            setError("Impossible de charger les données.");
         } finally {
             setLoading(false);
         }

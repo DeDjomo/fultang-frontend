@@ -21,6 +21,20 @@ function useLogin() {
   function saveUserData(user, effectiveRole) {
     localStorage.setItem("user_data_fultang", JSON.stringify(user));
     localStorage.setItem("user_role_fultang", effectiveRole);
+    // Stocker l'ID et le nom du personnel pour le filtrage des rapports
+    if (user.id) {
+      localStorage.setItem("personnel_id", String(user.id));
+      console.log("✅ personnel_id sauvegardé:", user.id);
+    } else {
+      console.warn("⚠️ user.id manquant, personnel_id non sauvegardé!");
+    }
+    if (user.nom && user.prenom) {
+      localStorage.setItem("user_name", `${user.nom} ${user.prenom}`);
+      console.log("✅ user_name sauvegardé:", `${user.nom} ${user.prenom}`);
+    } else if (user.username) {
+      localStorage.setItem("user_name", user.username);
+      console.log("✅ user_name sauvegardé:", user.username);
+    }
   }
 
   function clearLocalStorage() {
@@ -28,6 +42,8 @@ function useLogin() {
     localStorage.removeItem("refresh_token_fultang");
     localStorage.removeItem("user_data_fultang");
     localStorage.removeItem("user_role_fultang");
+    localStorage.removeItem("personnel_id");
+    localStorage.removeItem("user_name");
   }
 
   async function login(data) {
