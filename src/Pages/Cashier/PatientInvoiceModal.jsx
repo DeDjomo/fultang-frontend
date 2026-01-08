@@ -27,7 +27,12 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
         numero_quittance: '',
         Montant_paye: '',
         Motif: '',
-        id_session: ''
+        id_session: '',
+        mode_paiement: 'especes',
+        // Cheque fields
+        cheque_numero: '',
+        cheque_banque: '',
+        cheque_titulaire: ''
     });
 
     //Redirect state
@@ -69,7 +74,26 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+
+        // Validation for specific fields
+        if (name === 'mobile_numero') {
+            // Only allow digits and max 9 chars
+            const numericValue = value.replace(/\D/g, '').slice(0, 9);
+            setFormData(prev => ({ ...prev, [name]: numericValue }));
+            return;
+        }
+
+        if (name === 'carte_numero') {
+            // Only allow digits and max 4 chars
+            const numericValue = value.replace(/\D/g, '').slice(0, 4);
+            setFormData(prev => ({ ...prev, [name]: numericValue }));
+            return;
+        }
+
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
     };
 
     const handleSubmitQuittance = async (e) => {
@@ -80,14 +104,59 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
             return;
         }
 
+        // Specific validation for payment modes
+        if (formData.mode_paiement === 'mobile_money') {
+            if (!formData.mobile_numero || formData.mobile_numero.length !== 9) {
+                message.warning('Mobile Money number must be exactly 9 digits');
+                return;
+            }
+        }
+
+        if (formData.mode_paiement === 'carte') {
+            if (!formData.carte_numero || formData.carte_numero.length !== 4) {
+                message.warning('Card number must be exactly 4 digits');
+                return;
+            }
+        }
+
         setSubmitting(true);
         try {
             const dataToSend = {
-                ...formData,
+                numero_quittance: formData.numero_quittance,
                 date_paiement: new Date().toISOString(),
-                Montant_paye: parseFloat(formData.Montant_paye)
+                Montant_paye: parseFloat(formData.Montant_paye),
+                Motif: formData.Motif,
+                mode_paiement: formData.mode_paiement,
+                // Include check details
+                ...(formData.mode_paiement === 'cheque' && {
+                    cheque_numero: formData.cheque_numero,
+                    cheque_banque: formData.cheque_banque,
+                    cheque_titulaire: formData.cheque_titulaire
+                }),
+                // Include Mobile Money details
+                ...(formData.mode_paiement === 'mobile_money' && {
+                    mobile_numero: formData.mobile_numero,
+                    mobile_operateur: formData.mobile_operateur,
+                    mobile_reference: formData.mobile_reference
+                }),
+                // Include Virement details
+                ...(formData.mode_paiement === 'virement' && {
+                    virement_banque: formData.virement_banque,
+                    virement_reference: formData.virement_reference,
+                    virement_date: formData.virement_date,
+                    virement_compte: formData.virement_compte
+                }),
+                // Include Carte details
+                ...(formData.mode_paiement === 'carte' && {
+                    carte_numero: formData.carte_numero,
+                    carte_reference: formData.carte_reference,
+                    carte_terminal: formData.carte_terminal
+                }),
+                // Send null instead of empty string for id_session to avoid IntegrityError
+                id_session: formData.id_session || null
             };
 
+            console.log('Sending quittance data:', dataToSend);
             await createQuittance(dataToSend);
             showSuccess('Le reçu a été ajouté avec succès.', 'Reçu créé');
             setShowAddForm(false);
@@ -95,7 +164,11 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
                 numero_quittance: '',
                 Montant_paye: '',
                 Motif: '',
-                id_session: patient.id_session
+                id_session: patient.id_session,
+                mode_paiement: 'especes',
+                cheque_numero: '',
+                cheque_banque: '',
+                cheque_titulaire: ''
             });
             loadQuittances();
         } catch (error) {
@@ -136,7 +209,13 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
             numero_quittance: '',
             Montant_paye: '',
             Motif: '',
-            id_session: ''
+            id_session: '',
+            mode_paiement: 'especes',
+            // Reset all payment fields
+            cheque_numero: '', cheque_banque: '', cheque_titulaire: '',
+            mobile_numero: '', mobile_operateur: 'orange', mobile_reference: '',
+            virement_banque: '', virement_reference: '', virement_date: '', virement_compte: '',
+            carte_numero: '', carte_reference: '', carte_terminal: ''
         });
         onClose();
     };
@@ -219,18 +298,231 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
                                     />
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Purpose / Description</label>
-                                <textarea
-                                    name="Motif"
-                                    value={formData.Motif}
-                                    onChange={handleInputChange}
-                                    rows="3"
-                                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
-                                    placeholder="Payment purpose or description..."
-                                    required
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Purpose / Description</label>
+                                    <textarea
+                                        name="Motif"
+                                        value={formData.Motif}
+                                        onChange={handleInputChange}
+                                        rows="3"
+                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                                        placeholder="Payment purpose or description..."
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Method</label>
+                                    <select
+                                        name="mode_paiement"
+                                        value={formData.mode_paiement}
+                                        onChange={handleInputChange}
+                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    >
+                                        <option value="especes">Espèces (Cash)</option>
+                                        <option value="mobile_money">Mobile Money</option>
+                                        <option value="virement">Virement Bancaire</option>
+                                        <option value="cheque">Chèque</option>
+                                        <option value="carte">Carte Bancaire</option>
+                                    </select>
+                                </div>
                             </div>
+
+                            {/* Conditional Check Fields */}
+                            {formData.mode_paiement === 'cheque' && (
+                                <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-3">
+                                    <h4 className="font-semibold text-gray-700 text-sm border-b pb-2 mb-2">Check Details</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Check Number</label>
+                                            <input
+                                                type="text"
+                                                name="cheque_numero"
+                                                value={formData.cheque_numero}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                placeholder="chk-12345"
+                                                required={formData.mode_paiement === 'cheque'}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Bank Name</label>
+                                            <input
+                                                type="text"
+                                                name="cheque_banque"
+                                                value={formData.cheque_banque}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                placeholder="e.g. SGBC"
+                                                required={formData.mode_paiement === 'cheque'}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Account Holder</label>
+                                            <input
+                                                type="text"
+                                                name="cheque_titulaire"
+                                                value={formData.cheque_titulaire}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                placeholder="Name on check"
+                                                required={formData.mode_paiement === 'cheque'}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Conditional Mobile Money Fields */}
+                            {formData.mode_paiement === 'mobile_money' && (
+                                <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-3">
+                                    <h4 className="font-semibold text-gray-700 text-sm border-b pb-2 mb-2">Mobile Money Details</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Payer Number (9 digits)</label>
+                                            <input
+                                                type="text"
+                                                name="mobile_numero"
+                                                value={formData.mobile_numero || ''}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                placeholder="e.g. 699XXXXXX"
+                                                maxLength="9"
+                                                pattern="\d{9}"
+                                                title="Must be exactly 9 digits"
+                                                required={formData.mode_paiement === 'mobile_money'}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Operator</label>
+                                            <select
+                                                name="mobile_operateur"
+                                                value={formData.mobile_operateur || 'orange'}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                            >
+                                                <option value="orange">Orange Money</option>
+                                                <option value="mtn">MTN Mobile Money</option>
+                                                <option value="autre">Other</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Transaction Ref</label>
+                                            <input
+                                                type="text"
+                                                name="mobile_reference"
+                                                value={formData.mobile_reference || ''}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                placeholder="Transaction ID"
+                                                required={formData.mode_paiement === 'mobile_money'}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Conditional Bank Transfer Fields */}
+                            {formData.mode_paiement === 'virement' && (
+                                <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-3">
+                                    <h4 className="font-semibold text-gray-700 text-sm border-b pb-2 mb-2">Bank Transfer Details</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Bank Name</label>
+                                            <input
+                                                type="text"
+                                                name="virement_banque"
+                                                value={formData.virement_banque || ''}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                placeholder="e.g. Afriland First Bank"
+                                                required={formData.mode_paiement === 'virement'}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Transfer Reference</label>
+                                            <input
+                                                type="text"
+                                                name="virement_reference"
+                                                value={formData.virement_reference || ''}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                placeholder="Ref number"
+                                                required={formData.mode_paiement === 'virement'}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Date</label>
+                                            <input
+                                                type="date"
+                                                name="virement_date"
+                                                value={formData.virement_date || ''}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                required={formData.mode_paiement === 'virement'}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Source Account (Optional)</label>
+                                            <input
+                                                type="text"
+                                                name="virement_compte"
+                                                value={formData.virement_compte || ''}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                placeholder="Account number"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Conditional Card Fields */}
+                            {formData.mode_paiement === 'carte' && (
+                                <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-3">
+                                    <h4 className="font-semibold text-gray-700 text-sm border-b pb-2 mb-2">Card Payment Details</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Card Number (Last 4 digits)</label>
+                                            <input
+                                                type="text"
+                                                name="carte_numero"
+                                                value={formData.carte_numero || ''}
+                                                onChange={handleInputChange}
+                                                maxLength="4"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                placeholder="e.g. 1234"
+                                                pattern="\d{4}"
+                                                title="Must be exactly 4 digits"
+                                                required={formData.mode_paiement === 'carte'}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Transaction Ref</label>
+                                            <input
+                                                type="text"
+                                                name="carte_reference"
+                                                value={formData.carte_reference || ''}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                placeholder="Auth Code"
+                                                required={formData.mode_paiement === 'carte'}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Terminal ID (Optional)</label>
+                                            <input
+                                                type="text"
+                                                name="carte_terminal"
+                                                value={formData.carte_terminal || ''}
+                                                onChange={handleInputChange}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                placeholder="TPE ID"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex gap-3 justify-end">
                                 <button
                                     type="button"
