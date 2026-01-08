@@ -46,22 +46,13 @@ export function AppRoute() {
     const AdminDrugsListPage = React.lazy(async () => ({ default: (await import("../Pages/AdminViews/AdminDrugsList.jsx")).AdminDrugsList }));
     const AdminHospitalRoomPage = React.lazy(async () => ({ default: (await import("../Pages/AdminViews/AdminHospitalRooms.jsx")).AdminHospitalRooms }));
     const AdminFinancialReportsPage = React.lazy(async () => ({ default: (await import("../Pages/AdminViews/AdminFinancialReports.jsx")).AdminFinancialReports }));
-    const AccountantPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Accountant.jsx")).Accountant }));
     const AdminConsultationDetails = React.lazy(async () => ({ default: (await import("../Pages/AdminViews/ConsultationDetails.jsx")).ConsultationDetails }));
     /*const CurrentExamsLaboratoryPage = React.lazy(async () => ({default: (await import("../Pages/Laboratory/CurrentExams.jsx")).CurrentExams}));
     const ExamsHistoryLaboratoryPage = React.lazy(async () => ({default: (await import("../Pages/Laboratory/ExamsHistory.jsx")).ExamHistory}));*/
-    const AccountDetailsPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/AccountDetailsPage.jsx")).AccountDetailsPage }));
-    const AccountList = React.lazy(async () => ({ default: (await import("../Pages/Accountant/AccountList.jsx")).AccountList }));
 
     const DoctorAppointments = React.lazy(async () => ({ default: (await import("../Pages/Doctor/AppointmentList.jsx")).AppointmentList }));
     const DoctorWaitingRoom = React.lazy(async () => ({ default: (await import("../Pages/Doctor/DoctorWaitingRoom.jsx")).DoctorWaitingRoom }));
     const DoctorConsultation = React.lazy(async () => ({ default: (await import("../Pages/Doctor/ConsultationPage.jsx")).ConsultationPage }));
-
-
-    const FinancialContributions = React.lazy(async () => ({ default: (await import("../Pages/Accountant/FinancialContribution.jsx")).FinancialContributions, }));
-    const FinancialReportsAccountant = React.lazy(async () => ({ default: (await import("../Pages/Accountant/FinancialReports.jsx")).FinancialReports, }));
-
-    const CreateFactureAccountant = React.lazy(async () => ({ default: (await import("../Pages/Accountant/CreateFacture.jsx")).CreateFacturePage, }));
 
     const LaboratoryHomePage = React.lazy(async () => ({ default: (await import("../Pages/Laboratory/LaboratoryHomePage.jsx")).LaboratoryHomePage, }));
     const LaboratoryPatientList = React.lazy(async () => ({ default: (await import("../Pages/Laboratory/LaboratoryPatientList.jsx")).LaboratoryPatientList, }));
@@ -70,15 +61,6 @@ export function AppRoute() {
     const LaboratoryExamenHistories = React.lazy(async () => ({ default: (await import("../Pages/Laboratory/LaboratoryExamHistory.jsx")).ExamHistory, }));
     const LaboratoryExamResulDetails = React.lazy(async () => ({ default: (await import("../Pages/Laboratory/ExamResultDetail.jsx")).ExamResultDetails, }));
     const LaboratoryNotifications = React.lazy(async () => ({ default: (await import("../Pages/Laboratory/Notification.jsx")).Notification, }));
-
-
-    const FinancialAccountantHome = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Home/HomePage.jsx")).FinancialAccountantHomePage, }));
-    const FinancialAccountantChartOfAccount = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Comptabilité de Base/PlanComptable.jsx")).ChartOfAccounts, }));
-    const FinancialAccountantJournalEntries = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Comptabilité de Base/JournalsEntries.jsx")).JournalEntries, }));
-    const FinancialAccountingJournal = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Comptabilité de Base/AccountingJornal.jsx")).JournauxComptables, }));
-    const FinancialGrandLivre = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Comptabilité de Base/GrandLivre.jsx")).GrandLivreBalance }));
-    const FinancialPayrollJournal = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Payroll & Social Charge/PayrollJournal.jsx")).SocialChargesCalculator }));
-    const FinancialCostAnalytic = React.lazy(async () => ({ default: (await import("../Pages/AccountantNew/Payroll & Social Charge/CostAnalytic.jsx")).HRAnalyticsDashboard }));
 
     // ComptaMatiere (Comptable Matière) components
     const ComptaMatiereDashboard = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/Accountant.jsx")).Accountant }));
@@ -153,23 +135,15 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.adminDrugsListPage} element={<AdminDrugsListPage />} />
                 <Route path={AppRoutesPaths.adminHospitalRoomPage} element={<AdminHospitalRoomPage />} />
                 <Route path={AppRoutesPaths.adminFinancialReportsPage} element={<AdminFinancialReportsPage />} />
-                <Route path={AppRoutesPaths.accountantPage} element={<AccountantPage />} />
                 <Route path={AppRoutesPaths.adminConsultationDetailsPage} element={<AdminConsultationDetails />} />
                 {/*<Route path={AppRoutesPaths.laboratoryHistory} element={<ExamsHistoryLaboratoryPage />} />*/}
                 {/*<Route path={AppRoutesPaths.laboratoryCurrent} element={<CurrentExamsLaboratoryPage />} />*/}
                 <Route path={AppRoutesPaths.financialHistory} element={<FinancialHistory />} />
-                <Route path={AppRoutesPaths.accountDetails} element={<AccountDetailsPage />} />
-                <Route path={AppRoutesPaths.accountList} element={<AccountList />} />
                 <Route path={AppRoutesPaths.notFound} element={<NotFoundPage />} />
 
                 <Route path={AppRoutesPaths.doctorAppointment} element={<DoctorAppointments />} />
                 <Route path="/doctor/waiting-room" element={<DoctorWaitingRoom />} />
                 <Route path="/doctor/consultation" element={<DoctorConsultation />} />
-
-                <Route path={AppRoutesPaths.financialContributions} element={<FinancialContributions />} />
-                <Route path={AppRoutesPaths.financialReportsAccountant} element={<FinancialReportsAccountant />} />
-
-                <Route path={AppRoutesPaths.createFactureAccountant} element={<CreateFactureAccountant />} />
 
                 <Route path={AppRoutesPaths.laboratoryAssistantPage} element={<LaboratoryHomePage />} />
                 <Route path={AppRoutesPaths.laboratoryPatientList} element={<LaboratoryPatientList />} />
@@ -178,15 +152,6 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.laboratoryExamenHistories} element={<LaboratoryExamenHistories />} />
                 <Route path={AppRoutesPaths.laboratoryExamResultDetails} element={<LaboratoryExamResulDetails />} />
                 <Route path={AppRoutesPaths.laboratoryNotification} element={<LaboratoryNotifications />} />
-
-
-                <Route path={AppRoutesPaths.financialAccountantHome} element={<FinancialAccountantHome />} />
-                <Route path={AppRoutesPaths.financialAccountantChartOfAccount} element={<FinancialAccountantChartOfAccount />} />
-                <Route path={AppRoutesPaths.financialAccountantJournalEntries} element={<FinancialAccountantJournalEntries />} />
-                <Route path={AppRoutesPaths.financialAccountantAccountingJournals} element={<FinancialAccountingJournal />} />
-                <Route path={AppRoutesPaths.financialAccountantAccountingGrandLivre} element={<FinancialGrandLivre />} />
-                <Route path={AppRoutesPaths.financialAccountPayroll} element={<FinancialPayrollJournal />} />
-                <Route path={AppRoutesPaths.financialAccountantCostAnalytic} element={<FinancialCostAnalytic />} />
 
                 {/* ComptaMatiere (Comptable Matière) Routes */}
                 <Route path={AppRoutesPaths.comptaMatiereDashboard} element={<ComptaMatiereDashboard />} />
