@@ -101,7 +101,17 @@ export function AppRoute() {
     const PharmacistInventory = React.lazy(async () => ({ default: (await import("../Pages/Pharmacist/PharmacistInventory.jsx")).PharmacistInventory }));
     const PharmacistReports = React.lazy(async () => ({ default: (await import("../Pages/Pharmacist/PharmacistReports.jsx")).PharmacistReports }));
 
+    // Pharmacy components (from prototype)
+    const PharmacyMedication = React.lazy(async () => ({ default: (await import("../Pages/Pharmacy/Pharmacy.jsx")).Pharmacy }));
 
+    // Accountant Module components (from prototype)
+    const AccountantHomePage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Home/HomePage.jsx")).default }));
+    const QuittancesAValiderPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Quittances/QuittancesAValider.jsx")).default }));
+    const QuittancesValideesPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Quittances/QuittancesValidees.jsx")).default }));
+    const EcrituresComptablesPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Ecritures/EcrituresComptables.jsx")).default }));
+    const BalancePage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Balance/Balance.jsx")).default }));
+    const PlanComptablePage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/PlanComptable/PlanComptable.jsx")).default }));
+    const RapportsPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Rapports/Rapports.jsx")).default }));
 
 
 
@@ -200,6 +210,18 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.pharmacistDailySales} element={<PharmacistDailySales />} />
                 <Route path={AppRoutesPaths.pharmacistInventory} element={<PharmacistInventory />} />
                 <Route path={AppRoutesPaths.pharmacistReports} element={<PharmacistReports />} />
+
+                {/* Pharmacy Routes (from prototype) */}
+                <Route path={AppRoutesPaths.PharmacyMedication} element={<PharmacyMedication />} />
+
+                {/* Accountant Module Routes (from prototype) */}
+                <Route path={AppRoutesPaths.accountantHome} element={<AccountantHomePage />} />
+                <Route path={AppRoutesPaths.accountantQuittancesAValider} element={<QuittancesAValiderPage />} />
+                <Route path={AppRoutesPaths.accountantQuittancesValidees} element={<QuittancesValideesPage />} />
+                <Route path={AppRoutesPaths.accountantEcritures} element={<EcrituresComptablesPage />} />
+                <Route path={AppRoutesPaths.accountantBalance} element={<BalancePage />} />
+                <Route path={AppRoutesPaths.accountantPlanComptable} element={<PlanComptablePage />} />
+                <Route path={AppRoutesPaths.accountantRapports} element={<RapportsPage />} />
 
             </Routes>
         </React.Suspense>

@@ -99,6 +99,17 @@ export const AppRoutesPaths = {
     pharmacistEmitNeed: "/pharmacist/emit-need",
     pharmacistDailySales: "/pharmacist/daily-sales",
     pharmacistInventory: "/pharmacist/inventory",
-    pharmacistReports: "/pharmacist/reports"
+    pharmacistReports: "/pharmacist/reports",
 
+    // Pharmacy routes (from prototype)
+    PharmacyMedication: "/pharmacyMedication",
+
+    // Accountant Module (New - from prototype)
+    accountantHome: "/accountant/home",
+    accountantQuittancesAValider: "/accountant/quittances/a-valider",
+    accountantQuittancesValidees: "/accountant/quittances/validees",
+    accountantEcritures: "/accountant/ecritures",
+    accountantBalance: "/accountant/balance",
+    accountantPlanComptable: "/accountant/plan-comptable",
+    accountantRapports: "/accountant/rapports"
 }
