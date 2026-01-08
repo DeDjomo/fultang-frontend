@@ -1,4 +1,4 @@
-import { FaHome, FaClipboardList, FaShoppingCart, FaBoxes, FaFileAlt, FaPills } from "react-icons/fa";
+import { FaHome, FaClipboardList, FaShoppingCart, FaBoxes, FaFileAlt, FaPills, FaPrescriptionBottleAlt } from "react-icons/fa";
 // Navigation links for Pharmacist - Updated 2025-12-26
 
 export const PharmacistNavLink = [
@@ -6,6 +6,11 @@ export const PharmacistNavLink = [
         name: "Tableau de bord",
         link: "/pharmacist/dashboard",
         icon: FaHome
+    },
+    {
+        name: "Prescriptions",
+        link: "/pharmacist/prescriptions",
+        icon: FaPrescriptionBottleAlt
     },
     {
         name: "Liste des médicaments",

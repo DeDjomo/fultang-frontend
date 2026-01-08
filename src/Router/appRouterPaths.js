@@ -95,14 +95,12 @@ export const AppRoutesPaths = {
 
     // Pharmacist routes
     pharmacistDashboard: "/pharmacist/dashboard",
+    pharmacistPrescriptions: "/pharmacist/prescriptions",
     pharmacistMedicationList: "/pharmacist/medication-list",
     pharmacistEmitNeed: "/pharmacist/emit-need",
     pharmacistDailySales: "/pharmacist/daily-sales",
     pharmacistInventory: "/pharmacist/inventory",
     pharmacistReports: "/pharmacist/reports",
-
-    // Pharmacy routes (from prototype)
-    PharmacyMedication: "/pharmacyMedication",
 
     // Accountant Module (New - from prototype)
     accountantHome: "/accountant/home",
