@@ -3,7 +3,7 @@
  */
 import axiosInstance from '../Utils/axiosInstance';
 
-const BASE_URL = '/quittance';
+const BASE_URL = '/quittances';
 
 /**
  * Get all quittances for a specific patient

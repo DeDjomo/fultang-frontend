@@ -1,12 +1,11 @@
-import {Link, Navigate, useLocation} from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import PropTypes from "prop-types";
-import {AccessDenied} from "./AccessDenied.jsx";
-import {useAuthentication} from "../Utils/Provider.jsx";
-import {useEffect, useState} from "react";
-import {Loading} from "./Loading.jsx";
+import { AccessDenied } from "./AccessDenied.jsx";
+import { useAuthentication } from "../Utils/Provider.jsx";
+import { useEffect, useState } from "react";
+import { Loading } from "./Loading.jsx";
 
-export function DashBoard ({children,linkList, requiredRole})
-{
+export function DashBoard({ children, linkList, requiredRole }) {
     DashBoard.propTypes = {
         children: PropTypes.node.isRequired,
         linkList: PropTypes.array.isRequired,
@@ -15,7 +14,7 @@ export function DashBoard ({children,linkList, requiredRole})
 
     const location = useLocation();
     const activeLink = location.pathname;
-    const {isAuthenticated, hasRole} = useAuthentication();
+    const { isAuthenticated, hasRole } = useAuthentication();
     const [isLoading, setIsLoading] = useState(true);
 
 
@@ -30,26 +29,26 @@ export function DashBoard ({children,linkList, requiredRole})
 
 
 
-      if (isLoading) {
-        return <Loading/>
-      }
+    if (isLoading) {
+        return <Loading />
+    }
 
-      if (!isAuthenticated()) {
-          return <Navigate to="/login" />;
-      }
+    if (!isAuthenticated()) {
+        return <Navigate to="/login" />;
+    }
 
-      if (!hasRole(requiredRole)) {
-         return <AccessDenied Role={requiredRole}/>;
-      }
+    if (!hasRole(requiredRole)) {
+        return <AccessDenied Role={requiredRole} />;
+    }
 
 
     return (
         <div className="flex  h-screen">
-            <div className="w-[15%] fixed h-screen bg-gradient-to-t from-primary-start to-primary-end  flex flex-col">
+            <div className="w-[15%] fixed h-screen bg-gradient-to-t from-primary-start to-primary-end flex flex-col">
                 <h1 className="text-3xl text-white font-bold ml-6 mb-10 mt-7">
                     Fultang Clinic
                 </h1>
-                <nav className="flex flex-col">
+                <nav className="flex flex-col flex-1 overflow-y-auto pb-10">
                     {linkList.map((item, index) => {
                         const IconComponent = item.icon;
                         const isActive = activeLink.startsWith(item.link);
@@ -61,7 +60,7 @@ export function DashBoard ({children,linkList, requiredRole})
                                 to={item.link}
                             >
                                 <IconComponent
-                                    className={isActive ? "text-black text-xl mr-3" : "text-xl mr-3 text-white"}/>
+                                    className={isActive ? "text-black text-xl mr-3" : "text-xl mr-3 text-white"} />
                                 <p className={isActive ? "text-black  font-bold text-md " : "text-md font-bold text-white"}>{item.name}</p>
                             </Link>
                         )

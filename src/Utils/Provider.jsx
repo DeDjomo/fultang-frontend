@@ -21,6 +21,13 @@ function useLogin() {
   function saveUserData(user, effectiveRole) {
     localStorage.setItem("user_data_fultang", JSON.stringify(user));
     localStorage.setItem("user_role_fultang", effectiveRole);
+    // Stocker personnel_id et user_name pour les composants qui en ont besoin
+    if (user.idpersonnel || user.id) {
+      localStorage.setItem("personnel_id", String(user.idpersonnel || user.id));
+    }
+    if (user.nom || user.prenom) {
+      localStorage.setItem("user_name", `${user.nom || ''} ${user.prenom || ''}`.trim());
+    }
   }
 
   function clearLocalStorage() {
@@ -28,15 +35,26 @@ function useLogin() {
     localStorage.removeItem("refresh_token_fultang");
     localStorage.removeItem("user_data_fultang");
     localStorage.removeItem("user_role_fultang");
+    // Nettoyer également personnel_id et user_name
+    localStorage.removeItem("personnel_id");
+    localStorage.removeItem("user_name");
   }
 
   async function login(data) {
     try {
       const baseURL = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api/";
+      console.log('=== TENTATIVE DE CONNEXION ===');
+      console.log('URL Backend:', baseURL);
+      console.log('Données envoyées:', { username: data.username, password: '***' });
+
       const response = await axios.post(
         `${baseURL}login/`,
         data
       );
+
+      console.log('=== RÉPONSE DU BACKEND ===');
+      console.log('Status:', response.status);
+      console.log('Réponse complète:', response.data);
 
       if (response.status === 200 && response.data.success) {
         setIsLoading(false);
@@ -49,8 +67,14 @@ function useLogin() {
         const user = response.data.data.user;
         setUserData(user);
 
+        console.log('=== DÉTERMINATION DU RÔLE ===');
+        console.log('user.role:', user.role);
+        console.log('user.poste:', user.poste);
+
         // Pour le personnel, utiliser le poste au lieu du role pour la redirection
         const effectiveRole = user.role === 'personnel' ? user.poste : user.role;
+
+        console.log('Rôle effectif déterminé:', effectiveRole);
 
         // Stocker le role effectif (poste pour personnel, role pour admin)
         setUserRole(effectiveRole);
@@ -58,6 +82,14 @@ function useLogin() {
 
         // Sauvegarder dans localStorage pour persistence
         saveUserData(user, effectiveRole);
+
+        console.log('=== CONNEXION RÉUSSIE ===');
+        console.log('Retour au frontend:', {
+          success: true,
+          role: effectiveRole,
+          message: response.data.message,
+          first_login_done: user.first_login_done
+        });
 
         return {
           success: true,
@@ -68,10 +100,13 @@ function useLogin() {
       }
     } catch (error) {
       setIsLoading(false);
-      console.error("Authentication error:", error);
+      console.error("=== ERREUR D'AUTHENTIFICATION ===");
+      console.error("Error object:", error);
 
       if (error.response) {
         // Le serveur a répondu avec un code d'erreur
+        console.error('Réponse erreur du serveur:', error.response.data);
+        console.error('Status:', error.response.status);
         return {
           success: false,
           status: error.response.status,
@@ -80,6 +115,8 @@ function useLogin() {
         };
       } else if (error.request) {
         // La requête a été faite mais pas de réponse
+        console.error('Pas de réponse du serveur');
+        console.error('Request:', error.request);
         return {
           success: false,
           error: "Erreur de connexion",
@@ -87,6 +124,7 @@ function useLogin() {
         };
       } else {
         // Erreur lors de la configuration de la requête
+        console.error('Erreur de configuration:', error.message);
         return {
           success: false,
           error: "Erreur",
