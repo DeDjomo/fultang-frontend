@@ -2,9 +2,15 @@ import { FaCog, FaEnvelope, FaSignOutAlt } from "react-icons/fa";
 import { Tooltip } from "antd";
 import { useAuthentication } from "../../../Utils/Provider.jsx";
 import userIcon from "../../../assets/userIcon.png";
+import { useState } from "react";
+import { SettingsModal } from "../../../GlobalComponents/SettingsModal.jsx";
+import { useNavigate } from "react-router-dom";
+import { AppRoutesPaths } from "../../../Router/appRouterPaths.js";
 
 export function PharmacistNavBar() {
     const { logout, userData } = useAuthentication();
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const navigate = useNavigate();
 
     const applyNavLinkBtnStyle = () => {
         return " w-12 h-10 mt-1 border-2 bg-gray-100 flex justify-center items-center rounded-xl shadow-xl hover:bg-secondary text-secondary text-xl hover:text-white transition-all duration-300";
@@ -12,24 +18,34 @@ export function PharmacistNavBar() {
 
     return (
         <>
+            <SettingsModal
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+            />
             <div className="border-b-2 m-3  border-b-gray-300">
                 <div className="w-full h-[70px] flex justify-between">
                     <h1 className="ml-7 text-4xl text-secondary mt-3.5 font-bold">
                         Pharmacist
                     </h1>
                     <div className="flex gap-3 mt-3.5 mb-4 mr-5">
-                        <Tooltip placement={"top"} title={"settings"}>
-                            <button className={applyNavLinkBtnStyle()}>
+                        <Tooltip placement={"top"} title={"Settings"}>
+                            <button
+                                onClick={() => setIsSettingsOpen(true)}
+                                className={applyNavLinkBtnStyle()}
+                            >
                                 <FaCog />
                             </button>
                         </Tooltip>
 
-                        <Tooltip placement={"top"} title={"Messages"}>
-                            <button className={applyNavLinkBtnStyle()}>
+                        <Tooltip placement={"top"} title={"Messages / Reports"}>
+                            <button
+                                onClick={() => navigate(AppRoutesPaths.pharmacistReports)}
+                                className={applyNavLinkBtnStyle()}
+                            >
                                 <FaEnvelope />
                             </button>
                         </Tooltip>
-                        <Tooltip placement={"top"} title={"LogOut"}>
+                        <Tooltip placement={"top"} title={"Log Out"}>
                             <button
                                 onClick={() => {
                                     logout();

@@ -62,7 +62,7 @@ export function PharmacistReports() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
-        const baseUrl = "http://127.0.0.1:8000/api";
+        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
 
         try {
             setLoading(true);
@@ -163,7 +163,7 @@ export function PharmacistReports() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
-        const baseUrl = "http://127.0.0.1:8000/api";
+        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
 
         try {
             setSubmitting(true);
@@ -219,7 +219,7 @@ export function PharmacistReports() {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             };
-            const baseUrl = "http://127.0.0.1:8000/api";
+            const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
 
             try {
                 await fetch(`${baseUrl}/rapports/${report.idRapport}/`, {

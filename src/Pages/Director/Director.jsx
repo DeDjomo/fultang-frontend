@@ -56,7 +56,7 @@ export function Director() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
-        const baseUrl = "http://127.0.0.1:8000/api";
+        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
 
         try {
             setLoading(true);
@@ -214,7 +214,7 @@ export function Director() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
-        const baseUrl = "http://127.0.0.1:8000/api";
+        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
 
         try {
             setActionLoading(true);
@@ -257,7 +257,7 @@ export function Director() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
-        const baseUrl = "http://127.0.0.1:8000/api";
+        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
 
         try {
             setActionLoading(true);
@@ -744,8 +744,8 @@ export function Director() {
                                 onClick={confirmAction === 'approve' ? executeApprove : executeReject}
                                 disabled={actionLoading}
                                 className={`flex-1 px-4 py-3 text-white rounded-lg transition-all font-semibold disabled:opacity-50 flex items-center justify-center gap-2 ${confirmAction === 'approve'
-                                        ? 'bg-green-500 hover:bg-green-600'
-                                        : 'bg-red-500 hover:bg-red-600'
+                                    ? 'bg-green-500 hover:bg-green-600'
+                                    : 'bg-red-500 hover:bg-red-600'
                                     }`}
                             >
                                 {actionLoading ? (

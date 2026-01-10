@@ -58,7 +58,7 @@ export function PharmacistInventory() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
-        const baseUrl = "http://127.0.0.1:8000/api";
+        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
 
         try {
             setLoading(true);
@@ -108,7 +108,7 @@ export function PharmacistInventory() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
-        const baseUrl = "http://127.0.0.1:8000/api";
+        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
 
         try {
             const linesRes = await fetch(`${baseUrl}/lignes-archive-inventaire/?archive=${archive.id_archive}`, { headers, cache: "no-store" });
@@ -158,7 +158,7 @@ export function PharmacistInventory() {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             };
-            const baseUrl = "http://127.0.0.1:8000/api";
+            const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
 
             const archiveRes = await fetch(`${baseUrl}/archives-inventaire/`, {
                 method: 'POST',
@@ -228,7 +228,7 @@ export function PharmacistInventory() {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             };
-            const baseUrl = "http://127.0.0.1:8000/api";
+            const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
 
             // Récupérer les lignes de l'archive en cours
             const linesRes = await fetch(`${baseUrl}/lignes-archive-inventaire/?archive=${currentArchive.id_archive}`, { headers, cache: "no-store" });
@@ -322,7 +322,7 @@ export function PharmacistInventory() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
-        const baseUrl = "http://127.0.0.1:8000/api";
+        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
 
         try {
             setLoading(true);

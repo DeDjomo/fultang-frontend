@@ -50,7 +50,7 @@ export function MaterialList() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
-        const baseUrl = "http://127.0.0.1:8000/api";
+        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
 
         try {
             console.log("🚀 MaterialList - Loading fresh data...");

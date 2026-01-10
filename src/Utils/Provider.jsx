@@ -42,13 +42,13 @@ function useLogin() {
 
   async function login(data) {
     try {
-      const baseURL = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api/";
+      const baseURL = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
       console.log('=== TENTATIVE DE CONNEXION ===');
       console.log('URL Backend:', baseURL);
       console.log('Données envoyées:', { username: data.username, password: '***' });
 
       const response = await axios.post(
-        `${baseURL}login/`,
+        `${baseURL}/login/`,
         data
       );
 
@@ -140,7 +140,7 @@ function useLogin() {
       try {
         const baseURL = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api/";
         const response = await axios.get(
-          `${baseURL}me/`,
+          `${baseURL}/me/`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (response.status === 200) {
