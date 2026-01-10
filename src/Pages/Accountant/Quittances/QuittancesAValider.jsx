@@ -277,10 +277,12 @@ export function QuittancesAValiderPage() {
                                     filterOption={(input, option) =>
                                         (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                                     }
-                                    options={comptesProduits.map(c => ({
-                                        value: c.id,
-                                        label: `${c.numero_compte} - ${c.libelle}`
-                                    }))}
+                                    options={comptesProduits
+                                        .filter(c => c.numero_compte && c.numero_compte.length >= 6) // Only detail accounts (6+ digits)
+                                        .map(c => ({
+                                            value: c.id,
+                                            label: `${c.numero_compte} - ${c.libelle}`
+                                        }))}
                                 />
                                 <p className="text-xs text-gray-400 mt-1">
                                     Le compte de trésorerie (Caisse/Banque) sera automatiquement déterminé selon le mode de paiement.
