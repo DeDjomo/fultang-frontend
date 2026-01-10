@@ -126,7 +126,7 @@ export function LoginPage() {
                 break;
             case 'comptable':
                 console.log('Redirection vers: Accountant Page');
-                navigate(appRouterPaths.accountantPage);
+                navigate(appRouterPaths.accountantHome);
                 break;
             case 'comptable_matiere':
                 console.log('Redirection vers: Compta Matière Dashboard');

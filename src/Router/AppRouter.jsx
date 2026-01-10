@@ -85,13 +85,13 @@ export function AppRoute() {
     const PharmacistPrescriptions = React.lazy(async () => ({ default: (await import("../Pages/Pharmacist/PharmacistPrescriptions.jsx")).PharmacistPrescriptions }));
 
     // Accountant Module components (from prototype)
-    const AccountantHomePage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Home/HomePage.jsx")).default }));
-    const QuittancesAValiderPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Quittances/QuittancesAValider.jsx")).default }));
-    const QuittancesValideesPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Quittances/QuittancesValidees.jsx")).default }));
-    const EcrituresComptablesPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Ecritures/EcrituresComptables.jsx")).default }));
-    const BalancePage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Balance/Balance.jsx")).default }));
-    const PlanComptablePage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/PlanComptable/PlanComptable.jsx")).default }));
-    const RapportsPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Rapports/Rapports.jsx")).default }));
+    const AccountantHomePage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Home/HomePage.jsx")).AccountantHomePage }));
+    const QuittancesAValiderPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Quittances/QuittancesAValider.jsx")).QuittancesAValiderPage }));
+    const QuittancesValideesPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Quittances/QuittancesValidees.jsx")).QuittancesValideesPage }));
+    const EcrituresComptablesPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Ecritures/EcrituresComptables.jsx")).EcrituresComptablesPage }));
+    const BalancePage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Balance/Balance.jsx")).BalancePage }));
+    const PlanComptablePage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/PlanComptable/PlanComptable.jsx")).PlanComptablePage }));
+    const RapportsPage = React.lazy(async () => ({ default: (await import("../Pages/Accountant/Rapports/Rapports.jsx")).RapportsPage }));
 
 
 
