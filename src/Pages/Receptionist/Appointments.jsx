@@ -346,8 +346,8 @@ export function Appointments() {
                                         onClick={handlePrevPage}
                                         disabled={currentPage === 1}
                                         className={`flex items-center gap-1 px-4 py-2 rounded-lg font-medium transition-all ${currentPage === 1
-                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                : 'bg-white border border-gray-300 text-gray-700 hover:border-primary-end hover:text-primary-end'
+                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            : 'bg-white border border-gray-300 text-gray-700 hover:border-primary-end hover:text-primary-end'
                                             }`}
                                     >
                                         <ChevronLeft className="w-4 h-4" />
@@ -360,8 +360,8 @@ export function Appointments() {
                                                 key={page}
                                                 onClick={() => setCurrentPage(page)}
                                                 className={`w-10 h-10 rounded-lg font-medium transition-all ${currentPage === page
-                                                        ? 'bg-gradient-to-r from-primary-end to-primary-start text-white shadow-md'
-                                                        : 'bg-white border border-gray-300 text-gray-700 hover:border-primary-end'
+                                                    ? 'bg-gradient-to-r from-primary-end to-primary-start text-white shadow-md'
+                                                    : 'bg-white border border-gray-300 text-gray-700 hover:border-primary-end'
                                                     }`}
                                             >
                                                 {page}
@@ -373,8 +373,8 @@ export function Appointments() {
                                         onClick={handleNextPage}
                                         disabled={currentPage === totalPages}
                                         className={`flex items-center gap-1 px-4 py-2 rounded-lg font-medium transition-all ${currentPage === totalPages
-                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                                : 'bg-white border border-gray-300 text-gray-700 hover:border-primary-end hover:text-primary-end'
+                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                            : 'bg-white border border-gray-300 text-gray-700 hover:border-primary-end hover:text-primary-end'
                                             }`}
                                     >
                                         Next
