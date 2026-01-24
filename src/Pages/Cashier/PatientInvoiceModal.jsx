@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Modal } from 'antd';
-import { DollarSign, Plus, X, Send } from 'lucide-react';
+import { DollarSign, Plus, X, Send, Printer } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { getPatientQuittances, createQuittance, redirectPatientToService } from '../../services/quittancesApi';
 import { getAllServices } from '../../services/servicesApi';
@@ -37,6 +37,10 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
     //Redirect state
     const [showRedirectForm, setShowRedirectForm] = useState(false);
     const [selectedService, setSelectedService] = useState('');
+
+    // Print confirmation popup state
+    const [showPrintConfirm, setShowPrintConfirm] = useState(false);
+    const [newlyCreatedQuittance, setNewlyCreatedQuittance] = useState(null);
 
     useEffect(() => {
         if (isOpen && patient) {
@@ -156,7 +160,7 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
             };
 
             console.log('Sending quittance data:', dataToSend);
-            await createQuittance(dataToSend);
+            const response = await createQuittance(dataToSend);
             showSuccess('Le reçu a été ajouté avec succès.', 'Reçu créé');
             setShowAddForm(false);
             setFormData({
@@ -168,6 +172,19 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
                 cheque_banque: '',
                 cheque_titulaire: ''
             });
+
+            // Store the newly created quittance for print option
+            const createdQuittance = {
+                numero_quittance: response?.numero_quittance || `QT-${new Date().getFullYear()}-XXXXX`,
+                date_paiement: dataToSend.date_paiement,
+                Montant_paye: dataToSend.Montant_paye,
+                Motif: dataToSend.Motif,
+                mode_paiement: dataToSend.mode_paiement,
+                service: patient?.service_courant
+            };
+            setNewlyCreatedQuittance(createdQuittance);
+            setShowPrintConfirm(true);
+
             loadQuittances();
         } catch (error) {
             console.error('Error creating quittance:', error);
@@ -217,406 +234,596 @@ export default function PatientInvoiceModal({ isOpen, onClose, patient }) {
         onClose();
     };
 
+    // Function to print a single invoice
+    const handlePrintInvoice = (quittance) => {
+        const printContent = `
+            <!DOCTYPE html>
+            <html lang="fr">
+            <head>
+                <meta charset="UTF-8">
+                <title>Facture ${quittance.numero_quittance}</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { font-family: 'Arial', sans-serif; padding: 30px; background: white; }
+                    .header { text-align: center; border-bottom: 3px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
+                    .header h1 { color: #1e40af; font-size: 28px; margin-bottom: 5px; }
+                    .header p { color: #666; font-size: 12px; }
+                    .invoice-title { text-align: center; background: #2563eb; color: white; padding: 10px; font-size: 18px; font-weight: bold; margin-bottom: 25px; }
+                    .invoice-number { text-align: center; font-size: 14px; color: #666; margin-bottom: 20px; }
+                    .section { margin-bottom: 25px; }
+                    .section-title { font-weight: bold; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; }
+                    .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dotted #eee; }
+                    .row .label { color: #666; }
+                    .row .value { font-weight: 600; color: #333; }
+                    .amount-box { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 20px; text-align: center; border-radius: 8px; margin: 25px 0; }
+                    .amount-box .amount { font-size: 32px; font-weight: bold; }
+                    .amount-box .label { font-size: 14px; opacity: 0.9; }
+                    .footer { margin-top: 50px; }
+                    .signatures { display: flex; justify-content: space-between; margin-top: 60px; }
+                    .signature-box { text-align: center; width: 45%; }
+                    .signature-line { border-top: 1px solid #333; margin-top: 60px; padding-top: 10px; }
+                    .stamp-area { border: 2px dashed #ccc; height: 100px; margin-top: 10px; display: flex; align-items: center; justify-content: center; color: #999; font-size: 12px; }
+                    .terms { margin-top: 40px; padding: 15px; background: #f9f9f9; border-radius: 5px; font-size: 11px; color: #666; }
+                    @media print {
+                        body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>POLYCLINIQUE FULTANG</h1>
+                    <p>Rue de l'Hopital, Yaoundé - Cameroun</p>
+                    <p>Tél: +237 6XX XXX XXX | Email: contact@fultang.cm</p>
+                </div>
+                
+                <div class="invoice-title">FACTURE / RECEIPT</div>
+                <div class="invoice-number">N° ${quittance.numero_quittance}</div>
+                
+                <div class="section">
+                    <div class="section-title">Informations Patient</div>
+                    <div class="row">
+                        <span class="label">Nom complet:</span>
+                        <span class="value">${patient?.prenom || ''} ${patient?.nom || ''}</span>
+                    </div>
+                    <div class="row">
+                        <span class="label">Matricule:</span>
+                        <span class="value">${patient?.matricule || 'N/A'}</span>
+                    </div>
+                    <div class="row">
+                        <span class="label">Service:</span>
+                        <span class="value">${patient?.service_courant || quittance.service || 'N/A'}</span>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">Détails du Paiement</div>
+                    <div class="row">
+                        <span class="label">Date:</span>
+                        <span class="value">${new Date(quittance.date_paiement).toLocaleString('fr-FR')}</span>
+                    </div>
+                    <div class="row">
+                        <span class="label">Motif:</span>
+                        <span class="value">${quittance.Motif}</span>
+                    </div>
+                    <div class="row">
+                        <span class="label">Mode de paiement:</span>
+                        <span class="value">${quittance.mode_paiement || 'Espèces'}</span>
+                    </div>
+                </div>
+                
+                <div class="amount-box">
+                    <div class="label">MONTANT PAYÉ</div>
+                    <div class="amount">${parseFloat(quittance.Montant_paye).toLocaleString('fr-FR')} FCFA</div>
+                </div>
+                
+                <div class="footer">
+                    <div class="signatures">
+                        <div class="signature-box">
+                            <div class="signature-line">Le Caissier</div>
+                            <div class="stamp-area">Espace pour cachet</div>
+                        </div>
+                        <div class="signature-box">
+                            <div class="signature-line">Le Patient / Accompagnant</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="terms">
+                    <strong>Conditions:</strong> Ce reçu est à conserver précieusement. Aucun remboursement ne sera effectué sans présentation de ce document.
+                    Document généré le ${new Date().toLocaleString('fr-FR')} - Polyclinique Fultang
+                </div>
+            </body>
+            </html>
+        `;
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+            printWindow.print();
+        }, 500);
+    };
+
+    // Handle print confirmation
+    const handleConfirmPrint = () => {
+        if (newlyCreatedQuittance) {
+            handlePrintInvoice(newlyCreatedQuittance);
+        }
+        setShowPrintConfirm(false);
+        setNewlyCreatedQuittance(null);
+    };
+
+    const handleSkipPrint = () => {
+        setShowPrintConfirm(false);
+        setNewlyCreatedQuittance(null);
+    };
+
     return (
-        <Modal
-            open={isOpen}
-            onCancel={handleClose}
-            footer={null}
-            width={900}
-            title={null}
-            className="invoice-modal"
-        >
-            <div className="p-6">
-                {/* Header */}
-                <div className="mb-6 pb-4 border-b-2 border-gray-200">
-                    <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-                        <DollarSign className="w-8 h-8 text-primary-end" />
-                        Patient Invoices
-                    </h2>
-                    {patient && (
-                        <div className="mt-3 text-gray-600">
-                            <p className="text-lg"><span className="font-semibold">Patient:</span> {patient.prenom} {patient.nom}</p>
-                            <p className="text-sm"><span className="font-semibold">ID:</span> {patient.matricule} | <span className="font-semibold">Service:</span> {patient.service_courant}</p>
+        <>
+            {/* Print Confirmation Modal */}
+            <Modal
+                open={showPrintConfirm}
+                onCancel={handleSkipPrint}
+                footer={null}
+                width={450}
+                centered
+                className="print-confirm-modal"
+            >
+                <div className="p-6 text-center">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Printer className="w-8 h-8 text-green-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">Facture créée avec succès !</h3>
+                    <p className="text-gray-600 mb-6">Voulez-vous imprimer cette facture maintenant ?</p>
+
+                    {newlyCreatedQuittance && (
+                        <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm text-gray-500">N°</span>
+                                <span className="font-bold text-primary-end">{newlyCreatedQuittance.numero_quittance}</span>
+                            </div>
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm text-gray-500">Montant</span>
+                                <span className="text-xl font-bold text-green-600">
+                                    {parseFloat(newlyCreatedQuittance.Montant_paye).toLocaleString('fr-FR')} FCFA
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm text-gray-500">Motif</span>
+                                <span className="text-gray-700">{newlyCreatedQuittance.Motif}</span>
+                            </div>
                         </div>
                     )}
-                </div>
 
-                {/* Action Buttons */}
-                <div className="flex gap-3 mb-6">
-                    <button
-                        onClick={() => { setShowAddForm(!showAddForm); setShowRedirectForm(false); }}
-                        className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white px-5 py-2.5 rounded-lg hover:opacity-90 transition font-semibold shadow-md"
-                    >
-                        <Plus className="w-5 h-5" />
-                        Add New Receipt
-                    </button>
-                    <button
-                        onClick={() => { setShowRedirectForm(!showRedirectForm); setShowAddForm(false); }}
-                        className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-5 py-2.5 rounded-lg hover:opacity-90 transition font-semibold shadow-md"
-                    >
-                        <Send className="w-5 h-5" />
-                        Redirect Patient
-                    </button>
+                    <div className="flex gap-3 justify-center">
+                        <button
+                            onClick={handleSkipPrint}
+                            className="px-6 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-semibold transition"
+                        >
+                            Plus tard
+                        </button>
+                        <button
+                            onClick={handleConfirmPrint}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition"
+                        >
+                            <Printer className="w-4 h-4" />
+                            Oui, imprimer
+                        </button>
+                    </div>
                 </div>
+            </Modal>
 
-                {/* Add Receipt Form */}
-                {showAddForm && (
-                    <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg mb-6 border-2 border-green-200 shadow-lg">
-                        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                            <Plus className="w-5 h-5 text-green-600" />
-                            New Receipt
-                        </h3>
-                        <form onSubmit={handleSubmitQuittance} className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+            <Modal
+                open={isOpen}
+                onCancel={handleClose}
+                footer={null}
+                width={900}
+                title={null}
+                className="invoice-modal"
+            >
+                <div className="p-6">
+                    {/* Header */}
+                    <div className="mb-6 pb-4 border-b-2 border-gray-200">
+                        <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
+                            <DollarSign className="w-8 h-8 text-primary-end" />
+                            Patient Invoices
+                        </h2>
+                        {patient && (
+                            <div className="mt-3 text-gray-600">
+                                <p className="text-lg"><span className="font-semibold">Patient:</span> {patient.prenom} {patient.nom}</p>
+                                <p className="text-sm"><span className="font-semibold">ID:</span> {patient.matricule} | <span className="font-semibold">Service:</span> {patient.service_courant}</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3 mb-6">
+                        <button
+                            onClick={() => { setShowAddForm(!showAddForm); setShowRedirectForm(false); }}
+                            className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white px-5 py-2.5 rounded-lg hover:opacity-90 transition font-semibold shadow-md"
+                        >
+                            <Plus className="w-5 h-5" />
+                            Add New Receipt
+                        </button>
+                        <button
+                            onClick={() => { setShowRedirectForm(!showRedirectForm); setShowAddForm(false); }}
+                            className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-5 py-2.5 rounded-lg hover:opacity-90 transition font-semibold shadow-md"
+                        >
+                            <Send className="w-5 h-5" />
+                            Redirect Patient
+                        </button>
+                    </div>
+
+                    {/* Add Receipt Form */}
+                    {showAddForm && (
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg mb-6 border-2 border-green-200 shadow-lg">
+                            <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <Plus className="w-5 h-5 text-green-600" />
+                                New Receipt
+                            </h3>
+                            <form onSubmit={handleSubmitQuittance} className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Amount (FCFA) *</label>
+                                        <input
+                                            type="number"
+                                            name="Montant_paye"
+                                            value={formData.Montant_paye}
+                                            onChange={handleInputChange}
+                                            min="0"
+                                            step="0.01"
+                                            className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                            placeholder="0.00"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Method</label>
+                                        <select
+                                            name="mode_paiement"
+                                            value={formData.mode_paiement}
+                                            onChange={handleInputChange}
+                                            className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        >
+                                            <option value="especes">Espèces (Cash)</option>
+                                            <option value="mobile_money">Mobile Money</option>
+                                            <option value="virement">Virement Bancaire</option>
+                                            <option value="cheque">Chèque</option>
+                                            <option value="carte">Carte Bancaire</option>
+                                        </select>
+                                    </div>
+                                </div>
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Amount (FCFA) *</label>
-                                    <input
-                                        type="number"
-                                        name="Montant_paye"
-                                        value={formData.Montant_paye}
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Purpose / Description *</label>
+                                    <textarea
+                                        name="Motif"
+                                        value={formData.Motif}
                                         onChange={handleInputChange}
-                                        min="0"
-                                        step="0.01"
-                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                        placeholder="0.00"
+                                        rows="3"
+                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                                        placeholder="Payment purpose or description..."
                                         required
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Method</label>
-                                    <select
-                                        name="mode_paiement"
-                                        value={formData.mode_paiement}
-                                        onChange={handleInputChange}
-                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                <p className="text-xs text-gray-500 italic">* Le numéro de reçu sera généré automatiquement (format: QT-YYYY-XXXXX)</p>
+
+                                {/* Conditional Check Fields */}
+                                {formData.mode_paiement === 'cheque' && (
+                                    <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-3">
+                                        <h4 className="font-semibold text-gray-700 text-sm border-b pb-2 mb-2">Check Details</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Check Number</label>
+                                                <input
+                                                    type="text"
+                                                    name="cheque_numero"
+                                                    value={formData.cheque_numero}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                    placeholder="chk-12345"
+                                                    required={formData.mode_paiement === 'cheque'}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Bank Name</label>
+                                                <input
+                                                    type="text"
+                                                    name="cheque_banque"
+                                                    value={formData.cheque_banque}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                    placeholder="e.g. SGBC"
+                                                    required={formData.mode_paiement === 'cheque'}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Account Holder</label>
+                                                <input
+                                                    type="text"
+                                                    name="cheque_titulaire"
+                                                    value={formData.cheque_titulaire}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                    placeholder="Name on check"
+                                                    required={formData.mode_paiement === 'cheque'}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Conditional Mobile Money Fields */}
+                                {formData.mode_paiement === 'mobile_money' && (
+                                    <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-3">
+                                        <h4 className="font-semibold text-gray-700 text-sm border-b pb-2 mb-2">Mobile Money Details</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Payer Number (9 digits)</label>
+                                                <input
+                                                    type="text"
+                                                    name="mobile_numero"
+                                                    value={formData.mobile_numero || ''}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                    placeholder="e.g. 699XXXXXX"
+                                                    maxLength="9"
+                                                    pattern="\d{9}"
+                                                    title="Must be exactly 9 digits"
+                                                    required={formData.mode_paiement === 'mobile_money'}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Operator</label>
+                                                <select
+                                                    name="mobile_operateur"
+                                                    value={formData.mobile_operateur || 'orange'}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                >
+                                                    <option value="orange">Orange Money</option>
+                                                    <option value="mtn">MTN Mobile Money</option>
+                                                    <option value="autre">Other</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Transaction Ref</label>
+                                                <input
+                                                    type="text"
+                                                    name="mobile_reference"
+                                                    value={formData.mobile_reference || ''}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                    placeholder="Transaction ID"
+                                                    required={formData.mode_paiement === 'mobile_money'}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Conditional Bank Transfer Fields */}
+                                {formData.mode_paiement === 'virement' && (
+                                    <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-3">
+                                        <h4 className="font-semibold text-gray-700 text-sm border-b pb-2 mb-2">Bank Transfer Details</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Bank Name</label>
+                                                <input
+                                                    type="text"
+                                                    name="virement_banque"
+                                                    value={formData.virement_banque || ''}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                    placeholder="e.g. Afriland First Bank"
+                                                    required={formData.mode_paiement === 'virement'}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Transfer Reference</label>
+                                                <input
+                                                    type="text"
+                                                    name="virement_reference"
+                                                    value={formData.virement_reference || ''}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                    placeholder="Ref number"
+                                                    required={formData.mode_paiement === 'virement'}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Date</label>
+                                                <input
+                                                    type="date"
+                                                    name="virement_date"
+                                                    value={formData.virement_date || ''}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                    required={formData.mode_paiement === 'virement'}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Source Account (Optional)</label>
+                                                <input
+                                                    type="text"
+                                                    name="virement_compte"
+                                                    value={formData.virement_compte || ''}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                    placeholder="Account number"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Conditional Card Fields */}
+                                {formData.mode_paiement === 'carte' && (
+                                    <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-3">
+                                        <h4 className="font-semibold text-gray-700 text-sm border-b pb-2 mb-2">Card Payment Details</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Card Number (Last 4 digits)</label>
+                                                <input
+                                                    type="text"
+                                                    name="carte_numero"
+                                                    value={formData.carte_numero || ''}
+                                                    onChange={handleInputChange}
+                                                    maxLength="4"
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                    placeholder="e.g. 1234"
+                                                    pattern="\d{4}"
+                                                    title="Must be exactly 4 digits"
+                                                    required={formData.mode_paiement === 'carte'}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Transaction Ref</label>
+                                                <input
+                                                    type="text"
+                                                    name="carte_reference"
+                                                    value={formData.carte_reference || ''}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                    placeholder="Auth Code"
+                                                    required={formData.mode_paiement === 'carte'}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Terminal ID (Optional)</label>
+                                                <input
+                                                    type="text"
+                                                    name="carte_terminal"
+                                                    value={formData.carte_terminal || ''}
+                                                    onChange={handleInputChange}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
+                                                    placeholder="TPE ID"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="flex gap-3 justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddForm(false)}
+                                        className="px-5 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-semibold transition"
                                     >
-                                        <option value="especes">Espèces (Cash)</option>
-                                        <option value="mobile_money">Mobile Money</option>
-                                        <option value="virement">Virement Bancaire</option>
-                                        <option value="cheque">Chèque</option>
-                                        <option value="carte">Carte Bancaire</option>
-                                    </select>
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={submitting}
+                                        className="px-5 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:opacity-90 font-semibold transition flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                        {submitting ? 'Saving...' : 'Save Receipt'}
+                                    </button>
                                 </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Purpose / Description *</label>
-                                <textarea
-                                    name="Motif"
-                                    value={formData.Motif}
-                                    onChange={handleInputChange}
-                                    rows="3"
-                                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
-                                    placeholder="Payment purpose or description..."
-                                    required
-                                />
-                            </div>
-                            <p className="text-xs text-gray-500 italic">* Le numéro de reçu sera généré automatiquement (format: QT-YYYY-XXXXX)</p>
-
-                            {/* Conditional Check Fields */}
-                            {formData.mode_paiement === 'cheque' && (
-                                <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-3">
-                                    <h4 className="font-semibold text-gray-700 text-sm border-b pb-2 mb-2">Check Details</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Check Number</label>
-                                            <input
-                                                type="text"
-                                                name="cheque_numero"
-                                                value={formData.cheque_numero}
-                                                onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
-                                                placeholder="chk-12345"
-                                                required={formData.mode_paiement === 'cheque'}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Bank Name</label>
-                                            <input
-                                                type="text"
-                                                name="cheque_banque"
-                                                value={formData.cheque_banque}
-                                                onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
-                                                placeholder="e.g. SGBC"
-                                                required={formData.mode_paiement === 'cheque'}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Account Holder</label>
-                                            <input
-                                                type="text"
-                                                name="cheque_titulaire"
-                                                value={formData.cheque_titulaire}
-                                                onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
-                                                placeholder="Name on check"
-                                                required={formData.mode_paiement === 'cheque'}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Conditional Mobile Money Fields */}
-                            {formData.mode_paiement === 'mobile_money' && (
-                                <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-3">
-                                    <h4 className="font-semibold text-gray-700 text-sm border-b pb-2 mb-2">Mobile Money Details</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Payer Number (9 digits)</label>
-                                            <input
-                                                type="text"
-                                                name="mobile_numero"
-                                                value={formData.mobile_numero || ''}
-                                                onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
-                                                placeholder="e.g. 699XXXXXX"
-                                                maxLength="9"
-                                                pattern="\d{9}"
-                                                title="Must be exactly 9 digits"
-                                                required={formData.mode_paiement === 'mobile_money'}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Operator</label>
-                                            <select
-                                                name="mobile_operateur"
-                                                value={formData.mobile_operateur || 'orange'}
-                                                onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
-                                            >
-                                                <option value="orange">Orange Money</option>
-                                                <option value="mtn">MTN Mobile Money</option>
-                                                <option value="autre">Other</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Transaction Ref</label>
-                                            <input
-                                                type="text"
-                                                name="mobile_reference"
-                                                value={formData.mobile_reference || ''}
-                                                onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
-                                                placeholder="Transaction ID"
-                                                required={formData.mode_paiement === 'mobile_money'}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Conditional Bank Transfer Fields */}
-                            {formData.mode_paiement === 'virement' && (
-                                <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-3">
-                                    <h4 className="font-semibold text-gray-700 text-sm border-b pb-2 mb-2">Bank Transfer Details</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Bank Name</label>
-                                            <input
-                                                type="text"
-                                                name="virement_banque"
-                                                value={formData.virement_banque || ''}
-                                                onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
-                                                placeholder="e.g. Afriland First Bank"
-                                                required={formData.mode_paiement === 'virement'}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Transfer Reference</label>
-                                            <input
-                                                type="text"
-                                                name="virement_reference"
-                                                value={formData.virement_reference || ''}
-                                                onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
-                                                placeholder="Ref number"
-                                                required={formData.mode_paiement === 'virement'}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Date</label>
-                                            <input
-                                                type="date"
-                                                name="virement_date"
-                                                value={formData.virement_date || ''}
-                                                onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
-                                                required={formData.mode_paiement === 'virement'}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Source Account (Optional)</label>
-                                            <input
-                                                type="text"
-                                                name="virement_compte"
-                                                value={formData.virement_compte || ''}
-                                                onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
-                                                placeholder="Account number"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Conditional Card Fields */}
-                            {formData.mode_paiement === 'carte' && (
-                                <div className="bg-white p-4 rounded-lg border border-gray-200 space-y-3">
-                                    <h4 className="font-semibold text-gray-700 text-sm border-b pb-2 mb-2">Card Payment Details</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Card Number (Last 4 digits)</label>
-                                            <input
-                                                type="text"
-                                                name="carte_numero"
-                                                value={formData.carte_numero || ''}
-                                                onChange={handleInputChange}
-                                                maxLength="4"
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
-                                                placeholder="e.g. 1234"
-                                                pattern="\d{4}"
-                                                title="Must be exactly 4 digits"
-                                                required={formData.mode_paiement === 'carte'}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Transaction Ref</label>
-                                            <input
-                                                type="text"
-                                                name="carte_reference"
-                                                value={formData.carte_reference || ''}
-                                                onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
-                                                placeholder="Auth Code"
-                                                required={formData.mode_paiement === 'carte'}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-600 mb-1">Terminal ID (Optional)</label>
-                                            <input
-                                                type="text"
-                                                name="carte_terminal"
-                                                value={formData.carte_terminal || ''}
-                                                onChange={handleInputChange}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 text-sm"
-                                                placeholder="TPE ID"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                            <div className="flex gap-3 justify-end">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAddForm(false)}
-                                    className="px-5 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-semibold transition"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="px-5 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:opacity-90 font-semibold transition flex items-center gap-2 disabled:opacity-50"
-                                >
-                                    {submitting ? 'Saving...' : 'Save Receipt'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                )}
-
-                {/* Redirect Form */}
-                {showRedirectForm && (
-                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg mb-6 border-2 border-blue-200 shadow-lg">
-                        <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                            <Send className="w-5 h-5 text-blue-600" />
-                            Redirect Patient to Another Service
-                        </h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Select Service</label>
-                                <select
-                                    value={selectedService}
-                                    onChange={(e) => setSelectedService(e.target.value)}
-                                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                >
-                                    <option value="">-- Select Service --</option>
-                                    {services.map((service) => (
-                                        <option key={service.id} value={service.nom}>{service.nom}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="flex gap-3 justify-end">
-                                <button
-                                    onClick={() => setShowRedirectForm(false)}
-                                    className="px-5 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-semibold transition"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleRedirectPatient}
-                                    disabled={submitting}
-                                    className="px-5 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:opacity-90 font-semibold transition disabled:opacity-50 flex items-center gap-2"
-                                >
-                                    {submitting ? 'Redirecting...' : 'Redirect Patient'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Receipts List */}
-                <div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-4">Receipt History ({quittances.length})</h3>
-                    {loading ? (
-                        <div className="flex justify-center items-center h-32">
-                            <Loader size="medium" color="primary-end" />
-                        </div>
-                    ) : quittances.length === 0 ? (
-                        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                            <DollarSign className="w-16 h-16 text-gray-400 mx-auto mb-3" />
-                            <p className="text-gray-500 text-lg font-medium">No receipts found for this patient</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-3 max-h-96 overflow-y-auto">
-                            {quittances.map((quittance) => (
-                                <div key={quittance.idQuittance} className="bg-white border-2 border-gray-200 rounded-lg p-4 hover:shadow-md transition">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <span className="px-3 py-1 bg-primary-end text-white rounded-full text-sm font-bold">
-                                                    {quittance.numero_quittance}
-                                                </span>
-                                                <span className="text-2xl font-bold text-green-600">
-                                                    {parseFloat(quittance.Montant_paye).toLocaleString()} FCFA
-                                                </span>
-                                            </div>
-                                            <p className="text-gray-700 mb-2">{quittance.Motif}</p>
-                                            <div className="flex gap-4 text-sm text-gray-600">
-                                                <span><span className="font-semibold">Date:</span> {new Date(quittance.date_paiement).toLocaleString('en-US')}</span>
-                                                {quittance.service && <span><span className="font-semibold">Service:</span> {quittance.service}</span>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+                            </form>
                         </div>
                     )}
-                </div>
 
-                {/* Close Button */}
-                <div className="mt-6 flex justify-end">
-                    <button
-                        onClick={handleClose}
-                        className="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition flex items-center gap-2"
-                    >
-                        <X className="w-5 h-5" />
-                        Close
-                    </button>
+                    {/* Redirect Form */}
+                    {showRedirectForm && (
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg mb-6 border-2 border-blue-200 shadow-lg">
+                            <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <Send className="w-5 h-5 text-blue-600" />
+                                Redirect Patient to Another Service
+                            </h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Select Service</label>
+                                    <select
+                                        value={selectedService}
+                                        onChange={(e) => setSelectedService(e.target.value)}
+                                        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    >
+                                        <option value="">-- Select Service --</option>
+                                        {services.map((service) => (
+                                            <option key={service.id} value={service.nom}>{service.nom}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex gap-3 justify-end">
+                                    <button
+                                        onClick={() => setShowRedirectForm(false)}
+                                        className="px-5 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-semibold transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleRedirectPatient}
+                                        disabled={submitting}
+                                        className="px-5 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:opacity-90 font-semibold transition disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {submitting ? 'Redirecting...' : 'Redirect Patient'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Receipts List */}
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-4">Receipt History ({quittances.length})</h3>
+                        {loading ? (
+                            <div className="flex justify-center items-center h-32">
+                                <Loader size="medium" color="primary-end" />
+                            </div>
+                        ) : quittances.length === 0 ? (
+                            <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                                <DollarSign className="w-16 h-16 text-gray-400 mx-auto mb-3" />
+                                <p className="text-gray-500 text-lg font-medium">No receipts found for this patient</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                                {quittances.map((quittance) => (
+                                    <div key={quittance.idQuittance} className="bg-white border-2 border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <span className="px-3 py-1 bg-primary-end text-white rounded-full text-sm font-bold">
+                                                        {quittance.numero_quittance}
+                                                    </span>
+                                                    <span className="text-2xl font-bold text-green-600">
+                                                        {parseFloat(quittance.Montant_paye).toLocaleString()} FCFA
+                                                    </span>
+                                                </div>
+                                                <p className="text-gray-700 mb-2">{quittance.Motif}</p>
+                                                <div className="flex gap-4 text-sm text-gray-600">
+                                                    <span><span className="font-semibold">Date:</span> {new Date(quittance.date_paiement).toLocaleString('fr-FR')}</span>
+                                                    {quittance.service && <span><span className="font-semibold">Service:</span> {quittance.service}</span>}
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => handlePrintInvoice(quittance)}
+                                                className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition font-semibold"
+                                                title="Imprimer la facture"
+                                            >
+                                                <Printer className="w-4 h-4" />
+                                                Imprimer
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Close Button */}
+                    <div className="mt-6 flex justify-end">
+                        <button
+                            onClick={handleClose}
+                            className="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition flex items-center gap-2"
+                        >
+                            <X className="w-5 h-5" />
+                            Close
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </Modal>
+            </Modal>
+        </>
     );
 }
+

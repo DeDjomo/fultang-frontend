@@ -59,17 +59,17 @@ export function AccountantHomePage() {
                 const { quittances, comptes, ecritures } = dashboardData;
 
                 setStats({
-                    totalRecettes: quittances.global.total_quittances || 0,
-                    recettesJour: quittances.aujourdhui.count || 0,
-                    recettesMois: quittances.ce_mois.count || 0,
-                    montantJour: quittances.aujourdhui.total || 0,
-                    montantMois: quittances.ce_mois.total || 0,
-                    quittancesAValider: quittances.validation.a_valider || 0,
-                    quittancesValidees: quittances.validation.validees || 0,
-                    montantAValider: quittances.validation.montant_a_valider || 0,
-                    montantValidee: quittances.validation.montant_validee || 0,
-                    totalComptes: comptes.total || 0,
-                    comptesActifs: comptes.actifs || 0,
+                    totalRecettes: quittances?.global?.total_quittances || 0,
+                    recettesJour: quittances?.aujourdhui?.count || 0,
+                    recettesMois: quittances?.ce_mois?.count || 0,
+                    montantJour: quittances?.aujourdhui?.total || 0,
+                    montantMois: quittances?.ce_mois?.total || 0,
+                    quittancesAValider: quittances?.validation?.a_valider || 0,
+                    quittancesValidees: quittances?.validation?.validees || 0,
+                    montantAValider: quittances?.validation?.montant_a_valider || 0,
+                    montantValidee: quittances?.validation?.montant_validee || 0,
+                    totalComptes: comptes?.total || 0,
+                    comptesActifs: comptes?.actifs || 0,
                     // Écritures
                     totalEcritures: ecritures?.total_ecritures || 0,
                     ecrituresJour: ecritures?.ecritures_jour || 0,

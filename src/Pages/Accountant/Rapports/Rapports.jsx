@@ -261,7 +261,7 @@ export function RapportsPage() {
                             <div className="bg-white rounded-lg shadow-lg p-5">
                                 <div className="flex items-center gap-2 mb-4">
                                     <FaChartLine className="text-blue-500" />
-                                    <h2 className="text-lg font-bold text-gray-800">Évolution Mensuelle (2025 vs 2024)</h2>
+                                    <h2 className="text-lg font-bold text-gray-800">Évolution Mensuelle ({new Date().getFullYear()} vs {new Date().getFullYear() - 1})</h2>
                                 </div>
                                 <ResponsiveContainer width="100%" height={300}>
                                     <AreaChart data={stats.evolution}>
@@ -270,8 +270,8 @@ export function RapportsPage() {
                                         <YAxis tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
                                         <Tooltip formatter={(value) => formatCurrency(value)} />
                                         <Legend />
-                                        <Area type="monotone" dataKey="actuel" name="2025" fill="#8884d8" stroke="#8884d8" fillOpacity={0.3} />
-                                        <Area type="monotone" dataKey="precedent" name="2024" fill="#82ca9d" stroke="#82ca9d" fillOpacity={0.3} />
+                                        <Area type="monotone" dataKey="actuel" name={String(new Date().getFullYear())} fill="#8884d8" stroke="#8884d8" fillOpacity={0.3} />
+                                        <Area type="monotone" dataKey="precedent" name={String(new Date().getFullYear() - 1)} fill="#82ca9d" stroke="#82ca9d" fillOpacity={0.3} />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
@@ -300,78 +300,100 @@ export function RapportsPage() {
                             <div className="bg-white rounded-lg shadow-lg p-5">
                                 <h2 className="text-lg font-bold text-gray-800 mb-4">Répartition par Type de Recette</h2>
                                 {stats.parType.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height={250}>
-                                        <PieChart>
-                                            <Pie
-                                                data={stats.parType}
-                                                cx="50%"
-                                                cy="50%"
-                                                labelLine={false}
-                                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                                outerRadius={80}
-                                                fill="#8884d8"
-                                                dataKey="value"
-                                            >
-                                                {stats.parType.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip formatter={(value) => formatCurrency(value)} />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="h-[250px] flex items-center justify-center text-gray-400">Aucune donnée</div>
-                                )}
-                                <div className="mt-4 space-y-2">
-                                    {stats.parType.map((item, i) => (
-                                        <div key={i} className="flex justify-between items-center">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
-                                                <span className="text-sm">{item.name}</span>
-                                            </div>
-                                            <span className="text-sm font-bold">{formatCurrency(item.value)}</span>
+                                    <div className="flex flex-col lg:flex-row items-center gap-4">
+                                        <ResponsiveContainer width="100%" height={200}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={stats.parType}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={40}
+                                                    outerRadius={80}
+                                                    fill="#8884d8"
+                                                    dataKey="value"
+                                                    paddingAngle={2}
+                                                >
+                                                    {stats.parType.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip formatter={(value) => formatCurrency(value)} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        <div className="w-full space-y-2">
+                                            {(() => {
+                                                const total = stats.parType.reduce((sum, item) => sum + (item.value || 0), 0);
+                                                return stats.parType.map((item, i) => {
+                                                    const percent = total > 0 ? ((item.value / total) * 100).toFixed(2) : '0.00';
+                                                    return (
+                                                        <div key={i} className="flex justify-between items-center text-sm">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
+                                                                <span className="truncate">{item.name}</span>
+                                                            </div>
+                                                            <div className="flex gap-2 items-center flex-shrink-0">
+                                                                <span className="font-bold text-gray-600">{percent}%</span>
+                                                                <span className="font-bold">{formatCurrency(item.value)}</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                });
+                                            })()}
                                         </div>
-                                    ))}
-                                </div>
+                                    </div>
+                                ) : (
+                                    <div className="h-[200px] flex items-center justify-center text-gray-400">Aucune donnée</div>
+                                )}
                             </div>
 
                             {/* Par Mode de Paiement */}
                             <div className="bg-white rounded-lg shadow-lg p-5">
                                 <h2 className="text-lg font-bold text-gray-800 mb-4">Répartition par Mode de Paiement</h2>
                                 {stats.parMode.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height={250}>
-                                        <PieChart>
-                                            <Pie
-                                                data={stats.parMode}
-                                                cx="50%"
-                                                cy="50%"
-                                                labelLine={false}
-                                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                                outerRadius={80}
-                                                fill="#82ca9d"
-                                                dataKey="value"
-                                            >
-                                                {stats.parMode.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip formatter={(value) => formatCurrency(value)} />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="h-[250px] flex items-center justify-center text-gray-400">Aucune donnée</div>
-                                )}
-                                <div className="mt-4 space-y-2">
-                                    {stats.parMode.map((item, i) => (
-                                        <div key={i} className="flex justify-between items-center">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
-                                                <span className="text-sm">{item.name}</span>
-                                            </div>
-                                            <span className="text-sm font-bold">{formatCurrency(item.value)}</span>
+                                    <div className="flex flex-col lg:flex-row items-center gap-4">
+                                        <ResponsiveContainer width="100%" height={200}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={stats.parMode}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={40}
+                                                    outerRadius={80}
+                                                    fill="#82ca9d"
+                                                    dataKey="value"
+                                                    paddingAngle={2}
+                                                >
+                                                    {stats.parMode.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip formatter={(value) => formatCurrency(value)} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        <div className="w-full space-y-2">
+                                            {(() => {
+                                                const total = stats.parMode.reduce((sum, item) => sum + (item.value || 0), 0);
+                                                return stats.parMode.map((item, i) => {
+                                                    const percent = total > 0 ? ((item.value / total) * 100).toFixed(2) : '0.00';
+                                                    return (
+                                                        <div key={i} className="flex justify-between items-center text-sm">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
+                                                                <span className="truncate">{item.name}</span>
+                                                            </div>
+                                                            <div className="flex gap-2 items-center flex-shrink-0">
+                                                                <span className="font-bold text-gray-600">{percent}%</span>
+                                                                <span className="font-bold">{formatCurrency(item.value)}</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                });
+                                            })()}
                                         </div>
-                                    ))}
-                                </div>
+                                    </div>
+                                ) : (
+                                    <div className="h-[200px] flex items-center justify-center text-gray-400">Aucune donnée</div>
+                                )}
                             </div>
                         </div>
 
