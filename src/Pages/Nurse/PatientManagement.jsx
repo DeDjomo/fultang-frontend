@@ -15,7 +15,7 @@ import { getDossierByPatientId } from '../../services/dossiersApi';
 import { createObservation } from '../../services/observationsApi';
 import { rediriggerPatient, updateSessionStatus } from '../../services/sessionsApi';
 import { getAllServices } from '../../services/servicesApi';
-import { SendToCashierModal } from '../Modals/SendToCashierModal';
+import { OpenSessionModal } from '../Receptionist/OpenSessionModal';
 import { FaMoneyBillWave } from 'react-icons/fa';
 
 export function PatientManagement() {
@@ -422,12 +422,15 @@ export function PatientManagement() {
                     </div>
                 </div>
             </NurseNavBar>
-            <SendToCashierModal
+            <OpenSessionModal
                 isOpen={openSendToCashierModal}
                 onClose={() => setOpenSendToCashierModal(false)}
                 patient={patient}
+                mode="cashier"
+                isUpdate={true}
                 sessionId={sessionId}
                 onSuccess={() => {
+                    showSuccess('Le patient a été envoyé à la caisse avec succès.', 'Patient envoyé');
                     navigate('/nurse/waiting-room');
                 }}
             />

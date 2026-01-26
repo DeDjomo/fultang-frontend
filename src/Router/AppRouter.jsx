@@ -33,7 +33,7 @@ export function AppRoute() {
     const AdminPersonnelPage = React.lazy(async () => ({ default: (await import("../Pages/AdminViews/AdminPersonnelPage.jsx")).AdminPersonnelPage }));
     const AdminChambresPage = React.lazy(async () => ({ default: (await import("../Pages/AdminViews/AdminChambresPage.jsx")).AdminChambresPage }));
     const ReceptionistMedicalStaffsPage = React.lazy(async () => ({ default: (await import("../Pages/Receptionist/ReceptionistMedicalStaffs.jsx")).ReceptionistMedicalStaffs }));
-    const ReceptionistAppointmentsPage = React.lazy(async () => ({ default: (await import("../Pages/Receptionist/Appointments.jsx")).Appointments }));
+    // const ReceptionistAppointmentsPage = React.lazy(async () => ({ default: (await import("../Pages/Receptionist/Appointments.jsx")).Appointments }));
     const HospitalizedPatientsPage = React.lazy(async () => ({ default: (await import("../Pages/Receptionist/HospitalizedPatients.jsx")).HospitalizedPatients }));
     const AdminPatientListPage = React.lazy(async () => ({ default: (await import("../Pages/AdminViews/AdminPatientList.jsx")).AdminPatientList }));
     const AddMedicalStaffPage = React.lazy(async () => ({ default: (await import("../Pages/AdminViews/AddMedicalStaff.jsx")).AddMedicalStaff }));
@@ -70,6 +70,7 @@ export function AppRoute() {
     const ComptaMatiereReports = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/AccountantReports.jsx")).AccountantReports }));
     const ComptaMatiereMaterialList = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/MaterialList.jsx")).MaterialList }));
     const ComptaMatiereOutputList = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/OutputList.jsx")).OutputList }));
+    const ComptaMatiereInventoryArchives = React.lazy(async () => ({ default: (await import("../Pages/ComptaMatiere/AccountantInventoryArchives.jsx")).AccountantInventoryArchives }));
 
     // Director components
     const DirectorDashboard = React.lazy(async () => ({ default: (await import("../Pages/Director/Director.jsx")).Director }));
@@ -122,7 +123,7 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.adminPersonnelPage} element={<AdminPersonnelPage />} />
                 <Route path={AppRoutesPaths.adminChambresPage} element={<AdminChambresPage />} />
                 <Route path={AppRoutesPaths.receptionistMedicalStaffsPage} element={<ReceptionistMedicalStaffsPage />} />
-                <Route path={AppRoutesPaths.appointmentsPage} element={<ReceptionistAppointmentsPage />} />
+                {/* <Route path={AppRoutesPaths.appointmentsPage} element={<ReceptionistAppointmentsPage />} /> */}
                 <Route path={AppRoutesPaths.hospitalizedPatientsPage} element={<HospitalizedPatientsPage />} />
                 <Route path={AppRoutesPaths.adminPatientListPage} element={<AdminPatientListPage />} />
                 <Route path={AppRoutesPaths.addMedicalStaff} element={<AddMedicalStaffPage />} />
@@ -161,6 +162,7 @@ export function AppRoute() {
                 <Route path={AppRoutesPaths.comptaMatiereReports} element={<ComptaMatiereReports />} />
                 <Route path={AppRoutesPaths.comptaMatiereMaterialList} element={<ComptaMatiereMaterialList />} />
                 <Route path={AppRoutesPaths.comptaMatiereOutputList} element={<ComptaMatiereOutputList />} />
+                <Route path={AppRoutesPaths.comptaMatiereInventoryArchives} element={<ComptaMatiereInventoryArchives />} />
 
                 {/* Director Routes */}
                 <Route path={AppRoutesPaths.directorDashboard} element={<DirectorDashboard />} />

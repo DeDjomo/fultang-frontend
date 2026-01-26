@@ -69,6 +69,7 @@ export const AppRoutesPaths = {
     comptaMatiereReports: "/compta-matiere/reports",
     comptaMatiereMaterialList: "/compta-matiere/material-list",
     comptaMatiereOutputList: "/compta-matiere/output-list",
+    comptaMatiereInventoryArchives: "/compta-matiere/inventory-archives",
 
     // Director routes
     directorDashboard: "/director/dashboard",

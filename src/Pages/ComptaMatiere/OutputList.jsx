@@ -3,18 +3,20 @@ import { AccountantNavLink } from "./AccountantNavLink";
 import { AccountantNavBar } from "./Components/AccountantNavBar";
 import { useState, useEffect } from "react";
 import {
-    Search,
-    Eye,
-    Filter,
-    List,
-    FileText,
-    Building2,
-    Calendar,
-    PackageOpen,
-    RefreshCw
-} from "lucide-react";
+    FaSearch,
+    FaEye,
+    FaFilter,
+    FaListAlt,
+    FaFilePdf,
+    FaBuilding,
+    FaCalendarAlt,
+    FaBoxOpen,
+    FaSpinner,
+    FaSyncAlt
+} from "react-icons/fa";
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
+import { sortieApi, ligneSortieApi } from "../../services/comptabiliteMatiereApi";
 
 export function OutputList() {
     const [loading, setLoading] = useState(true);
@@ -23,65 +25,52 @@ export function OutputList() {
     const [filterMotif, setFilterMotif] = useState("all");
     const [filterPeriod, setFilterPeriod] = useState("all");
 
-    // Output data from API
+    // Données des sorties depuis l'API
     const [outputs, setOutputs] = useState([]);
 
-    // Pagination
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 5;
-
-    // Load outputs from API
+    // Charger les sorties depuis l'API
     useEffect(() => {
         loadData();
     }, []);
 
     async function loadData() {
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
-
         try {
             setLoading(true);
             setError(null);
 
-            // 1. Load outputs
-            const sortiesRes = await fetch(`${baseUrl}/sorties/`, { headers, cache: "no-store" });
-            const sortiesData = await sortiesRes.json();
-            const sorties = (sortiesData.results || sortiesData || []);
+            // 1. Charger les sorties via le service API
+            const sortiesData = await sortieApi.getAll();
+            const sorties = Array.isArray(sortiesData) ? sortiesData : (sortiesData.results || []);
 
-            // 2. For each output, load its lines
+            // 2. Pour chaque sortie, charger ses lignes (N+1 optimisation possible backend, mais ici frontend-side via service)
             const outputsWithLines = await Promise.all(
                 sorties.map(async (s) => {
                     try {
-                        const lignesRes = await fetch(`${baseUrl}/lignes-sortie/?id_sortie=${s.idSortie}`, { headers, cache: "no-store" });
-                        const lignesData = await lignesRes.json();
-                        const lignesRaw = lignesData.results || lignesData || [];
+                        const lignesData = await ligneSortieApi.getBySortie(s.idSortie);
+                        const lignesRaw = Array.isArray(lignesData) ? lignesData : (lignesData.results || []);
 
                         const lignes = lignesRaw.map(l => ({
-                            nomMateriel: l.materiel_nom || `Material #${l.id_materiel}`,
-                            codeMateriel: l.materiel_code || "",
-                            typeMateriel: l.type_materiel === "MEDICAL" ? "Medical Material" : "Durable Material",
+                            nomMateriel: l.nom_materiel || `Matériel #${l.id_materiel}`,
+                            codeMateriel: l.code_materiel || "",
+                            typeMateriel: l.type_materiel === "MEDICAL" ? "Matériel Médical" : "Matériel Durable",
                             quantite: l.quantite
                         }));
 
                         return {
-                            id: s.numero_sortie || `OUT-${s.idSortie}`,
+                            id: s.numero_sortie || `SOR-${s.idSortie}`,
                             idSortie: s.idSortie,
-                            serviceMedical: s.service_medical || "Not specified",
+                            serviceMedical: s.service_medical || "Non spécifié",
                             dateSortie: s.date_sortie?.split('T')[0] || '-',
                             dateEnregistrement: s.date_sortie?.split('T')[0] || '-',
                             motifSortie: mapMotif(s.motif_sortie),
                             articles: lignes
                         };
                     } catch (e) {
-                        console.warn("Error loading output lines " + s.idSortie, e);
+                        console.warn("Erreur chargement lignes sortie " + s.idSortie, e);
                         return {
-                            id: s.numero_sortie || `OUT-${s.idSortie}`,
+                            id: s.numero_sortie || `SOR-${s.idSortie}`,
                             idSortie: s.idSortie,
-                            serviceMedical: s.service_medical || "Not specified",
+                            serviceMedical: s.service_medical || "Non spécifié",
                             dateSortie: s.date_sortie?.split('T')[0] || '-',
                             dateEnregistrement: s.date_sortie?.split('T')[0] || '-',
                             motifSortie: mapMotif(s.motif_sortie),
@@ -94,8 +83,8 @@ export function OutputList() {
             setOutputs(outputsWithLines);
 
         } catch (err) {
-            console.error("Error loading outputs:", err);
-            setError("Unable to load outputs.");
+            console.error("Erreur chargement sorties:", err);
+            setError("Impossible de charger les sorties.");
         } finally {
             setLoading(false);
         }
@@ -103,13 +92,13 @@ export function OutputList() {
 
     function mapMotif(motif) {
         const map = {
-            'VENTE': 'sale',
-            'UTILISATION_SERVICE': 'usage',
-            'DEFECTUEUX': 'defective',
-            'PERIME': 'expired',
-            'PERTE': 'defective'
+            'VENTE': 'vente',
+            'UTILISATION_SERVICE': 'utilisation',
+            'DEFECTUEUX': 'defectueux',
+            'PERIME': 'perime',
+            'PERTE': 'defectueux'
         };
-        return map[motif] || 'defective';
+        return map[motif] || 'defectueux';
     }
 
     function getFilteredOutputs() {
@@ -140,14 +129,14 @@ export function OutputList() {
 
     function getMotifBadge(motif) {
         const config = {
-            defective: { bg: "bg-red-100", text: "text-red-800", label: "Defective" },
-            expired: { bg: "bg-orange-100", text: "text-orange-800", label: "Expired" },
-            sale: { bg: "bg-green-100", text: "text-green-800", label: "Sale" },
-            transfer: { bg: "bg-blue-100", text: "text-blue-800", label: "Transfer" },
-            usage: { bg: "bg-purple-100", text: "text-purple-800", label: "Usage" }
+            defectueux: { bg: "bg-red-100", text: "text-red-800", label: "Défectueux" },
+            perime: { bg: "bg-orange-100", text: "text-orange-800", label: "Périmé" },
+            vente: { bg: "bg-green-100", text: "text-green-800", label: "Vente" },
+            transfert: { bg: "bg-blue-100", text: "text-blue-800", label: "Transfert" },
+            utilisation: { bg: "bg-purple-100", text: "text-purple-800", label: "Utilisation" }
         };
 
-        const { bg, text, label } = config[motif] || config.defective;
+        const { bg, text, label } = config[motif] || config.defectueux;
 
         return (
             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${bg} ${text}`}>
@@ -162,11 +151,11 @@ export function OutputList() {
 
         doc.setFontSize(20);
         doc.setTextColor(26, 115, 163);
-        doc.text("Material Output List", pageWidth / 2, 20, { align: "center" });
+        doc.text("Liste des Sorties de Matériel", pageWidth / 2, 20, { align: "center" });
 
         doc.setFontSize(10);
         doc.setTextColor(100);
-        doc.text(`Generated: ${new Date().toLocaleDateString('en-US')} at ${new Date().toLocaleTimeString('en-US')}`, pageWidth / 2, 28, { align: "center" });
+        doc.text(`Généré le: ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, pageWidth / 2, 28, { align: "center" });
 
         doc.setDrawColor(80, 194, 185);
         doc.setLineWidth(0.5);
@@ -199,28 +188,28 @@ export function OutputList() {
             doc.setFont(undefined, 'normal');
 
             const motifLabels = {
-                defective: "Defective",
-                expired: "Expired",
-                sale: "Sale",
-                transfer: "Transfer",
-                usage: "Usage"
+                defectueux: "Défectueux",
+                perime: "Périmé",
+                vente: "Vente",
+                transfert: "Transfert",
+                utilisation: "Utilisation"
             };
-            doc.text(`Reason: ${motifLabels[output.motifSortie] || output.motifSortie}`, margin + 3, yPosition);
+            doc.text(`Motif: ${motifLabels[output.motifSortie] || output.motifSortie}`, margin + 3, yPosition);
 
             yPosition += 8;
 
             doc.setFont(undefined, 'bold');
-            doc.text("Items:", margin + 3, yPosition);
+            doc.text("Articles:", margin + 3, yPosition);
             yPosition += 6;
 
             doc.setFont(undefined, 'normal');
             if (output.articles && output.articles.length > 0) {
                 output.articles.forEach((article) => {
-                    doc.text(`• ${article.nomMateriel} (${article.codeMateriel}) - Qty: ${article.quantite}`, margin + 5, yPosition);
+                    doc.text(`• ${article.nomMateriel} (${article.codeMateriel}) - Qté: ${article.quantite}`, margin + 5, yPosition);
                     yPosition += 5;
                 });
             } else {
-                doc.text(`  No items`, margin + 5, yPosition);
+                doc.text(`  Aucun article`, margin + 5, yPosition);
                 yPosition += 5;
             }
 
@@ -233,25 +222,22 @@ export function OutputList() {
 
         doc.setFontSize(9);
         doc.setTextColor(100);
-        doc.text(`Total: ${filteredOutputs.length} output(s)`, margin, pageHeight - 12);
-        doc.text("Fultang Clinic - Material Accountant", pageWidth - margin, pageHeight - 12, { align: "right" });
+        doc.text(`Total: ${filteredOutputs.length} sortie(s)`, margin, pageHeight - 12);
+        doc.text("Fultang Clinic - Comptable Matière", pageWidth - margin, pageHeight - 12, { align: "right" });
 
-        doc.save(`material_outputs_${new Date().toISOString().split('T')[0]}.pdf`);
+        doc.save(`sorties_materiel_${new Date().toISOString().split('T')[0]}.pdf`);
     }
 
     const filteredOutputs = getFilteredOutputs();
-    const totalPages = Math.ceil(filteredOutputs.length / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const currentOutputs = filteredOutputs.slice(startIndex, startIndex + itemsPerPage);
 
     if (loading) {
         return (
-            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"comptable_matiere"}>
+            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"ComptaMatiere"}>
                 <AccountantNavBar />
                 <div className="flex items-center justify-center h-96">
                     <div className="text-center">
-                        <RefreshCw className="animate-spin text-primary-start mx-auto mb-4 w-10 h-10" />
-                        <p className="text-gray-600">Loading outputs...</p>
+                        <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
+                        <p className="text-gray-600">Chargement des sorties...</p>
                     </div>
                 </div>
             </AccountantDashBoard>
@@ -261,35 +247,32 @@ export function OutputList() {
     return (
         <AccountantDashBoard
             linkList={AccountantNavLink}
-            requiredRole={"comptable_matiere"}
+            requiredRole={"ComptaMatiere"}
         >
             <AccountantNavBar />
             <div className="p-6 space-y-6">
-                {/* Modern gradient header */}
-                <div className="bg-gradient-to-br from-primary-end to-primary-start text-white rounded-lg p-6 shadow-lg">
-                    <div className="flex items-center justify-between flex-wrap gap-4">
-                        <div className="flex items-center gap-3">
-                            <List className="w-8 h-8" />
-                            <div>
-                                <h1 className="text-2xl font-bold">Output List</h1>
-                                <p className="text-sm opacity-90">{outputs.length} outputs registered</p>
-                            </div>
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <FaListAlt className="text-4xl text-primary-start" />
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-800">Liste des Sorties</h1>
+                            <p className="text-gray-500">{outputs.length} sorties enregistrées</p>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={loadData}
-                                disabled={loading}
-                                className="flex items-center gap-2 px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-all"
-                            >
-                                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} /> Refresh
-                            </button>
-                            <button
-                                onClick={exportToPDF}
-                                className="flex items-center gap-2 px-4 py-2 bg-white text-primary-end rounded-lg hover:bg-gray-100 transition-all"
-                            >
-                                <FileText className="w-5 h-5" /> Export PDF
-                            </button>
-                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={loadData}
+                            disabled={loading}
+                            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
+                        >
+                            <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
+                        </button>
+                        <button
+                            onClick={exportToPDF}
+                            className="flex items-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all duration-300 shadow-lg"
+                        >
+                            <FaFilePdf /> Exporter PDF
+                        </button>
                     </div>
                 </div>
 
@@ -299,64 +282,64 @@ export function OutputList() {
                     </div>
                 )}
 
-                {/* Filters */}
+                {/* Filtres */}
                 <div className="bg-white rounded-lg shadow-lg p-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                                <Search className="w-4 h-4" />
-                                Search
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                <FaSearch className="inline mr-2" />
+                                Rechercher
                             </label>
                             <input
                                 type="text"
                                 value={searchTerm}
-                                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                                onChange={(e) => setSearchTerm(e.target.value)}
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
-                                placeholder="Output #, service, material, code..."
+                                placeholder="N° sortie, service, matériel, code..."
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                                <Filter className="w-4 h-4" />
-                                Reason
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                <FaFilter className="inline mr-2" />
+                                Motif
                             </label>
                             <select
                                 value={filterMotif}
-                                onChange={(e) => { setFilterMotif(e.target.value); setCurrentPage(1); }}
+                                onChange={(e) => setFilterMotif(e.target.value)}
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
                             >
-                                <option value="all">All reasons</option>
-                                <option value="defective">Defective</option>
-                                <option value="expired">Expired</option>
-                                <option value="sale">Sale</option>
-                                <option value="transfer">Transfer</option>
-                                <option value="usage">Usage</option>
+                                <option value="all">Tous les motifs</option>
+                                <option value="defectueux">Défectueux</option>
+                                <option value="perime">Périmé</option>
+                                <option value="vente">Vente</option>
+                                <option value="transfert">Transfert</option>
+                                <option value="utilisation">Utilisation</option>
                             </select>
                         </div>
 
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Period
+                                Période
                             </label>
                             <select
                                 value={filterPeriod}
-                                onChange={(e) => { setFilterPeriod(e.target.value); setCurrentPage(1); }}
+                                onChange={(e) => setFilterPeriod(e.target.value)}
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
                             >
-                                <option value="all">All periods</option>
-                                <option value="today">Today</option>
-                                <option value="week">This week</option>
-                                <option value="month">This month</option>
+                                <option value="all">Toutes les périodes</option>
+                                <option value="today">Aujourd&apos;hui</option>
+                                <option value="week">Cette semaine</option>
+                                <option value="month">Ce mois</option>
                             </select>
                         </div>
                     </div>
                 </div>
 
-                {/* Output List */}
+                {/* Liste des sorties */}
                 <div className="space-y-4">
-                    {currentOutputs.length > 0 ? (
-                        currentOutputs.map((output) => (
+                    {filteredOutputs.length > 0 ? (
+                        filteredOutputs.map((output) => (
                             <OutputCard
                                 key={output.id}
                                 output={output}
@@ -365,38 +348,14 @@ export function OutputList() {
                         ))
                     ) : (
                         <div className="bg-white rounded-lg shadow-lg p-12 text-center text-gray-500">
-                            <PackageOpen className="mx-auto text-gray-300 mb-4 w-16 h-16" />
-                            <p className="text-lg">No outputs found</p>
-                            <p className="text-sm text-gray-400 mt-1">Try adjusting your filters</p>
+                            <FaBoxOpen className="mx-auto text-5xl text-gray-300 mb-4" />
+                            <p>Aucune sortie trouvée</p>
                         </div>
                     )}
                 </div>
 
-                {/* Pagination */}
-                {totalPages > 1 && (
-                    <div className="flex justify-center items-center gap-4">
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                            disabled={currentPage === 1}
-                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            Previous
-                        </button>
-                        <span className="text-gray-600 font-medium">
-                            Page {currentPage} of {totalPages}
-                        </span>
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                            disabled={currentPage === totalPages}
-                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            Next
-                        </button>
-                    </div>
-                )}
-
                 <div className="text-sm text-gray-600 text-right">
-                    Showing {currentOutputs.length} of {filteredOutputs.length} output(s)
+                    Affichage de {filteredOutputs.length} sur {outputs.length} sorties
                 </div>
             </div>
         </AccountantDashBoard>
@@ -423,14 +382,14 @@ function OutputCard({ output, getMotifBadge }) {
                         <div className="flex gap-2 mb-2 flex-wrap">
                             {getMotifBadge(output.motifSortie)}
                             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
-                                {totalArticles} item(s)
+                                {totalArticles} article(s)
                             </span>
                         </div>
                     </div>
                     <div className="text-right">
                         <p className="text-sm text-gray-600 flex items-center gap-1 justify-end">
-                            <Calendar className="text-gray-400 w-4 h-4" />
-                            Output Date
+                            <FaCalendarAlt className="text-gray-400" />
+                            Date de sortie
                         </p>
                         <p className="font-semibold text-gray-800">{output.dateSortie}</p>
                     </div>
@@ -439,26 +398,26 @@ function OutputCard({ output, getMotifBadge }) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                         <p className="text-sm text-gray-600 flex items-center gap-1">
-                            <Building2 className="text-gray-400 w-4 h-4" />
-                            Responsible Service
+                            <FaBuilding className="text-gray-400" />
+                            Service responsable
                         </p>
                         <p className="font-semibold text-gray-800">{output.serviceMedical}</p>
                     </div>
                     <div>
-                        <p className="text-sm text-gray-600">Registration Date</p>
+                        <p className="text-sm text-gray-600">Date d&apos;enregistrement</p>
                         <p className="font-semibold text-gray-800">{output.dateEnregistrement}</p>
                     </div>
                     <div>
-                        <p className="text-sm text-gray-600">Total Quantity</p>
-                        <p className="font-semibold text-gray-800 text-lg">{totalQuantite} unit(s)</p>
+                        <p className="text-sm text-gray-600">Quantité totale</p>
+                        <p className="font-semibold text-gray-800 text-lg">{totalQuantite} unité(s)</p>
                     </div>
                 </div>
 
                 {showDetails && output.articles && output.articles.length > 0 && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                         <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                            <PackageOpen className="text-primary-start w-5 h-5" />
-                            Items in this output:
+                            <FaBoxOpen className="text-primary-start" />
+                            Articles concernés par cette sortie:
                         </h4>
                         <div className="space-y-2">
                             {output.articles.map((article, index) => (
@@ -468,13 +427,13 @@ function OutputCard({ output, getMotifBadge }) {
                                         <span className="text-xs text-gray-500 font-mono ml-2">({article.codeMateriel})</span>
                                     </div>
                                     <div className="flex items-center gap-4">
-                                        <span className={`px-2 py-1 rounded text-xs ${article.typeMateriel === 'Medical Material'
+                                        <span className={`px-2 py-1 rounded text-xs ${article.typeMateriel === 'Matériel Médical'
                                             ? 'bg-red-100 text-red-700'
                                             : 'bg-blue-100 text-blue-700'
                                             }`}>
                                             {article.typeMateriel}
                                         </span>
-                                        <span className="font-bold text-gray-800">Qty: {article.quantite}</span>
+                                        <span className="font-bold text-gray-800">Qté: {article.quantite}</span>
                                     </div>
                                 </div>
                             ))}
@@ -486,8 +445,8 @@ function OutputCard({ output, getMotifBadge }) {
                     onClick={() => setShowDetails(!showDetails)}
                     className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all duration-300"
                 >
-                    <Eye className="w-5 h-5" />
-                    {showDetails ? "Hide items" : `View ${totalArticles} item(s)`}
+                    <FaEye />
+                    {showDetails ? "Masquer les articles" : `Voir les ${totalArticles} article(s)`}
                 </button>
             </div>
         </div>

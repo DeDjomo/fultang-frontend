@@ -29,5 +29,3 @@ authentication/
 polyclinic/
 fultang/
 db.sqlite3
-
-.env

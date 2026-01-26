@@ -60,3 +60,19 @@ export const updateRendezVous = async (id, data) => {
         throw error;
     }
 };
+
+/**
+ * Recupere tous les rendez-vous d'un medecin specifique.
+ * @param {number} medecinId - ID du medecin
+ */
+export const getRendezVousByMedecin = async (medecinId) => {
+    try {
+        const response = await axiosInstance.get(`${BASE_URL}/`, {
+            params: { id_medecin: medecinId }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching rendez-vous by medecin:', error);
+        throw error;
+    }
+};

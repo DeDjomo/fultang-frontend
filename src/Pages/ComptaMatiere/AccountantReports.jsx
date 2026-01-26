@@ -17,8 +17,7 @@ import {
 } from "react-icons/fa";
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
-import { rapportApi } from "../../services/comptabiliteMatiereApi";
-import { getAllPersonnel } from "../../services/personnelApi";
+import { rapportApi, personnelApi } from "../../services/comptabiliteMatiereApi";
 
 export function AccountantReports() {
     const [loading, setLoading] = useState(true);
@@ -33,20 +32,48 @@ export function AccountantReports() {
         corps: ""
     });
 
-    // ID du comptable connecté
-    const currentUserId = parseInt(localStorage.getItem("personnel_id") || "1");
+    // Récupérer l'ID du comptable connecté - TOUJOURS depuis user_data_fultang
+    const getCurrentUserId = () => {
+        const userData = localStorage.getItem("user_data_fultang");
+
+        // DEBUG: Afficher ce qui est stocké
+        console.log("🔍 DEBUG getCurrentUserId (Comptable):");
+        console.log("   - user_data_fultang brut:", userData);
+
+        if (userData) {
+            try {
+                const parsed = JSON.parse(userData);
+                console.log("   - user_data_fultang parsé:", parsed);
+                const userId = parsed.id;
+                if (userId) {
+                    localStorage.setItem("personnel_id", String(userId));
+                    console.log("   ✅ ID trouvé:", userId, "Poste:", parsed.poste);
+                    return userId;
+                }
+            } catch (e) {
+                console.error("Erreur parsing user_data_fultang:", e);
+            }
+        }
+
+        console.log("   ⚠️ Aucun ID valide trouvé - utilisateur non identifié");
+        return null;
+    };
+
+    const currentUserId = getCurrentUserId();
     const currentUserName = localStorage.getItem("user_name") || "Comptable Matière";
+
+    console.log("👤 Utilisateur courant - ID:", currentUserId, "Nom:", currentUserName);
 
     // Rapports depuis l'API
     const [sentReports, setSentReports] = useState([]);
     const [receivedReports, setReceivedReports] = useState([]);
 
-    // Liste du personnel pour le sélecteur de destinataire
-    const [personnelList, setPersonnelList] = useState([]);
-
     // État pour le modal de détails
     const [selectedReport, setSelectedReport] = useState(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
+
+    // Liste du personnel pour sélection destinataire
+    const [personnelList, setPersonnelList] = useState([]);
 
     // Charger les données
     useEffect(() => {
@@ -58,55 +85,68 @@ export function AccountantReports() {
             setLoading(true);
             setError(null);
 
-            // Charger les rapports et le personnel en parallèle
+            // Vérifier que l'utilisateur est connecté
+            if (!currentUserId) {
+                setError("Utilisateur non identifié. Veuillez vous reconnecter.");
+                setLoading(false);
+                return;
+            }
+
+            // Charger rapports et personnel en parallèle
             const [rapportsData, personnelData] = await Promise.all([
-                rapportApi.getAll(),
-                getAllPersonnel()
+                rapportApi.getByUser(currentUserId), // Filtrage côté backend
+                personnelApi.getAll()
             ]);
 
-            // Traiter les rapports
-            const rapports = rapportsData.results || rapportsData;
+            // Stocker la liste du personnel - s'assurer que c'est un tableau
+            const personnels = Array.isArray(personnelData) ? personnelData :
+                (Array.isArray(personnelData?.results) ? personnelData.results : []);
+            setPersonnelList(personnels);
 
-            // Stocker la liste du personnel
-            const personnel = personnelData.results || personnelData || [];
-            setPersonnelList(personnel);
+            // Les rapports sont déjà filtrés par le backend
+            const rapportsSent = rapportsData.sent || [];
+            const rapportsReceived = rapportsData.received || [];
 
-            // Fonction helper pour trouver le nom du personnel
-            const getPersonnelName = (id) => {
-                const p = personnel.find(p => p.id === id);
-                return p ? `${p.nom} ${p.prenom}` : `Personnel #${id}`;
-            };
+            // Debug: afficher les infos de filtrage
+            console.log("📊 DEBUG RAPPORTS (filtrés côté backend):");
+            console.log("   - currentUserId:", currentUserId);
+            console.log("   - Rapports envoyés:", rapportsSent.length);
+            console.log("   - Rapports reçus:", rapportsReceived.length);
 
-            // Filtrer les rapports envoyés par le comptable
-            const sent = rapports.filter(r => r.expediteur === currentUserId);
-            setSentReports(sent.map(r => formatReport(r, getPersonnelName)));
+            // Formatter les rapports envoyés
+            setSentReports(rapportsSent.map(r => formatReport(r, personnels)));
 
-            // Filtrer les rapports reçus par le comptable
-            const received = rapports.filter(r => r.destinataire === currentUserId);
-            setReceivedReports(received.map(r => ({ ...formatReport(r, getPersonnelName), isRead: r.est_lu })));
+            // Formatter les rapports reçus avec état lu/non lu
+            setReceivedReports(rapportsReceived.map(r => ({ ...formatReport(r, personnels), isRead: r.est_lu })));
 
         } catch (err) {
-            console.error("Error loading reports:", err);
-            setError("Unable to load reports. Please verify the backend is running.");
+            console.error("Erreur lors du chargement des rapports:", err);
+            setError("Impossible de charger les rapports. Vérifiez que le backend est en cours d'exécution.");
         } finally {
             setLoading(false);
         }
     }
 
-    function formatReport(r, getPersonnelName = (id) => `Personnel #${id}`) {
+    function formatReport(r, personnels = []) {
+        // S'assurer que personnels est un tableau
+        const safePersonnels = Array.isArray(personnels) ? personnels : [];
+        const expediteurInfo = safePersonnels.find(p => p.id === r.expediteur);
+        const destinataireInfo = safePersonnels.find(p => p.id === r.destinataire);
+
         return {
-            id: r.code_rapport || `RPT-${r.idRapport}`,
-            idRapport: r.idRapport,
+            id: r.code_rapport || `RPT-${r.id || Date.now()}`,
+            idRapport: r.id,  // C'est 'id' retourné par le backend
             objet: r.objet,
             corps: r.corps,
             dateEnvoi: r.date_creation?.split('T')[0] || new Date().toISOString().split('T')[0],
             expediteur: r.expediteur,
-            expediteurName: getPersonnelName(r.expediteur),
+            expediteurName: expediteurInfo ? `${expediteurInfo.nom} ${expediteurInfo.prenom}` : `Personnel #${r.expediteur}`,
             destinataire: r.destinataire,
-            destinataireName: getPersonnelName(r.destinataire),
+            destinataireName: destinataireInfo ? `${destinataireInfo.nom} ${destinataireInfo.prenom}` : `Personnel #${r.destinataire}`,
             type: r.type_rapport,
-            concerneName: getPersonnelName(r.destinataire),
-            concerne: r.destinataire
+            concerneName: destinataireInfo ? `${destinataireInfo.nom} ${destinataireInfo.prenom}` : `Personnel #${r.destinataire}`,
+            concerne: r.destinataire,
+            isRead: r.est_lu === true
         };
     }
 
@@ -114,7 +154,12 @@ export function AccountantReports() {
         e.preventDefault();
 
         if (!reportForm.destinataire) {
-            setError("Please enter the recipient ID.");
+            setError("Veuillez sélectionner un destinataire.");
+            return;
+        }
+
+        if (!currentUserId) {
+            setError("Utilisateur non identifié. Veuillez vous reconnecter.");
             return;
         }
 
@@ -122,31 +167,34 @@ export function AccountantReports() {
             setSubmitting(true);
             setError(null);
 
+            // Générer un code unique qui respecte max_length=20 du backend
             const now = new Date();
-            const year = now.getFullYear();
-            const existingCount = sentReports.length + receivedReports.length;
-            const codeRapport = `RPT-${year}-${String(existingCount + 1).padStart(3, '0')}`;
+            const timestamp = now.getTime().toString(36).toUpperCase();
+            const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+            const codeRapport = `RPT-${timestamp}-${random}`.substring(0, 20);
 
             const newReportData = {
                 code_rapport: codeRapport,
                 objet: reportForm.objet,
                 corps: reportForm.corps,
                 type_rapport: "GENERAL",
-                id_personnel: currentUserId, // Champ requis par le backend
                 expediteur: currentUserId,
                 destinataire: parseInt(reportForm.destinataire)
             };
 
+            console.log("🔑 Utilisateur connecté - ID:", currentUserId, "Nom:", currentUserName);
+            console.log("📤 Envoi du rapport:", newReportData);
+
             await rapportApi.create(newReportData);
 
-            setSuccessMessage("Report sent successfully!");
+            setSuccessMessage("Rapport envoyé avec succès !");
             setTimeout(() => setSuccessMessage(""), 3000);
             setReportForm({ objet: "", destinataire: "", corps: "" });
             await loadData();
 
         } catch (err) {
-            console.error("Error sending report:", err);
-            setError("Error sending report. Please try again.");
+            console.error("Erreur lors de l'envoi:", err);
+            setError("Erreur lors de l'envoi du rapport. Veuillez réessayer.");
         } finally {
             setSubmitting(false);
         }
@@ -159,12 +207,12 @@ export function AccountantReports() {
         // Si c'est un rapport reçu et non lu, le marquer comme lu
         if (isReceived && !report.isRead && report.idRapport) {
             try {
-                await rapportApi.patch(report.idRapport, { est_lu: true });
+                await rapportApi.marquerLu(report.idRapport);
                 setReceivedReports(prev => prev.map(r =>
                     r.id === report.id ? { ...r, isRead: true } : r
                 ));
             } catch (err) {
-                console.error("Error marking as read:", err);
+                console.error("Erreur lors du marquage:", err);
             }
         }
     }
@@ -181,7 +229,7 @@ export function AccountantReports() {
 
         doc.setFontSize(14);
         doc.setTextColor(80, 194, 185);
-        doc.text("Official Report", pageWidth / 2, 28, { align: "center" });
+        doc.text("Rapport Officiel", pageWidth / 2, 28, { align: "center" });
 
         doc.setDrawColor(80, 194, 185);
         doc.setLineWidth(0.5);
@@ -193,7 +241,7 @@ export function AccountantReports() {
         let yPos = 50;
 
         doc.setFont(undefined, 'bold');
-        doc.text("Reference:", margin, yPos);
+        doc.text("Référence:", margin, yPos);
         doc.setFont(undefined, 'normal');
         doc.text(report.id, margin + 30, yPos);
 
@@ -205,19 +253,19 @@ export function AccountantReports() {
 
         yPos += 8;
         doc.setFont(undefined, 'bold');
-        doc.text("Subject:", margin, yPos);
+        doc.text("Objet:", margin, yPos);
         doc.setFont(undefined, 'normal');
         doc.text(report.objet, margin + 30, yPos);
 
         yPos += 12;
         doc.setFont(undefined, 'bold');
-        doc.text("Sender:", margin, yPos);
+        doc.text("Expéditeur:", margin, yPos);
         doc.setFont(undefined, 'normal');
         doc.text(isReceived ? report.expediteurName : currentUserName, margin + 40, yPos);
 
         yPos += 8;
         doc.setFont(undefined, 'bold');
-        doc.text("Recipient:", margin, yPos);
+        doc.text("Destinataire:", margin, yPos);
         doc.setFont(undefined, 'normal');
         doc.text(report.concerneName || report.destinataireName, margin + 45, yPos);
 
@@ -228,7 +276,7 @@ export function AccountantReports() {
         yPos += 15;
         doc.setFont(undefined, 'bold');
         doc.setFontSize(12);
-        doc.text("Report Body:", margin, yPos);
+        doc.text("Corps du Rapport:", margin, yPos);
 
         yPos += 10;
         doc.setFont(undefined, 'normal');
@@ -256,11 +304,11 @@ export function AccountantReports() {
 
         doc.setFontSize(16);
         doc.setTextColor(26, 115, 163);
-        doc.text("Sent Reports List", pageWidth / 2, 20, { align: "center" });
+        doc.text("Liste des Rapports Envoyés", pageWidth / 2, 20, { align: "center" });
 
         doc.setFontSize(10);
         doc.setTextColor(100);
-        doc.text(`Exported: ${new Date().toLocaleDateString('en-US')}`, pageWidth / 2, 28, { align: "center" });
+        doc.text(`Exporté le: ${new Date().toLocaleDateString('fr-FR')}`, pageWidth / 2, 28, { align: "center" });
 
         let yPos = 40;
 
@@ -296,11 +344,11 @@ export function AccountantReports() {
 
         doc.setFontSize(16);
         doc.setTextColor(26, 115, 163);
-        doc.text("Received Reports List", pageWidth / 2, 20, { align: "center" });
+        doc.text("Liste des Rapports Reçus", pageWidth / 2, 20, { align: "center" });
 
         doc.setFontSize(10);
         doc.setTextColor(100);
-        doc.text(`Exported: ${new Date().toLocaleDateString('en-US')}`, pageWidth / 2, 28, { align: "center" });
+        doc.text(`Exporté le: ${new Date().toLocaleDateString('fr-FR')}`, pageWidth / 2, 28, { align: "center" });
 
         let yPos = 40;
 
@@ -331,12 +379,12 @@ export function AccountantReports() {
 
     if (loading) {
         return (
-            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"comptable_matiere"}>
+            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"ComptaMatiere"}>
                 <AccountantNavBar />
                 <div className="flex items-center justify-center h-96">
                     <div className="text-center">
                         <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
-                        <p className="text-gray-600">Loading reports...</p>
+                        <p className="text-gray-600">Chargement des rapports...</p>
                     </div>
                 </div>
             </AccountantDashBoard>
@@ -346,21 +394,21 @@ export function AccountantReports() {
     return (
         <AccountantDashBoard
             linkList={AccountantNavLink}
-            requiredRole={"comptable_matiere"}
+            requiredRole={"ComptaMatiere"}
         >
             <AccountantNavBar />
             <div className="p-6 space-y-6">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <FaFileAlt className="text-4xl text-primary-start" />
-                        <h1 className="text-3xl font-bold text-gray-800">Report Management</h1>
+                        <h1 className="text-3xl font-bold text-gray-800">Gestion des Rapports</h1>
                     </div>
                     <button
                         onClick={loadData}
                         disabled={loading}
                         className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
                     >
-                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> Refresh
+                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
                     </button>
                 </div>
 
@@ -380,13 +428,13 @@ export function AccountantReports() {
                 <div className="bg-white rounded-lg shadow-lg p-6">
                     <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                         <FaEnvelope className="text-primary-end" />
-                        Write a New Report
+                        Rédiger un Nouveau Rapport
                     </h2>
                     <form onSubmit={handleSubmitReport} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Subject *
+                                    Objet *
                                 </label>
                                 <input
                                     type="text"
@@ -394,43 +442,44 @@ export function AccountantReports() {
                                     value={reportForm.objet}
                                     onChange={(e) => setReportForm({ ...reportForm, objet: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
-                                    placeholder="Report subject (max 10 chars)"
+                                    placeholder="Objet du rapport (max 10 car.)"
                                     required
                                 />
-                                <p className="text-xs text-gray-500 mt-1">{reportForm.objet.length}/10 characters</p>
+                                <p className="text-xs text-gray-500 mt-1">{reportForm.objet.length}/10 caractères</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Recipient *
+                                    Destinataire *
                                 </label>
                                 <select
-                                    value={reportForm.destinataire}
+                                    value={reportForm.destinataire || ''}
                                     onChange={(e) => setReportForm({ ...reportForm, destinataire: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
                                     required
                                 >
-                                    <option value="">Select a recipient</option>
+                                    <option value="">Sélectionner un destinataire</option>
                                     {personnelList
-                                        .filter(p => p.id !== currentUserId)
+                                        .filter(p => ['comptable_matiere', 'directeur', 'pharmacien'].includes(p.poste?.toLowerCase()))
+                                        .filter(p => p.id !== currentUserId) // Exclure l'utilisateur connecté
                                         .map(p => (
                                             <option key={p.id} value={p.id}>
-                                                {p.nom} {p.prenom} - {p.poste || 'N/A'}
+                                                {p.nom} {p.prenom} ({p.poste})
                                             </option>
                                         ))
                                     }
                                 </select>
-                                <p className="text-xs text-gray-500 mt-1">Select the person to send the report to</p>
+                                <p className="text-xs text-gray-500 mt-1">Sélectionnez le destinataire du rapport</p>
                             </div>
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Report body *
+                                Corps du rapport *
                             </label>
                             <textarea
                                 value={reportForm.corps}
                                 onChange={(e) => setReportForm({ ...reportForm, corps: e.target.value })}
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
-                                placeholder="Write your report content here..."
+                                placeholder="Rédigez le contenu de votre rapport ici..."
                                 rows="6"
                                 required
                             />
@@ -438,11 +487,11 @@ export function AccountantReports() {
                         <div className="flex justify-end">
                             <button
                                 type="submit"
-                                disabled={submitting}
-                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
+                                disabled={submitting || !reportForm.destinataire}
+                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {submitting ? <FaSpinner className="animate-spin" /> : <FaPaperPlane />}
-                                Send
+                                Envoyer
                             </button>
                         </div>
                     </form>
@@ -455,14 +504,14 @@ export function AccountantReports() {
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                 <FaPaperPlane className="text-blue-500" />
-                                Sent Reports ({sentReports.length})
+                                Rapports Envoyés ({sentReports.length})
                             </h2>
                             <button
                                 onClick={exportAllSentToPDF}
                                 disabled={sentReports.length === 0}
                                 className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm disabled:opacity-50"
                             >
-                                <FaFilePdf /> Export PDF
+                                <FaFilePdf /> Exporter PDF
                             </button>
                         </div>
                         <div className="max-h-96 overflow-y-auto space-y-3">
@@ -477,7 +526,7 @@ export function AccountantReports() {
                                     />
                                 ))
                             ) : (
-                                <p className="text-gray-500 text-center py-4">No sent reports</p>
+                                <p className="text-gray-500 text-center py-4">Aucun rapport envoyé</p>
                             )}
                         </div>
                     </div>
@@ -487,10 +536,10 @@ export function AccountantReports() {
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                 <FaInbox className="text-green-500" />
-                                Received Reports ({receivedReports.length})
+                                Rapports Reçus ({receivedReports.length})
                                 {receivedReports.filter(r => !r.isRead).length > 0 && (
                                     <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                                        {receivedReports.filter(r => !r.isRead).length} new
+                                        {receivedReports.filter(r => !r.isRead).length} nouveau(x)
                                     </span>
                                 )}
                             </h2>
@@ -499,7 +548,7 @@ export function AccountantReports() {
                                 disabled={receivedReports.length === 0}
                                 className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm disabled:opacity-50"
                             >
-                                <FaFilePdf /> Export PDF
+                                <FaFilePdf /> Exporter PDF
                             </button>
                         </div>
                         <div className="max-h-96 overflow-y-auto space-y-3">
@@ -514,7 +563,7 @@ export function AccountantReports() {
                                     />
                                 ))
                             ) : (
-                                <p className="text-gray-500 text-center py-4">No received reports</p>
+                                <p className="text-gray-500 text-center py-4">Aucun rapport reçu</p>
                             )}
                         </div>
                     </div>
@@ -530,7 +579,7 @@ export function AccountantReports() {
                                 <div className="bg-primary-end/20 p-2 rounded-full">
                                     <FaFileAlt className="w-5 h-5 text-primary-start" />
                                 </div>
-                                <h2 className="text-xl font-bold text-gray-800">Report Details</h2>
+                                <h2 className="text-xl font-bold text-gray-800">Détails du Rapport</h2>
                             </div>
                             <button
                                 onClick={() => setShowDetailModal(false)}
@@ -543,7 +592,7 @@ export function AccountantReports() {
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gray-50 p-3 rounded-lg">
-                                    <p className="text-sm text-gray-600">Reference</p>
+                                    <p className="text-sm text-gray-600">Référence</p>
                                     <p className="font-bold text-gray-800">{selectedReport.id}</p>
                                 </div>
                                 <div className="bg-gray-50 p-3 rounded-lg">
@@ -553,29 +602,29 @@ export function AccountantReports() {
                             </div>
 
                             <div className="bg-gray-50 p-3 rounded-lg">
-                                <p className="text-sm text-gray-600">Subject</p>
+                                <p className="text-sm text-gray-600">Objet</p>
                                 <p className="font-bold text-gray-800">{selectedReport.objet}</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-blue-50 p-3 rounded-lg">
                                     <p className="text-sm text-blue-600 flex items-center gap-1">
-                                        <FaUser /> Sender
+                                        <FaUser /> Expéditeur
                                     </p>
                                     <p className="font-bold text-gray-800">
-                                        {selectedReport.isReceived ? selectedReport.expediteurName : "You"}
+                                        {selectedReport.isReceived ? selectedReport.expediteurName : "Vous"}
                                     </p>
                                 </div>
                                 <div className="bg-green-50 p-3 rounded-lg">
                                     <p className="text-sm text-green-600 flex items-center gap-1">
-                                        <FaUser /> Recipient
+                                        <FaUser /> Destinataire
                                     </p>
                                     <p className="font-bold text-gray-800">{selectedReport.concerneName}</p>
                                 </div>
                             </div>
 
                             <div className="bg-gray-50 p-4 rounded-lg">
-                                <p className="text-sm text-gray-600 mb-2 font-semibold">Report Body</p>
+                                <p className="text-sm text-gray-600 mb-2 font-semibold">Corps du rapport</p>
                                 <p className="text-gray-800 whitespace-pre-wrap">{selectedReport.corps}</p>
                             </div>
 
@@ -587,13 +636,13 @@ export function AccountantReports() {
                                     }}
                                     className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
                                 >
-                                    <FaFilePdf /> Download PDF
+                                    <FaFilePdf /> Télécharger PDF
                                 </button>
                                 <button
                                     onClick={() => setShowDetailModal(false)}
                                     className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
                                 >
-                                    Close
+                                    Fermer
                                 </button>
                             </div>
                         </div>
@@ -628,7 +677,7 @@ function ReportCard({ report, type, onView, onExport }) {
                         </span>
                         {isUnread && (
                             <span className="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">
-                                New
+                                Nouveau
                             </span>
                         )}
                     </div>
@@ -649,7 +698,7 @@ function ReportCard({ report, type, onView, onExport }) {
                         : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
                         }`}
                 >
-                    <FaEye /> View
+                    <FaEye /> Voir
                 </button>
                 <button
                     onClick={onExport}

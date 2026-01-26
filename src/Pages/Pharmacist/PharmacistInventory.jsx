@@ -58,14 +58,14 @@ export function PharmacistInventory() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
-        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
+        const baseUrl = import.meta.env.VITE_BACKEND_COMPTABILITE_MATIERE_URL || "http://127.0.0.1:8000";
 
         try {
             setLoading(true);
             setError(null);
 
             // Charger les matériels médicaux avec fetch
-            const materielsRes = await fetch(`${baseUrl}/materiels-medicaux/`, { headers, cache: "no-store" });
+            const materielsRes = await fetch(`${baseUrl}/api/materiels-medicaux/`, { headers, cache: "no-store" });
             const materielsData = await materielsRes.json();
             const medicationsFormatted = (materielsData.results || materielsData || []).map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
@@ -80,7 +80,7 @@ export function PharmacistInventory() {
             setMedications(medicationsFormatted);
 
             // Charger les archives d'inventaire avec fetch
-            const archivesRes = await fetch(`${baseUrl}/archives-inventaire/`, { headers, cache: "no-store" });
+            const archivesRes = await fetch(`${baseUrl}/api/archives-inventaire/`, { headers, cache: "no-store" });
             const archivesData = await archivesRes.json();
             const archivesList = archivesData.results || archivesData || [];
             setArchives(archivesList);
@@ -108,10 +108,10 @@ export function PharmacistInventory() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
-        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
+        const baseUrl = import.meta.env.VITE_BACKEND_COMPTABILITE_MATIERE_URL || "http://127.0.0.1:8000";
 
         try {
-            const linesRes = await fetch(`${baseUrl}/lignes-archive-inventaire/?archive=${archive.id_archive}`, { headers, cache: "no-store" });
+            const linesRes = await fetch(`${baseUrl}/api/lignes-archive/?archive=${parseInt(archive.id_archive)}`, { headers, cache: "no-store" });
             const linesData = await linesRes.json();
             const lines = linesData.results || linesData || [];
 
@@ -158,9 +158,9 @@ export function PharmacistInventory() {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             };
-            const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
+            const baseUrl = import.meta.env.VITE_BACKEND_COMPTABILITE_MATIERE_URL || "http://127.0.0.1:8000";
 
-            const archiveRes = await fetch(`${baseUrl}/archives-inventaire/`, {
+            const archiveRes = await fetch(`${baseUrl}/api/archives-inventaire/`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(archiveData)
@@ -170,7 +170,7 @@ export function PharmacistInventory() {
 
             // Créer les lignes d'archive pour chaque médicament
             for (const med of medications) {
-                await fetch(`${baseUrl}/lignes-archive-inventaire/`, {
+                await fetch(`${baseUrl}/api/lignes-archive/`, {
                     method: 'POST',
                     headers,
                     body: JSON.stringify({
@@ -185,7 +185,7 @@ export function PharmacistInventory() {
             }
 
             // Recharger les archives
-            const archivesRes = await fetch(`${baseUrl}/archives-inventaire/`, { headers, cache: "no-store" });
+            const archivesRes = await fetch(`${baseUrl}/api/archives-inventaire/`, { headers, cache: "no-store" });
             const archivesData = await archivesRes.json();
             setArchives(archivesData.results || archivesData || []);
 
@@ -228,10 +228,10 @@ export function PharmacistInventory() {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             };
-            const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
+            const baseUrl = import.meta.env.VITE_BACKEND_COMPTABILITE_MATIERE_URL || "http://127.0.0.1:8000";
 
             // Récupérer les lignes de l'archive en cours
-            const linesRes = await fetch(`${baseUrl}/lignes-archive-inventaire/?archive=${currentArchive.id_archive}`, { headers, cache: "no-store" });
+            const linesRes = await fetch(`${baseUrl}/api/lignes-archive/?archive=${parseInt(currentArchive.id_archive)}`, { headers, cache: "no-store" });
             const linesData = await linesRes.json();
             const lines = linesData.results || linesData || [];
 
@@ -245,7 +245,7 @@ export function PharmacistInventory() {
                     if (difference > 0) statutDiff = "EXCEDENT";
                     else if (difference < 0) statutDiff = "DEFICIT";
 
-                    await fetch(`${baseUrl}/lignes-archive-inventaire/${line.id_ligne_archive}/`, {
+                    await fetch(`${baseUrl}/api/lignes-archive/${line.id_ligne_archive}/`, {
                         method: 'PATCH',
                         headers,
                         body: JSON.stringify({
@@ -256,7 +256,7 @@ export function PharmacistInventory() {
                     });
 
                     // Mettre à jour le stock du matériel
-                    await fetch(`${baseUrl}/materiels-medicaux/${med.id}/`, {
+                    await fetch(`${baseUrl}/api/materiels-medicaux/${med.id}/`, {
                         method: 'PATCH',
                         headers,
                         body: JSON.stringify({
@@ -267,7 +267,7 @@ export function PharmacistInventory() {
             }
 
             // Terminer l'archive
-            await fetch(`${baseUrl}/archives-inventaire/${currentArchive.id_archive}/`, {
+            await fetch(`${baseUrl}/api/archives-inventaire/${parseInt(currentArchive.id_archive)}/`, {
                 method: 'PATCH',
                 headers,
                 body: JSON.stringify({
@@ -322,11 +322,11 @@ export function PharmacistInventory() {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         };
-        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
+        const baseUrl = import.meta.env.VITE_BACKEND_COMPTABILITE_MATIERE_URL || "http://127.0.0.1:8000";
 
         try {
             setLoading(true);
-            const linesRes = await fetch(`${baseUrl}/lignes-archive-inventaire/?archive=${archive.id_archive}`, { headers, cache: "no-store" });
+            const linesRes = await fetch(`${baseUrl}/api/lignes-archive/?archive=${parseInt(archive.id_archive)}`, { headers, cache: "no-store" });
 
             if (!linesRes.ok) {
                 throw new Error(`Erreur HTTP ${linesRes.status}: ${linesRes.statusText}`);

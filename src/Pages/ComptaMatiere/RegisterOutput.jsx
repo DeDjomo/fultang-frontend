@@ -23,15 +23,13 @@ export function RegisterOutput() {
     // Informations de sortie
     const [outputInfo, setOutputInfo] = useState({
         numeroSortie: "",
-        serviceMedical: "",
+        serviceMedical: "Comptabilité Matière", // Service fixe pour le comptable matière
         dateSortie: new Date().toISOString().split('T')[0],
         dateEnregistrement: new Date().toISOString().split('T')[0],
-        motifSortie: "DEFECTUEUX",
-        observations: ""
+        motifSortie: "DEFECTUEUX"
     });
 
-    // État pour les suggestions
-    const [activeSuggestions, setActiveSuggestions] = useState({});
+    // États
     const [formError, setFormError] = useState("");
 
     // Charger les données au montage
@@ -52,42 +50,32 @@ export function RegisterOutput() {
      * - GET /api/sorties/ (pour calculer le dernier ID)
      */
     async function loadData() {
-        const token = localStorage.getItem("token_key_fultang");
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        };
-        const baseUrl = import.meta.env.VITE_BACKEND_FULTANG_API_BASE_MEDICALSTAFF_URL || "http://127.0.0.1:8000/api";
-
         try {
             setLoading(true);
             setError(null);
 
-            // Charger les matériels médicaux et durables en parallèle (cache désactivé)
-            const [medicauxRes, durablesRes] = await Promise.all([
-                fetch(`${baseUrl}/materiels-medicaux/`, { headers, cache: "no-store" }).then(res => res.json()),
-                fetch(`${baseUrl}/materiels-durables/`, { headers, cache: "no-store" }).then(res => res.json())
+            // Charger les matériels médicaux et durables en parallèle
+            const [medicauxData, durablesData] = await Promise.all([
+                materielMedicalApi.getAll(),
+                materielDurableApi.getAll()
             ]);
 
-            const medicauxData = medicauxRes.results || medicauxRes || [];
-            const durablesData = durablesRes.results || durablesRes || [];
-
-            const medicaux = medicauxData.map(m => ({
+            const medicaux = (medicauxData.results || medicauxData || []).map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
                 category: "MEDICAL",
-                categoryDisplay: "Medical Material",
+                categoryDisplay: "Matériel Médical",
                 quantity: m.quantite_stock,
                 prixVente: parseFloat(m.prix_vente_unitaire) || 0
             }));
 
-            const durables = durablesData.map(m => ({
+            const durables = (durablesData.results || durablesData || []).map(m => ({
                 id: m.idMateriel || m.materiel_ptr_id,
                 code: m.code_materiel,
                 name: m.nom_Materiel,
                 category: "DURABLE",
-                categoryDisplay: "Durable Material",
+                categoryDisplay: "Matériel Durable",
                 quantity: m.quantite_stock,
                 prixVente: null
             }));
@@ -96,10 +84,8 @@ export function RegisterOutput() {
 
             // Générer le numéro de sortie
             // Récupérer toutes les sorties pour trouver le dernier numéro
-            // Note: Optimisation possible -> Endpoint dédié backend 'next-number'
-            const sortiesRes = await fetch(`${baseUrl}/sorties/`, { headers, cache: "no-store" });
-            const sortiesData = await sortiesRes.json();
-            const sorties = sortiesData.results || sortiesData || [];
+            const sortiesData = await sortieApi.getAll();
+            const sorties = Array.isArray(sortiesData) ? sortiesData : (sortiesData.results || []);
 
             const year = new Date().getFullYear();
             const count = sorties.filter(s => s.numero_sortie?.includes(`SOR-${year}`)).length + 1;
@@ -109,7 +95,7 @@ export function RegisterOutput() {
 
         } catch (err) {
             console.error("Erreur chargement:", err);
-            setError("Unable to load fresh data.");
+            setError("Impossible de charger les données.");
         } finally {
             setLoading(false);
         }
@@ -140,25 +126,6 @@ export function RegisterOutput() {
         ));
     }
 
-    function handleNameChange(itemId, name) {
-        updateOutputItem(itemId, 'nomMateriel', name);
-
-        if (name.length > 0) {
-            const filteredSuggestions = materialsDatabase.filter(m =>
-                m.name.toLowerCase().includes(name.toLowerCase())
-            );
-            setActiveSuggestions(prev => ({
-                ...prev,
-                [itemId]: filteredSuggestions
-            }));
-        } else {
-            setActiveSuggestions(prev => ({
-                ...prev,
-                [itemId]: []
-            }));
-        }
-    }
-
     function selectMaterial(itemId, material) {
         setOutputItems(outputItems.map(item =>
             item.id === itemId ? {
@@ -170,10 +137,6 @@ export function RegisterOutput() {
                 stockDisponible: material.quantity
             } : item
         ));
-        setActiveSuggestions(prev => ({
-            ...prev,
-            [itemId]: []
-        }));
     }
 
     async function handleSubmit(e) {
@@ -182,18 +145,18 @@ export function RegisterOutput() {
 
         // Validation
         if (!outputInfo.serviceMedical) {
-            setFormError("Please select a medical service.");
+            setFormError("Veuillez sélectionner un service médical.");
             return;
         }
 
         for (const item of outputItems) {
             if (!item.nomMateriel || !item.codeMateriel || !item.quantite || !item.materialId) {
-                setFormError("Please fill all fields for each item.");
+                setFormError("Veuillez remplir tous les champs pour chaque article.");
                 return;
             }
 
             if (parseInt(item.quantite) > item.stockDisponible) {
-                setFormError(`Insufficient quantity for "${item.nomMateriel}". Stock: ${item.stockDisponible}, Requested: ${item.quantite}`);
+                setFormError(`Quantité insuffisante pour "${item.nomMateriel}". Stock: ${item.stockDisponible}, Demandé: ${item.quantite}`);
                 return;
             }
         }
@@ -204,24 +167,22 @@ export function RegisterOutput() {
             // 💾 TRANSACTION DE SAUVEGARDE
             // Étape 1: Créer l'entête de la sortie
             // POST /api/sorties/
-            // Champs backend: numero_sortie, date_sortie, motif_sortie, idPersonnel
             const personnelId = parseInt(localStorage.getItem("personnel_id") || "1");
             const sortieData = {
                 numero_sortie: outputInfo.numeroSortie,
-                date_sortie: `${outputInfo.dateSortie}T00:00:00`,
+                date_sortie: outputInfo.dateSortie,
                 motif_sortie: outputInfo.motifSortie,
-                idPersonnel: personnelId,
-                service_responsable: outputInfo.serviceMedical,
-                observations: outputInfo.observations || null
+                // Note: service_medical n'existe pas dans le modèle backend Sortie
+                // Le service est identifié via idPersonnel (personnel connecté)
+                idPersonnel: personnelId
             };
 
             const createdSortie = await sortieApi.create(sortieData);
 
             // Étape 2: Créer les lignes de sortie et décrémenter le stock
-            // Champs backend: id_sortie, id_materiel, code_materiel, nom_materiel, type_materiel, quantite, prix_unitaire, sous_total
+            // - POST /api/lignes-sortie/ (pour chaque article)
+            // - PATCH /api/materiels-.../ (mise à jour quantite_stock)
             for (const item of outputItems) {
-                const prixUnitaire = item.typeMateriel === "MEDICAL" ?
-                    materialsDatabase.find(m => m.id === item.materialId)?.prixVente : null;
                 const ligneData = {
                     id_sortie: createdSortie.idSortie,
                     id_materiel: item.materialId,
@@ -229,8 +190,11 @@ export function RegisterOutput() {
                     nom_materiel: item.nomMateriel,
                     type_materiel: item.typeMateriel,
                     quantite: parseInt(item.quantite),
-                    prix_unitaire: prixUnitaire
+                    prix_unitaire: item.typeMateriel === "MEDICAL" ?
+                        materialsDatabase.find(m => m.id === item.materialId)?.prixVente : null
                 };
+
+                console.log("📝 Création ligne sortie:", ligneData);
                 await ligneSortieApi.create(ligneData);
 
                 // Mettre à jour le stock
@@ -245,7 +209,7 @@ export function RegisterOutput() {
                 }
             }
 
-            setSuccessMessage(`Output registered successfully! # ${outputInfo.numeroSortie}`);
+            setSuccessMessage(`Sortie enregistrée avec succès ! N° ${outputInfo.numeroSortie}`);
             setTimeout(() => setSuccessMessage(""), 5000);
 
             // Réinitialiser le formulaire
@@ -258,13 +222,16 @@ export function RegisterOutput() {
                 serviceMedical: "",
                 dateSortie: new Date().toISOString().split('T')[0],
                 dateEnregistrement: new Date().toISOString().split('T')[0],
-                motifSortie: "DEFECTUEUX",
-                observations: ""
+                motifSortie: "DEFECTUEUX"
             }));
 
         } catch (err) {
             console.error("Erreur lors de l'enregistrement:", err);
-            setFormError("Error registering output. Please try again.");
+            console.error("❌ Détails erreur backend:", err.response?.data);
+            const backendError = err.response?.data
+                ? JSON.stringify(err.response.data, null, 2)
+                : err.message;
+            setFormError("Erreur: " + backendError);
         } finally {
             setSubmitting(false);
         }
@@ -272,12 +239,12 @@ export function RegisterOutput() {
 
     if (loading) {
         return (
-            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"comptable_matiere"}>
+            <AccountantDashBoard linkList={AccountantNavLink} requiredRole={"ComptaMatiere"}>
                 <AccountantNavBar />
                 <div className="flex items-center justify-center h-96">
                     <div className="text-center">
                         <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
-                        <p className="text-gray-600">Loading data...</p>
+                        <p className="text-gray-600">Chargement des données...</p>
                     </div>
                 </div>
             </AccountantDashBoard>
@@ -287,21 +254,21 @@ export function RegisterOutput() {
     return (
         <AccountantDashBoard
             linkList={AccountantNavLink}
-            requiredRole={"comptable_matiere"}
+            requiredRole={"ComptaMatiere"}
         >
             <AccountantNavBar />
             <div className="p-6 space-y-6">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <FaBoxOpen className="text-4xl text-primary-start" />
-                        <h1 className="text-3xl font-bold text-gray-800">Register Output</h1>
+                        <h1 className="text-3xl font-bold text-gray-800">Enregistrer une Sortie</h1>
                     </div>
                     <button
                         onClick={loadData}
                         disabled={loading}
                         className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
                     >
-                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> Refresh
+                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
                     </button>
                 </div>
 
@@ -320,7 +287,7 @@ export function RegisterOutput() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Informations de sortie */}
                     <div className="bg-white rounded-lg shadow-lg p-6">
-                        <h2 className="text-xl font-bold text-gray-800 mb-4">Output Information</h2>
+                        <h2 className="text-xl font-bold text-gray-800 mb-4">Informations de Sortie</h2>
 
                         {formError && (
                             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
@@ -331,7 +298,7 @@ export function RegisterOutput() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Output Number
+                                    Numéro de sortie
                                 </label>
                                 <input
                                     type="text"
@@ -339,35 +306,25 @@ export function RegisterOutput() {
                                     className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 font-mono font-bold"
                                     readOnly
                                 />
-                                <p className="text-xs text-gray-500 mt-1">Auto-generated</p>
+                                <p className="text-xs text-gray-500 mt-1">Généré automatiquement</p>
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Responsible Medical Service *
+                                    Service responsable
                                 </label>
-                                <select
+                                <input
+                                    type="text"
                                     value={outputInfo.serviceMedical}
-                                    onChange={(e) => setOutputInfo({ ...outputInfo, serviceMedical: e.target.value })}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
-                                    required
-                                >
-                                    <option value="">Select a service</option>
-                                    <option value="Service Médical">Medical Service</option>
-                                    <option value="Service Cardiologie">Cardiology Service</option>
-                                    <option value="Pharmacie">Pharmacy</option>
-                                    <option value="Laboratoire">Laboratory</option>
-                                    <option value="Administration">Administration</option>
-                                    <option value="Bloc Opératoire">Operating Room</option>
-                                    <option value="Service Pédiatrie">Pediatrics Service</option>
-                                    <option value="Urgences">Emergency</option>
-                                    <option value="Radiologie">Radiology</option>
-                                </select>
+                                    className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 font-semibold"
+                                    readOnly
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Service défini automatiquement</p>
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Output Date *
+                                    Date de sortie *
                                 </label>
                                 <input
                                     type="date"
@@ -388,12 +345,12 @@ export function RegisterOutput() {
                                     className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
                                     readOnly
                                 />
-                                <p className="text-xs text-gray-500 mt-1">Today's date (automatic)</p>
+                                <p className="text-xs text-gray-500 mt-1">Date du jour (automatique)</p>
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Output Reason *
+                                    Motif de la sortie *
                                 </label>
                                 <select
                                     value={outputInfo.motifSortie}
@@ -401,25 +358,12 @@ export function RegisterOutput() {
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
                                     required
                                 >
-                                    <option value="DEFECTUEUX">Defective</option>
-                                    <option value="PERIME">Expired</option>
-                                    <option value="VENTE">Sale</option>
-                                    <option value="UTILISATION_SERVICE">Internal Use</option>
-                                    <option value="PERTE">Loss</option>
+                                    <option value="DEFECTUEUX">Défectueux</option>
+                                    <option value="PERIME">Périmé</option>
+                                    <option value="VENTE">Vente</option>
+                                    <option value="UTILISATION_SERVICE">Utilisation interne</option>
+                                    <option value="PERTE">Perte</option>
                                 </select>
-                            </div>
-
-                            <div className="md:col-span-3">
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Observations
-                                </label>
-                                <textarea
-                                    value={outputInfo.observations}
-                                    onChange={(e) => setOutputInfo({ ...outputInfo, observations: e.target.value })}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent transition-all"
-                                    placeholder="Optional remarks about this output..."
-                                    rows="2"
-                                />
                             </div>
                         </div>
                     </div>
@@ -427,13 +371,13 @@ export function RegisterOutput() {
                     {/* Articles en sortie */}
                     <div className="bg-white rounded-lg shadow-lg p-6">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold text-gray-800">Output Items</h2>
+                            <h2 className="text-xl font-bold text-gray-800">Articles en Sortie</h2>
                             <button
                                 type="button"
                                 onClick={addOutputItem}
                                 className="flex items-center gap-2 px-4 py-2 bg-primary-start text-white rounded-lg hover:opacity-90 transition-all duration-300"
                             >
-                                <FaPlus /> Add Item
+                                <FaPlus /> Ajouter un article
                             </button>
                         </div>
 
@@ -442,10 +386,9 @@ export function RegisterOutput() {
                                 <OutputItemRow
                                     key={item.id}
                                     item={item}
-                                    suggestions={activeSuggestions[item.id] || []}
-                                    onUpdate={updateOutputItem}
-                                    onNameChange={handleNameChange}
+                                    materialsDatabase={materialsDatabase}
                                     onSelectMaterial={selectMaterial}
+                                    onUpdate={updateOutputItem}
                                     onRemove={removeOutputItem}
                                     canRemove={outputItems.length > 1}
                                 />
@@ -455,7 +398,7 @@ export function RegisterOutput() {
                         <div className="mt-4 p-3 bg-primary-end/10 rounded-lg">
                             <p className="text-sm text-primary-start flex items-center gap-2">
                                 <FaCheckCircle />
-                                Total: {outputItems.length} item(s) in output
+                                Total: {outputItems.length} article(s) en sortie
                             </p>
                         </div>
                     </div>
@@ -472,7 +415,7 @@ export function RegisterOutput() {
                             }}
                             className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all duration-300"
                         >
-                            Cancel
+                            Annuler
                         </button>
                         <button
                             type="submit"
@@ -480,7 +423,7 @@ export function RegisterOutput() {
                             className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all duration-300 disabled:opacity-50"
                         >
                             {submitting ? <FaSpinner className="animate-spin" /> : <FaSave />}
-                            Register Output
+                            Enregistrer la sortie
                         </button>
                     </div>
                 </form>
@@ -489,58 +432,54 @@ export function RegisterOutput() {
     );
 }
 
-function OutputItemRow({ item, suggestions, onUpdate, onNameChange, onSelectMaterial, onRemove, canRemove }) {
+function OutputItemRow({ item, materialsDatabase, onSelectMaterial, onUpdate, onRemove, canRemove }) {
     OutputItemRow.propTypes = {
         item: PropTypes.object.isRequired,
-        suggestions: PropTypes.array.isRequired,
-        onUpdate: PropTypes.func.isRequired,
-        onNameChange: PropTypes.func.isRequired,
+        materialsDatabase: PropTypes.array.isRequired,
         onSelectMaterial: PropTypes.func.isRequired,
+        onUpdate: PropTypes.func.isRequired,
         onRemove: PropTypes.func.isRequired,
         canRemove: PropTypes.bool.isRequired
     };
 
-    const [showSuggestions, setShowSuggestions] = useState(false);
+    // Gérer la sélection d'un matériel via le select
+    function handleMaterialSelect(e) {
+        const materialId = parseInt(e.target.value);
+        if (materialId) {
+            const material = materialsDatabase.find(m => m.id === materialId);
+            if (material) {
+                onSelectMaterial(item.id, material);
+            }
+        }
+    }
 
     return (
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div className="relative">
+                <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Material Name *
+                        Nom Matériel *
                     </label>
-                    <input
-                        type="text"
-                        value={item.nomMateriel}
-                        onChange={(e) => onNameChange(item.id, e.target.value)}
-                        onFocus={() => setShowSuggestions(true)}
-                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                    <select
+                        value={item.materialId || ""}
+                        onChange={handleMaterialSelect}
                         className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end"
-                        placeholder="Type to search..."
                         required
-                    />
-                    {showSuggestions && suggestions.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                            {suggestions.map((material) => (
-                                <div
-                                    key={material.id}
-                                    onClick={() => onSelectMaterial(item.id, material)}
-                                    className="p-2 hover:bg-primary-end/10 cursor-pointer border-b border-gray-100 last:border-b-0"
-                                >
-                                    <div className="font-semibold text-gray-800 text-sm">{material.name}</div>
-                                    <div className="text-xs text-gray-500 flex justify-between">
-                                        <span className="font-mono">{material.code}</span>
-                                        <span>Stock: {material.quantity}</span>
-                                    </div>
-                                </div>
+                    >
+                        <option value="">Sélectionner un matériel</option>
+                        {[...materialsDatabase]
+                            .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+                            .map((material) => (
+                                <option key={material.id} value={material.id}>
+                                    {material.name} ({material.code}) - Stock: {material.quantity}
+                                </option>
                             ))}
-                        </div>
-                    )}
+                    </select>
                 </div>
 
                 <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Material Code
+                        Code Matériel
                     </label>
                     <input
                         type="text"
@@ -553,11 +492,11 @@ function OutputItemRow({ item, suggestions, onUpdate, onNameChange, onSelectMate
 
                 <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Material Type
+                        Type Matériel
                     </label>
                     <input
                         type="text"
-                        value={item.typeMateriel === "MEDICAL" ? "Medical Material" : item.typeMateriel === "DURABLE" ? "Durable Material" : ""}
+                        value={item.typeMateriel === "MEDICAL" ? "Matériel Médical" : item.typeMateriel === "DURABLE" ? "Matériel Durable" : ""}
                         className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100"
                         placeholder="Auto"
                         readOnly
@@ -566,7 +505,7 @@ function OutputItemRow({ item, suggestions, onUpdate, onNameChange, onSelectMate
 
                 <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Quantity * {item.stockDisponible > 0 && <span className="text-xs text-gray-500">(Stock: {item.stockDisponible})</span>}
+                        Quantité * {item.stockDisponible > 0 && <span className="text-xs text-gray-500">(Stock: {item.stockDisponible})</span>}
                     </label>
                     <input
                         type="number"

@@ -44,7 +44,7 @@ export function SettingsModal({ isOpen, onClose }) {
             open={isOpen}
             onCancel={onClose}
             footer={null}
-            destroyOnClose
+            destroyOnHidden
         >
             <div className="space-y-6">
                 {/* Section Sécurité */}

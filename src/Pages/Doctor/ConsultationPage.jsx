@@ -27,7 +27,7 @@ import {
 } from '../../services/patientHistoryApi';
 import { useFeedback } from '../../contexts/FeedbackContext.jsx';
 import Loader from '../../GlobalComponents/Loader';
-import { SendToCashierModal } from '../Modals/SendToCashierModal';
+import { OpenSessionModal } from '../Receptionist/OpenSessionModal';
 import { ConfirmationModal } from '../Modals/ConfirmAction.Modal.jsx';
 
 export function ConsultationPage() {
@@ -715,12 +715,15 @@ export function ConsultationPage() {
                     </button>
                 </div>
             </div>
-            <SendToCashierModal
+            <OpenSessionModal
                 isOpen={openSendToCashierModal}
                 onClose={() => setOpenSendToCashierModal(false)}
                 patient={patient}
+                mode="cashier"
+                isUpdate={true}
                 sessionId={sessionId}
                 onSuccess={() => {
+                    showSuccess('Le patient a été envoyé à la caisse avec succès.', 'Patient envoyé');
                     navigate('/doctor/waiting-room');
                 }}
             />

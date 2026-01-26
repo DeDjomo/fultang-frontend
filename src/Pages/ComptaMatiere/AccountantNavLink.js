@@ -7,55 +7,63 @@ import {
   FaChartLine,
   FaBoxes,
   FaListAlt,
+  FaArchive,
 } from "react-icons/fa";
 
 export const AccountantNavLink = [
   {
-    name: "Dashboard",
+    name: "Tableau de bord",
     link: appRoutes.comptaMatiereDashboard,
     icon: FaHome,
-    description: "Overview of activities"
+    description: "Vue d'ensemble des activités"
   },
 
   {
-    name: "Emit Need",
+    name: "Émettre un besoin",
     link: appRoutes.comptaMatiereEmitNeed,
     icon: FaClipboardList,
-    description: "Create a material request"
+    description: "Créer une demande de matériel"
   },
 
   {
-    name: "Register Delivery",
+    name: "Enregistrer une livraison",
     link: appRoutes.comptaMatiereRegisterDelivery,
     icon: FaTruck,
-    description: "Record material reception"
+    description: "Enregistrer la réception de matériel"
   },
 
   {
-    name: "Register Output",
+    name: "Enregistrer une sortie",
     link: appRoutes.comptaMatiereRegisterOutput,
     icon: FaBoxOpen,
-    description: "Record material output"
+    description: "Enregistrer la sortie de matériel"
   },
 
   {
-    name: "Reports",
+    name: "Consulter Inventaire",
+    link: appRoutes.comptaMatiereInventoryArchives,
+    icon: FaArchive,
+    description: "Voir les inventaires terminés"
+  },
+
+  {
+    name: "Rapports",
     link: appRoutes.comptaMatiereReports,
     icon: FaChartLine,
-    description: "View reports"
+    description: "Consulter les rapports"
   },
 
   {
-    name: "Material List",
+    name: "Liste du matériel",
     link: appRoutes.comptaMatiereMaterialList,
     icon: FaBoxes,
-    description: "Available material inventory"
+    description: "Inventaire du matériel disponible"
   },
 
   {
-    name: "Output List",
+    name: "Liste des sorties",
     link: appRoutes.comptaMatiereOutputList,
     icon: FaListAlt,
-    description: "Material output history"
+    description: "Historique des sorties de matériel"
   },
 ];

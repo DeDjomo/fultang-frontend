@@ -17,8 +17,7 @@ import {
 } from "react-icons/fa";
 import PropTypes from "prop-types";
 import jsPDF from "jspdf";
-import { rapportApi } from "../../services/comptabiliteMatiereApi";
-import { getAllPersonnel } from "../../services/personnelApi";
+import { rapportApi, personnelApi } from "../../services/comptabiliteMatiereApi";
 
 export function DirectorReports() {
     const [loading, setLoading] = useState(true);
@@ -33,9 +32,40 @@ export function DirectorReports() {
         corps: ""
     });
 
-    // ID du directeur connecté
-    const currentUserId = parseInt(localStorage.getItem("personnel_id") || "1");
+    // Récupérer l'ID du directeur connecté - TOUJOURS depuis user_data_fultang
+    const getCurrentUserId = () => {
+        const userData = localStorage.getItem("user_data_fultang");
+
+        // DEBUG: Afficher ce qui est stocké
+        console.log("🔍 DEBUG getCurrentUserId:");
+        console.log("   - user_data_fultang brut:", userData);
+
+        if (userData) {
+            try {
+                const parsed = JSON.parse(userData);
+                console.log("   - user_data_fultang parsé:", parsed);
+                // Utiliser 'id' car c'est ce que le backend retourne lors du login
+                const userId = parsed.id;
+                if (userId) {
+                    // Toujours mettre à jour personnel_id pour garder la cohérence
+                    localStorage.setItem("personnel_id", String(userId));
+                    console.log("   ✅ ID trouvé:", userId, "Poste:", parsed.poste);
+                    return userId;
+                }
+            } catch (e) {
+                console.error("Erreur parsing user_data_fultang:", e);
+            }
+        }
+
+        console.log("   ⚠️ Aucun ID valide trouvé - utilisateur non identifié");
+        console.log("   💡 Conseil: Déconnectez-vous et reconnectez-vous");
+        return null;
+    };
+
+    const currentUserId = getCurrentUserId();
     const currentUserName = localStorage.getItem("user_name") || "Directeur";
+
+    console.log("👤 Utilisateur courant - ID:", currentUserId, "Nom:", currentUserName);
 
     // Rapports depuis l'API
     const [sentReports, setSentReports] = useState([]);
@@ -67,25 +97,36 @@ export function DirectorReports() {
             setLoading(true);
             setError(null);
 
-            // Charger les rapports et le personnel en parallèle
+            // Vérifier que l'utilisateur est connecté
+            if (!currentUserId) {
+                setError("Utilisateur non identifié. Veuillez vous reconnecter.");
+                setLoading(false);
+                return;
+            }
+
+            // Charger les rapports filtrés et le personnel en parallèle
             const [rapportsData, personnelData] = await Promise.all([
-                rapportApi.getAll(),
-                getAllPersonnel()
+                rapportApi.getByUser(currentUserId), // Utilisation de l'API filtrée
+                personnelApi.getAll()
             ]);
 
-            // Stocker la liste du personnel
-            const personnel = personnelData.results || personnelData || [];
+            // Stocker la liste du personnel - s'assurer que c'est un tableau
+            const personnel = Array.isArray(personnelData) ? personnelData :
+                (Array.isArray(personnelData?.results) ? personnelData.results : []);
             setPersonnelList(personnel);
 
-            const rapports = rapportsData.results || rapportsData;
+            const rapportsSent = rapportsData.sent || [];
+            const rapportsReceived = rapportsData.received || [];
 
-            // Filtrer les rapports envoyés par le directeur
-            const sent = rapports.filter(r => r.expediteur === currentUserId);
-            setSentReports(sent.map(r => formatReport(r, getPersonnelNameFromList(personnel))));
+            // Debug
+            console.log("🔍 DEBUG RAPPORTS DIRECTOR (filtrés backend):");
+            console.log("   currentUserId:", currentUserId);
+            console.log("   📤 Rapports envoyés:", rapportsSent.length);
+            console.log("   📥 Rapports reçus:", rapportsReceived.length);
 
-            // Filtrer les rapports reçus par le directeur
-            const received = rapports.filter(r => r.destinataire === currentUserId);
-            setReceivedReports(received.map(r => ({ ...formatReport(r, getPersonnelNameFromList(personnel)), isRead: r.est_lu })));
+            // Mise à jour des états avec les données déjà filtrées
+            setSentReports(rapportsSent.map(r => formatReport(r, getPersonnelNameFromList(personnel))));
+            setReceivedReports(rapportsReceived.map(r => ({ ...formatReport(r, getPersonnelNameFromList(personnel)), isRead: r.est_lu })));
 
         } catch (err) {
             console.error("Erreur lors du chargement des rapports:", err);
@@ -98,7 +139,9 @@ export function DirectorReports() {
     // Helper avec liste passée en paramètre (pour éviter problème de référence)
     function getPersonnelNameFromList(list) {
         return (id) => {
-            const person = list.find(p => p.idpersonnel === id || p.id === id);
+            // S'assurer que list est un tableau
+            const safeList = Array.isArray(list) ? list : [];
+            const person = safeList.find(p => p.idpersonnel === id || p.id === id);
             if (person) {
                 return `${person.nom || ''} ${person.prenom || ''}`;
             }
@@ -108,8 +151,8 @@ export function DirectorReports() {
 
     function formatReport(r, getPersonnelName = (id) => `Personnel #${id}`) {
         return {
-            id: r.code_rapport || `RPT-${r.idRapport}`,
-            idRapport: r.idRapport,
+            id: r.code_rapport || `RPT-${r.id || r.idRapport || Date.now()}`,
+            idRapport: r.id || r.idRapport,
             objet: r.objet,
             corps: r.corps,
             dateEnvoi: r.date_creation?.split('T')[0] || new Date().toISOString().split('T')[0],
@@ -127,7 +170,12 @@ export function DirectorReports() {
         e.preventDefault();
 
         if (!reportForm.destinataire) {
-            setError("Veuillez saisir l'ID du destinataire.");
+            setError("Veuillez sélectionner un destinataire.");
+            return;
+        }
+
+        if (!currentUserId) {
+            setError("Utilisateur non identifié. Veuillez vous reconnecter.");
             return;
         }
 
@@ -135,10 +183,11 @@ export function DirectorReports() {
             setSubmitting(true);
             setError(null);
 
+            // Générer un code unique qui respecte max_length=20 du backend
             const now = new Date();
-            const year = now.getFullYear();
-            const existingCount = sentReports.length + receivedReports.length;
-            const codeRapport = `RPT-${year}-${String(existingCount + 1).padStart(3, '0')}`;
+            const timestamp = now.getTime().toString(36).toUpperCase();
+            const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+            const codeRapport = `RPT-${timestamp}-${random}`.substring(0, 20);
 
             const newReportData = {
                 code_rapport: codeRapport,
@@ -149,6 +198,9 @@ export function DirectorReports() {
                 expediteur: currentUserId,
                 destinataire: parseInt(reportForm.destinataire)
             };
+
+            console.log("🔑 Utilisateur connecté - ID:", currentUserId, "Nom:", currentUserName);
+            console.log("📤 Envoi du rapport:", newReportData);
 
             await rapportApi.create(newReportData);
 
@@ -417,21 +469,23 @@ export function DirectorReports() {
                                     Destinataire *
                                 </label>
                                 <select
-                                    value={reportForm.destinataire}
+                                    value={reportForm.destinataire || ''}
                                     onChange={(e) => setReportForm({ ...reportForm, destinataire: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
                                     required
                                 >
                                     <option value="">-- Sélectionner un destinataire --</option>
                                     {personnelList
-                                        .filter(p => (p.idpersonnel || p.id) !== currentUserId)
+                                        .filter(p => ['comptable_matiere', 'directeur', 'pharmacien'].includes(p.poste?.toLowerCase()))
+                                        .filter(p => p.id !== currentUserId) // Exclure l'utilisateur connecté
                                         .map(p => (
-                                            <option key={p.idpersonnel || p.id} value={p.idpersonnel || p.id}>
-                                                {p.nom} {p.prenom} ({p.role || p.poste || 'N/A'})
+                                            <option key={p.id} value={p.id}>
+                                                {p.nom} {p.prenom} ({p.poste})
                                             </option>
                                         ))
                                     }
                                 </select>
+                                <p className="text-xs text-gray-500 mt-1">Sélectionnez le destinataire du rapport</p>
                             </div>
                         </div>
                         <div>
@@ -450,8 +504,8 @@ export function DirectorReports() {
                         <div className="flex justify-end">
                             <button
                                 type="submit"
-                                disabled={submitting}
-                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
+                                disabled={submitting || !reportForm.destinataire}
+                                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {submitting ? <FaSpinner className="animate-spin" /> : <FaPaperPlane />}
                                 Envoyer

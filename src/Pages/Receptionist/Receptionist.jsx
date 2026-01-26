@@ -11,7 +11,6 @@ import Wait from "../Modals/wait.jsx";
 import { ViewPatientDetailsModal } from "./ViewPatientDetailsModal.jsx";
 import { EditPatientInfosModal } from "./EditPatientInfosModal.jsx";
 import { OpenSessionModal } from "./OpenSessionModal.jsx";
-import { CreateSessionForCashierModal } from "../Modals/CreateSessionForCashierModal.jsx";
 
 import { Button, Tag, Space, Table, Input, Tooltip, Dropdown, Menu } from 'antd';
 import {
@@ -417,10 +416,11 @@ export function Receptionist() {
                     setCanOPenSuccessModal(true);
                 }}
             />
-            <CreateSessionForCashierModal
+            <OpenSessionModal
                 isOpen={canOpenSendToCashierModal}
                 onClose={() => setCanOpenSendToCashierModal(false)}
                 patient={selectedPatientDetails}
+                mode="cashier"
                 onSuccess={() => {
                     setSuccessMessage("Patient sent to cashier successfully!");
                     setCanOPenSuccessModal(true);
