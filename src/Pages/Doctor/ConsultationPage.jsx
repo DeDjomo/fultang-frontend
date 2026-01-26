@@ -28,7 +28,10 @@ import {
 import { useFeedback } from '../../contexts/FeedbackContext.jsx';
 import Loader from '../../GlobalComponents/Loader';
 import { SendToCashierModal } from '../Modals/SendToCashierModal';
+import { EditPatientVitalsModal } from '../Modals/EditPatientVitalsModal.jsx';
 import { ConfirmationModal } from '../Modals/ConfirmAction.Modal.jsx';
+import { downloadPatientHistoryPDF } from '../../services/patientHistoryApi';
+import { FaEdit, FaFilePdf } from 'react-icons/fa';
 
 export function ConsultationPage() {
     const location = useLocation();
@@ -50,6 +53,7 @@ export function ConsultationPage() {
     const [selectedPrescriptionExamen, setSelectedPrescriptionExamen] = useState(null);
     const [selectedChambre, setSelectedChambre] = useState(null);
     const [openSendToCashierModal, setOpenSendToCashierModal] = useState(false);
+    const [isEditVitalsModalOpen, setIsEditVitalsModalOpen] = useState(false);
     const [showHospitalizationModal, setShowHospitalizationModal] = useState(false);
     const { showSuccess, showError, showWarning } = useFeedback();
 
@@ -83,13 +87,33 @@ export function ConsultationPage() {
         setLoading(true);
         try {
             const response = await getDossierByPatientId(patient.id);
-            const data = response.data || response;
+            console.log("Dossier response:", response);
 
-            if (Array.isArray(data) && data.length > 0) {
-                setDossier(data[0]);
-            } else if (data && !Array.isArray(data)) {
-                setDossier(data);
+            let dossierData = null;
+
+            // Cas 1: Structure standard Fultang { success: true, data: [...] }
+            if (response.success && Array.isArray(response.data)) {
+                // Securité: Chercher le dossier correspondant au patient actuel (si le filtre backend échoue)
+                dossierData = response.data.find(d => d.id_patient == patient.id);
+                // Fallback: Si non trouvé mais qu'il n'y a qu'un résultat
+                if (!dossierData && response.data.length > 0) {
+                    console.warn("Dossier ID mismatch or not found in list");
+                }
             }
+            // Cas 2: Retourne directement un tableau
+            else if (Array.isArray(response)) {
+                dossierData = response.find(d => d.id_patient == patient.id);
+            }
+            // Cas 3: Retourne data dans data (axios without interceptor stripping?)
+            else if (response.data && Array.isArray(response.data)) {
+                dossierData = response.data.find(d => d.id_patient == patient.id);
+            }
+            // Cas 4: Objet direct (si get by ID direct au lieu de filtre)
+            else if ((response.id || response.id_patient) && (response.id_patient === patient.id || response.id === patient.id)) {
+                dossierData = response;
+            }
+
+            setDossier(dossierData);
         } catch (error) {
             console.error('Error loading dossier:', error);
             showError('Erreur lors du chargement du dossier patient.', 'Échec du chargement');
@@ -276,6 +300,38 @@ export function ConsultationPage() {
                 <span className="flex items-center gap-2">
                     <FileText className="w-4 h-4" />
                     Patient Record
+                    <div className="flex gap-2 ml-4">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsEditVitalsModalOpen(true);
+                            }}
+                            className="bg-blue-100 text-blue-600 p-1 rounded hover:bg-blue-200 transition-colors"
+                            title="Modifier les données"
+                        >
+                            <FaEdit className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                console.log("Download PDF requested for dossier:", dossier);
+                                const idToUse = dossier?.id || dossier?.id_patient || patient?.id;
+                                if (idToUse) {
+                                    showSuccess("Génération du PDF en cours...", "Téléchargement");
+                                    downloadPatientHistoryPDF(idToUse).catch(err => {
+                                        console.error("PDF Download error:", err);
+                                        showError("Erreur lors du téléchargement du PDF", "Erreur");
+                                    });
+                                } else {
+                                    showError("Impossible de trouver l'ID du dossier patient", "Erreur");
+                                }
+                            }}
+                            className="bg-red-100 text-red-600 p-1 rounded hover:bg-red-200 transition-colors"
+                            title="Télécharger l'historique PDF"
+                        >
+                            <FaFilePdf className="w-4 h-4" />
+                        </button>
+                    </div>
                 </span>
             ),
             children: (
@@ -730,6 +786,12 @@ export function ConsultationPage() {
                 onConfirm={confirmHospitalization}
                 title="Confirmer l'hospitalisation"
                 message={`Êtes-vous sûr de vouloir hospitaliser ${patient?.prenom} ${patient?.nom} ?`}
+            />
+            <EditPatientVitalsModal
+                isOpen={isEditVitalsModalOpen}
+                onClose={() => setIsEditVitalsModalOpen(false)}
+                patientId={patient?.id}
+                onSuccess={() => loadDossierPatient()}
             />
         </CustomDashboard>
     );

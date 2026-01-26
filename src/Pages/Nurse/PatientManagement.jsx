@@ -16,7 +16,8 @@ import { createObservation } from '../../services/observationsApi';
 import { rediriggerPatient, updateSessionStatus } from '../../services/sessionsApi';
 import { getAllServices } from '../../services/servicesApi';
 import { SendToCashierModal } from '../Modals/SendToCashierModal';
-import { FaMoneyBillWave } from 'react-icons/fa';
+import { EditPatientVitalsModal } from '../Modals/EditPatientVitalsModal.jsx';
+import { FaMoneyBillWave, FaEdit } from 'react-icons/fa';
 
 export function PatientManagement() {
     const { state } = useLocation();
@@ -37,6 +38,7 @@ export function PatientManagement() {
     const [submittingObs, setSubmittingObs] = useState(false);
     const [submittingRedirect, setSubmittingRedirect] = useState(false);
     const [openSendToCashierModal, setOpenSendToCashierModal] = useState(false);
+    const [isEditVitalsModalOpen, setIsEditVitalsModalOpen] = useState(false);
     const { showSuccess, showError, showWarning } = useFeedback();
 
     const personnelTypes = [
@@ -61,15 +63,35 @@ export function PatientManagement() {
         try {
             setLoadingDossier(true);
             const response = await getDossierByPatientId(patient.id);
-            const data = response.data || response;
+            console.log("Dossier response:", response);
 
-            if (Array.isArray(data) && data.length > 0) {
-                setDossier(data[0]);
-            } else if (data && !Array.isArray(data)) {
-                setDossier(data);
+            let dossierData = null;
+
+            // Cas 1: Structure standard Fultang { success: true, data: [...] }
+            if (response.success && Array.isArray(response.data)) {
+                // Utilisation de == pour permettre la coercion string/number
+                dossierData = response.data.find(d => d.id_patient == patient.id);
+                if (!dossierData && response.data.length > 0) {
+                    console.warn("Dossier ID mismatch or not found in list (PatientManagement)", patient.id);
+                }
             }
+            // Cas 2: Retourne directement un tableau
+            else if (Array.isArray(response)) {
+                dossierData = response.find(d => d.id_patient == patient.id);
+            }
+            // Cas 3: Retourne data dans data
+            else if (response.data && Array.isArray(response.data)) {
+                dossierData = response.data.find(d => d.id_patient == patient.id);
+            }
+            // Cas 4: Objet direct (si get by ID direct au lieu de filtre)
+            else if (response.id || response.id_patient) {
+                dossierData = response;
+            }
+
+            setDossier(dossierData);
         } catch (error) {
             console.error('Error loading dossier:', error);
+            showError("Impossible de charger le dossier patient.", "Erreur");
         } finally {
             setLoadingDossier(false);
         }
@@ -208,6 +230,13 @@ export function PatientManagement() {
                                 <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                                     <FileText className="w-7 h-7" />
                                     Dossier Medical
+                                    <button
+                                        onClick={() => setIsEditVitalsModalOpen(true)}
+                                        className="ml-auto text-sm bg-blue-100 text-blue-600 px-3 py-1 rounded-full flex items-center gap-2 hover:bg-blue-200 transition-colors"
+                                    >
+                                        <FaEdit />
+                                        Modifier
+                                    </button>
                                 </h2>
                             </div>
 
@@ -430,6 +459,12 @@ export function PatientManagement() {
                 onSuccess={() => {
                     navigate('/nurse/waiting-room');
                 }}
+            />
+            <EditPatientVitalsModal
+                isOpen={isEditVitalsModalOpen}
+                onClose={() => setIsEditVitalsModalOpen(false)}
+                patientId={patient?.id}
+                onSuccess={() => loadDossierPatient()} // Correction: utilisation de la fonction existante
             />
         </DashBoard>
     );

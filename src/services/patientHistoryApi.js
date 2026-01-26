@@ -45,3 +45,46 @@ export const getPatientResultatsExamens = async (patientId) => {
     const response = await axiosInstance.get(`${BASE_URL}/${patientId}/resultats-examens`);
     return response.data;
 };
+
+/**
+ * Récupérer le dossier médical d'un patient
+ * @param {number} patientId - ID du patient
+ */
+/**
+ * Récupérer le dossier médical d'un patient
+ * @param {number} patientId - ID du patient
+ */
+export const getDossierPatient = async (patientId) => {
+    // L'endpoint backend est /api/dossiers-patients/?id_patient=XX
+    const response = await axiosInstance.get(`/dossiers-patients/?id_patient=${patientId}`);
+    return response.data;
+};
+
+/**
+ * Mettre à jour le dossier médical
+ * @param {number} patientId - ID du patient (qui est aussi ID du dossier)
+ * @param {Object} data - Données à mettre à jour
+ */
+export const updateDossierPatient = async (patientId, data) => {
+    // L'endpoint backend est /api/dossiers-patients/ID/
+    const response = await axiosInstance.patch(`/dossiers-patients/${patientId}/`, data);
+    return response.data;
+};
+
+/**
+ * Télécharger l'historique médical en PDF
+ * @param {number} dossierId - ID du dossier
+ */
+export const downloadPatientHistoryPDF = async (dossierId) => {
+    const response = await axiosInstance.get(`/dossiers-patients/${dossierId}/download-history/`, {
+        responseType: 'blob'
+    });
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `historique_medical_${dossierId}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+};
