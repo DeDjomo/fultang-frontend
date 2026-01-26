@@ -43,7 +43,7 @@ export default function FinancialHistory() {
     );
 
     return (
-        <DashBoard linkList={cashierNavLink} /* requiredRole="Cashier" */>
+        <DashBoard linkList={cashierNavLink} requiredRole="caissier">
             <CashierNavBar />
             <div className="p-6">
                 <div className="flex justify-between items-center mb-8">
@@ -70,8 +70,8 @@ export default function FinancialHistory() {
                                     key={p}
                                     onClick={() => setPeriod(p)}
                                     className={`flex-1 py-2 px-4 rounded-md font-semibold transition-all duration-300 capitalize ${period === p
-                                            ? 'bg-white text-primary-end shadow-sm'
-                                            : 'text-gray-500 hover:text-gray-700'
+                                        ? 'bg-white text-primary-end shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
                                         }`}
                                 >
                                     {p}
