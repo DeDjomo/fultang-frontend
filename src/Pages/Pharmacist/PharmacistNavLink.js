@@ -1,39 +1,38 @@
 import { FaHome, FaClipboardList, FaShoppingCart, FaBoxes, FaFileAlt, FaPills, FaPrescriptionBottleAlt } from "react-icons/fa";
-// Navigation links for Pharmacist - Updated 2025-12-26
 
 export const PharmacistNavLink = [
     {
-        name: "Tableau de bord",
+        nameKey: "sidebar.dashboard",
         link: "/pharmacist/dashboard",
         icon: FaHome
     },
     {
-        name: "Prescriptions",
+        nameKey: "sidebar.prescriptions",
         link: "/pharmacist/prescriptions",
         icon: FaPrescriptionBottleAlt
     },
     {
-        name: "Liste des médicaments",
+        nameKey: "sidebar.medicationList",
         link: "/pharmacist/medication-list",
         icon: FaPills
     },
     {
-        name: "Émettre un besoin",
+        nameKey: "sidebar.emitNeed",
         link: "/pharmacist/emit-need",
         icon: FaClipboardList
     },
     {
-        name: "Ventes du jour",
+        nameKey: "sidebar.dailySales",
         link: "/pharmacist/daily-sales",
         icon: FaShoppingCart
     },
     {
-        name: "Inventaire",
+        nameKey: "sidebar.inventory",
         link: "/pharmacist/inventory",
         icon: FaBoxes
     },
     {
-        name: "Rapports",
+        nameKey: "sidebar.reports",
         link: "/pharmacist/reports",
         icon: FaFileAlt
     }

@@ -8,22 +8,22 @@ import { Building2, Users, Stethoscope } from "lucide-react";
  */
 export const newAdminNavLink = [
     {
-        name: "Dashboard",
+        nameKey: "sidebar.dashboard",
         link: appRoutes.adminHomePage,
         icon: FaHome,
     },
     {
-        name: "Services",
+        nameKey: "sidebar.services",
         icon: Building2,
         link: appRoutes.adminServicesPage,
     },
     {
-        name: "Personnel",
+        nameKey: "sidebar.staff",
         icon: Users,
         link: appRoutes.adminPersonnelPage,
     },
     {
-        name: "Chambres",
+        nameKey: "sidebar.rooms",
         icon: Stethoscope,
         link: appRoutes.adminChambresPage,
     },

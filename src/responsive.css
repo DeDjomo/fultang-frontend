@@ -1,0 +1,712 @@
+/**
+ * ============================================
+ * FULTANG HOSPITAL - RESPONSIVE STYLES
+ * ============================================
+ * Ce fichier rend toutes les pages responsives
+ * en ciblant les éléments et classes existants
+ * via des media queries globales.
+ * ============================================
+ */
+
+/* ============================================
+   VARIABLES CSS POUR LA RESPONSIVITÉ
+   ============================================ */
+:root {
+  --sidebar-width-desktop: 15%;
+  --sidebar-width-tablet: 220px;
+  --sidebar-width-mobile: 100%;
+  --content-margin-desktop: 15.5%;
+  --content-margin-tablet: 220px;
+  --content-margin-mobile: 0;
+}
+
+/* ============================================
+   STYLES DE BASE - AMÉLIORATION GLOBALE
+   ============================================ */
+
+/* Scrollbar horizontal automatique pour les tableaux */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Images responsives par défaut */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Texte trop long - gestion du débordement */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================
+   ÉCRANS TRÈS LARGES (> 1536px)
+   ============================================ */
+@media (min-width: 1536px) {
+  /* Pas de changements majeurs, le design actuel fonctionne bien */
+}
+
+/* ============================================
+   ÉCRANS LARGES / DESKTOPS (1280px - 1536px)
+   ============================================ */
+@media (max-width: 1536px) and (min-width: 1280px) {
+  /* Ajustements légers pour les grands écrans */
+}
+
+/* ============================================
+   ÉCRANS MOYENS / LAPTOPS (1024px - 1280px)
+   ============================================ */
+@media (max-width: 1280px) {
+  /* Réduction des marges et paddings */
+  .p-6 {
+    padding: 1rem !important;
+  }
+  
+  .p-8 {
+    padding: 1.5rem !important;
+  }
+  
+  /* Réduction de la largeur des éléments fixes */
+  .w-\[1400px\] {
+    width: 100% !important;
+    max-width: 1100px !important;
+  }
+  
+  .w-\[620px\] {
+    width: 50% !important;
+    min-width: 280px !important;
+  }
+  
+  .w-\[550px\] {
+    width: 45% !important;
+    min-width: 320px !important;
+  }
+  
+  /* Réduction des tailles de texte pour les titres */
+  .text-5xl {
+    font-size: 2.5rem !important;
+  }
+  
+  .text-4xl {
+    font-size: 2rem !important;
+  }
+  
+  .text-3xl {
+    font-size: 1.5rem !important;
+  }
+}
+
+/* ============================================
+   TABLETTES (768px - 1024px)
+   ============================================ */
+@media (max-width: 1024px) {
+  /* === SIDEBAR === */
+  /* Sidebar fixe devient plus étroite */
+  .w-\[15\%\],
+  .w-\[18\%\] {
+    width: var(--sidebar-width-tablet) !important;
+  }
+  
+  /* Contenu principal - ajustement de la marge */
+  .ml-\[15\.5\%\],
+  .ml-\[17\.5\%\] {
+    margin-left: var(--content-margin-tablet) !important;
+  }
+  
+  /* Masquer le texte des liens sidebar, garder les icônes */
+  .w-\[15\%\] nav p,
+  .w-\[18\%\] nav p {
+    display: none;
+  }
+  
+  .w-\[15\%\] nav a,
+  .w-\[18\%\] nav a,
+  .w-\[15\%\] nav > div,
+  .w-\[18\%\] nav > div {
+    justify-content: center;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+  
+  .w-\[15\%\] nav svg,
+  .w-\[18\%\] nav svg {
+    margin-right: 0 !important;
+    font-size: 1.5rem !important;
+  }
+  
+  /* Titre du sidebar */
+  .w-\[15\%\] h1,
+  .w-\[18\%\] h1 {
+    font-size: 1rem !important;
+    margin-left: 0.5rem !important;
+    text-align: center;
+  }
+  
+  /* === PAGE DE LOGIN === */
+  .flex.ml-56 {
+    margin-left: 0 !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    padding: 1rem !important;
+  }
+  
+  .ml-56 {
+    margin-left: 0 !important;
+  }
+  
+  .mt-28 {
+    margin-top: 1.5rem !important;
+  }
+  
+  .ml-16 {
+    margin-left: 0 !important;
+    margin-top: 1.5rem !important;
+  }
+  
+  /* Largeurs fixes - rendre flexibles */
+  .w-\[1400px\] {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+  }
+  
+  .w-\[620px\],
+  .w-\[550px\] {
+    width: 100% !important;
+    max-width: 500px !important;
+  }
+  
+  .h-\[480px\] {
+    height: auto !important;
+    min-height: auto !important;
+  }
+  
+  /* === GRIDS === */
+  .grid-cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  
+  .lg\:grid-cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  
+  .lg\:grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  
+  /* === TABLEAUX === */
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  
+  th, td {
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.75rem !important;
+  }
+  
+  /* === MODALES === */
+  .max-w-2xl,
+  .max-w-3xl,
+  .max-w-4xl {
+    max-width: 95vw !important;
+    margin: 1rem !important;
+  }
+  
+  /* === FORMULAIRES === */
+  .grid-cols-2:not(.gap-4) {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* === TEXTES === */
+  .text-5xl {
+    font-size: 2rem !important;
+  }
+  
+  .text-4xl {
+    font-size: 1.75rem !important;
+  }
+  
+  .text-3xl {
+    font-size: 1.25rem !important;
+  }
+  
+  .text-2xl {
+    font-size: 1.125rem !important;
+  }
+  
+  .leading-10 {
+    line-height: 1.75rem !important;
+  }
+}
+
+/* ============================================
+   MOBILES LANDSCAPE & GRANDES TABLETTES (640px - 768px)
+   ============================================ */
+@media (max-width: 768px) {
+  /* === SIDEBAR MOBILE - MASQUÉE PAR DÉFAUT === */
+  .w-\[15\%\],
+  .w-\[18\%\] {
+    position: fixed !important;
+    left: -100% !important;
+    width: 80% !important;
+    max-width: 280px !important;
+    z-index: 1000 !important;
+    transition: left 0.3s ease-in-out !important;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.3) !important;
+  }
+  
+  /* Afficher le texte des liens en mode mobile ouvert */
+  .w-\[15\%\] nav p,
+  .w-\[18\%\] nav p {
+    display: block !important;
+  }
+  
+  .w-\[15\%\] nav a,
+  .w-\[18\%\] nav a,
+  .w-\[15\%\] nav > div,
+  .w-\[18\%\] nav > div {
+    justify-content: flex-start !important;
+    margin-left: 1rem !important;
+  }
+  
+  .w-\[15\%\] nav svg,
+  .w-\[18\%\] nav svg {
+    margin-right: 0.75rem !important;
+  }
+  
+  /* Sidebar ouverte (via JS - toggle class) */
+  .sidebar-open .w-\[15\%\],
+  .sidebar-open .w-\[18\%\] {
+    left: 0 !important;
+  }
+  
+  /* Contenu prend toute la largeur */
+  .ml-\[15\.5\%\],
+  .ml-\[17\.5\%\] {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  
+  /* === GRIDS MOBILE === */
+  .grid-cols-2,
+  .grid-cols-3,
+  .md\:grid-cols-2,
+  .lg\:grid-cols-3,
+  .lg\:grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* === FLEX LAYOUTS === */
+  .flex.justify-between {
+    flex-direction: column !important;
+    gap: 1rem !important;
+  }
+  
+  .flex.items-center.gap-4 {
+    flex-wrap: wrap !important;
+  }
+  
+  /* === NAVBARS === */
+  .flex.justify-between.items-center.p-4,
+  .flex.justify-between.items-center.px-6 {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+    padding: 0.75rem !important;
+  }
+  
+  /* === CARTES ET STAT CARDS === */
+  .rounded-lg.shadow-lg.p-6 {
+    padding: 1rem !important;
+  }
+  
+  /* === BUTTONS === */
+  .w-44 {
+    width: auto !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  
+  button {
+    touch-action: manipulation;
+  }
+  
+  /* === LOGIN PAGE MOBILE === */
+  .flex.flex-col.items-center.justify-center {
+    padding: 1rem !important;
+  }
+  
+  .bg-white.shadow-2xl.border-2 {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    margin-top: 1rem !important;
+  }
+  
+  /* Masquer la description sur mobile */
+  .text-justify.font-bold.text-md.leading-10 {
+    display: none !important;
+  }
+  
+  .italic.mt-4.text-blue-400 {
+    display: none !important;
+  }
+  
+  /* === MODALES MOBILE === */
+  .fixed.inset-0 > div {
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+  
+  .max-h-\[80vh\] {
+    max-height: 100vh !important;
+  }
+  
+  /* === PADDING ET MARGES === */
+  .p-6 {
+    padding: 0.75rem !important;
+  }
+  
+  .p-8 {
+    padding: 1rem !important;
+  }
+  
+  .px-6 {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  
+  .py-6 {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+  
+  .gap-6 {
+    gap: 1rem !important;
+  }
+  
+  .gap-4 {
+    gap: 0.75rem !important;
+  }
+  
+  /* === TEXTES MOBILE === */
+  .text-5xl {
+    font-size: 1.75rem !important;
+  }
+  
+  .text-4xl {
+    font-size: 1.5rem !important;
+  }
+  
+  .text-3xl {
+    font-size: 1.25rem !important;
+  }
+  
+  .text-2xl {
+    font-size: 1rem !important;
+  }
+  
+  .text-xl {
+    font-size: 0.95rem !important;
+  }
+}
+
+/* ============================================
+   PETITS MOBILES (< 640px)
+   ============================================ */
+@media (max-width: 640px) {
+  /* === LAYOUT GÉNÉRAL === */
+  body {
+    font-size: 14px;
+  }
+  
+  /* === LOGIN === */
+  .text-white.mt-28.mb-2.font-bold {
+    font-size: 1.5rem !important;
+    margin-top: 1rem !important;
+    text-align: center !important;
+  }
+  
+  .w-\[550px\],
+  .w-\[620px\] {
+    width: 100% !important;
+    padding: 0 0.5rem !important;
+  }
+  
+  /* === FORMULAIRES === */
+  form {
+    width: 100% !important;
+  }
+  
+  input, select, textarea {
+    font-size: 16px !important; /* Empêche le zoom iOS */
+  }
+  
+  .h-12 {
+    height: 2.75rem !important;
+  }
+  
+  /* === BOUTONS === */
+  button.text-2xl {
+    font-size: 1rem !important;
+  }
+  
+  button {
+    padding: 0.625rem 1rem !important;
+    font-size: 0.875rem !important;
+  }
+  
+  /* Boutons d'action dans les tableaux */
+  .px-4.py-2 {
+    padding: 0.375rem 0.625rem !important;
+    font-size: 0.75rem !important;
+  }
+  
+  /* === TABLEAUX === */
+  table {
+    font-size: 0.75rem !important;
+  }
+  
+  th, td {
+    padding: 0.375rem 0.5rem !important;
+  }
+  
+  /* Masquer certaines colonnes moins importantes */
+  th:nth-child(n+5),
+  td:nth-child(n+5) {
+    display: none;
+  }
+  
+  /* === CARDS === */
+  .rounded-lg.shadow-lg {
+    border-radius: 0.5rem !important;
+  }
+  
+  /* === STAT CARDS === */
+  .text-3xl.font-bold.text-gray-900 {
+    font-size: 1.5rem !important;
+  }
+  
+  /* === MODALES PETITS ÉCRANS === */
+  .p-6.space-y-4 {
+    padding: 0.75rem !important;
+  }
+  
+  .grid.grid-cols-2.gap-4 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* === QUICK ACTIONS === */
+  .flex.flex-col.items-center.gap-3.p-6 {
+    padding: 0.75rem !important;
+  }
+  
+  .rounded-full.p-4 {
+    padding: 0.625rem !important;
+  }
+  
+  .w-8.h-8 {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+  }
+  
+  /* === BADGES === */
+  .px-3.py-1.rounded-full {
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.625rem !important;
+  }
+  
+  /* === ESPACEMENTS GLOBAUX === */
+  .space-y-6 > * + * {
+    margin-top: 1rem !important;
+  }
+  
+  .mb-10 {
+    margin-bottom: 1.5rem !important;
+  }
+  
+  .mt-7 {
+    margin-top: 1rem !important;
+  }
+}
+
+/* ============================================
+   TRÈS PETITS ÉCRANS (< 375px)
+   ============================================ */
+@media (max-width: 375px) {
+  body {
+    font-size: 13px;
+  }
+  
+  .text-3xl {
+    font-size: 1rem !important;
+  }
+  
+  .text-2xl {
+    font-size: 0.875rem !important;
+  }
+  
+  .text-xl {
+    font-size: 0.875rem !important;
+  }
+  
+  .p-4 {
+    padding: 0.5rem !important;
+  }
+  
+  .p-3 {
+    padding: 0.375rem !important;
+  }
+  
+  .rounded-lg {
+    border-radius: 0.375rem !important;
+  }
+}
+
+/* ============================================
+   IMPRESSION
+   ============================================ */
+@media print {
+  /* Masquer sidebar et navbar */
+  .w-\[15\%\],
+  .w-\[18\%\],
+  nav {
+    display: none !important;
+  }
+  
+  /* Contenu pleine largeur */
+  .ml-\[15\.5\%\],
+  .ml-\[17\.5\%\] {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  
+  /* Pas de backgrounds colorés */
+  .bg-gradient-to-r,
+  .bg-gradient-to-t,
+  .bg-gradient-to-b {
+    background: white !important;
+    color: black !important;
+  }
+  
+  /* Tableaux lisibles */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  
+  th, td {
+    border: 1px solid #ccc !important;
+    padding: 0.5rem !important;
+  }
+  
+  /* Masquer boutons */
+  button {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   UTILITAIRES SUPPLÉMENTAIRES
+   ============================================ */
+
+/* Empêcher le texte de déborder */
+.break-words {
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+/* Conteneur responsive pour les tableaux */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Menu hamburger (à ajouter via JS si nécessaire) */
+.menu-toggle {
+  display: none;
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1001;
+  padding: 0.75rem;
+  background: linear-gradient(to right, #1A73A3, #50C2B9);
+  border-radius: 0.5rem;
+  color: white;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+@media (max-width: 768px) {
+  .menu-toggle {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* Overlay pour fermer le menu */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 999;
+}
+
+.sidebar-open .sidebar-overlay {
+  display: block;
+}
+
+/* ============================================
+   CLASSES UTILITAIRES RESPONSIVE
+   ============================================ */
+
+/* Masquer sur mobile */
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Masquer sur desktop */
+@media (min-width: 769px) {
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* Centrer sur mobile */
+@media (max-width: 768px) {
+  .center-mobile {
+    text-align: center !important;
+    justify-content: center !important;
+  }
+}
+
+/* Stack sur mobile (flexbox column) */
+@media (max-width: 768px) {
+  .stack-mobile {
+    flex-direction: column !important;
+  }
+}
+
+/* Full width sur mobile */
+@media (max-width: 768px) {
+  .full-mobile {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}

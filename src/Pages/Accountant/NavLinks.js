@@ -9,42 +9,42 @@ import { AppRoutesPaths as appRoutes } from "../../Router/appRouterPaths.js";
 
 export const accountantNavLink = [
     {
-        name: 'Dashboard',
+        nameKey: "sidebar.dashboard",
         icon: MdDashboard,
         link: appRoutes.accountantHome,
     },
     {
-        name: 'À Valider',
+        nameKey: "sidebar.toValidate",
         icon: FaCheckCircle,
         link: '/accountant/quittances/a-valider',
     },
     {
-        name: 'Quittances Validées',
+        nameKey: "sidebar.validatedReceipts",
         icon: FaCheckDouble,
         link: '/accountant/quittances/validees',
     },
     {
-        name: 'Écritures Comptables',
+        nameKey: "sidebar.accountingEntries",
         icon: FaFileAlt,
         link: '/accountant/ecritures',
     },
     {
-        name: 'Balance',
+        nameKey: "sidebar.balance",
         icon: FaBalanceScale,
         link: '/accountant/balance',
     },
     {
-        name: 'Plan Comptable',
+        nameKey: "sidebar.chartOfAccounts",
         icon: FaBookOpen,
         link: '/accountant/plan-comptable',
     },
     {
-        name: 'Rapports',
+        nameKey: "sidebar.reports",
         icon: HiOutlineDocumentReport,
         link: '/accountant/rapports',
     },
     {
-        name: 'Help Center',
+        nameKey: "sidebar.help",
         icon: MdHelpOutline,
         link: appRoutes.helpCenterPage,
     }

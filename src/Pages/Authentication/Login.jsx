@@ -2,18 +2,20 @@ import loginBackground from "../../assets/logIn.png";
 import { FaExclamation } from "react-icons/fa";
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Wait from "../Modals/wait.jsx";
 import { Eye, EyeOff } from 'lucide-react';
 import { AppRoutesPaths as appRouterPaths } from "../../Router/appRouterPaths.js";
 import { useAuthentication } from "../../Utils/Provider.jsx";
 import { ChangePasswordModal } from "../../GlobalComponents/ChangePasswordModal.jsx";
+import { LanguageSwitcher } from "../../GlobalComponents/LanguageSwitcher.jsx";
 
 
 
 
 export function LoginPage() {
 
-
+    const { t } = useTranslation();
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [loginError, setLoginError] = useState("");
@@ -63,7 +65,7 @@ export function LoginPage() {
             if (response && response.error) {
                 setLoginError(`${response.error}: ${response.detail}`);
             } else {
-                setLoginError("Une erreur inconnue s'est produite");
+                setLoginError(t('auth.errorOccurred'));
             }
         }
 
@@ -165,34 +167,37 @@ export function LoginPage() {
                     backgroundRepeat: "no-repeat",
                 }}
             >
-                <p onClick={() => navigate("/")} className="text-3xl text-white font-bold mt-6 ml-8 cursor-pointer">
-                    FullTang
-                </p>
+                {/* Header avec logo et sélecteur de langue */}
+                <div className="flex justify-between items-center px-8 mt-6">
+                    <p onClick={() => navigate("/")} className="text-3xl text-white font-bold cursor-pointer">
+                        FullTang
+                    </p>
+                    <div className="bg-white/20 backdrop-blur-sm rounded-xl p-1">
+                        <LanguageSwitcher />
+                    </div>
+                </div>
                 <div className="flex-1 flex flex-col items-center justify-center">
                     <div className="flex ml-56 mt-28 w-[1400px] h-[480px]">
                         <div className="flex flex-col w-[620px]">
                             <p className="text-white mt-28 mb-2 font-bold text-5xl ml-4">
-                                WELCOME ON FULTANG
+                                {t('auth.welcomeTitle')}
                             </p>
                             <p className="text-justify font-bold text-md leading-10">
-                                Polyclinic fultang is a hospital management application, providing care and monitoring of patients from arrival to discharge,
-                                this via the platform. We first register the patient at the reception level, then follow the chain of follow-up according to his problem or his situation.
-                                Polyclinic Fultang has several departments namely the dental service, the ophthalmology service, the general medicine, the laboratory,
-                                as well as a pharmacy.
+                                {t('auth.welcomeDescription')}
                             </p>
                             <p className="italic mt-4 text-blue-400 text-xl ">
-                                Note: this page is the hospital staff login page
+                                {t('auth.noteStaff')}
                             </p>
                             <button onClick={() => navigate(appRouterPaths.helpCenterPage)} className="w-44 h-14  py-2 border-secondary border-2 text-secondary rounded-lg px-1 mt-4 font-bold hover:text-white hover:bg-secondary transition-all duration-300">
                                 <div className="flex justify-center items-center">
                                     <FaExclamation className="mr-1 " />
-                                    <p>Notify A problem</p>
+                                    <p>{t('auth.notifyProblem')}</p>
                                 </div>
                             </button>
                         </div>
                         <div className="bg-white shadow-2xl border-2 w-[550px] mt-6 ml-16 flex flex-col rounded-lg">
                             <div className="flex mb-10">
-                                <p className="text-3xl font-bold mt-4 ml-4  ">Log In</p>
+                                <p className="text-3xl font-bold mt-4 ml-4  ">{t('auth.loginTitle')}</p>
                                 {isLoginErrorPresent && (
                                     <p className="text-red-500 text-md font-bold mt-6 ml-8 mr-2">{loginError}</p>)}
 
@@ -200,7 +205,7 @@ export function LoginPage() {
                             <form className="ml-4 mr-8 flex flex-col" onSubmit={handleLogin}>
                                 <div>
                                     <label className="text-md font-bold">
-                                        username
+                                        {t('auth.username')}
                                     </label>
                                     <div className="bg-gray-300 h-12 mt-2 rounded-lg mb-4">
                                         <input type="text"
@@ -208,12 +213,12 @@ export function LoginPage() {
                                             autoComplete="username"
                                             onChange={(e) => { setUsername(e.target.value) }}
                                             className="w-full rounded-lg h-12 ml-2 mr-2 bg-gray-300 border-none outline:none focus:border-none ring-0 focus:outline-none focus:ring-0 autofill:shadow-[inset_0_0_0px_1000px_rgb(209,213,219)]"
-                                            placeholder={"Enter your username here"} />
+                                            placeholder={t('auth.enterUsername')} />
                                     </div>
                                 </div>
                                 <div className="mt-5">
                                     <label className="text-md font-bold">
-                                        Password
+                                        {t('auth.password')}
                                     </label>
                                     <div className="bg-gray-300 h-12 mt-2 rounded-lg flex items-center relative">
                                         <input
@@ -222,7 +227,7 @@ export function LoginPage() {
                                             type={showPassword ? "text" : "password"}
                                             onChange={(e) => { setPassword(e.target.value) }}
                                             className="w-full rounded-lg h-12 ml-2 mr-10 bg-gray-300 border-none outline:none ring-0 focus:outline-none focus:ring-0"
-                                            placeholder="Enter your password here"
+                                            placeholder={t('auth.enterPassword')}
                                         />
                                         <button
                                             type="button"
@@ -238,7 +243,7 @@ export function LoginPage() {
                                     </div>
                                     <Link to={appRouterPaths.forgottenPasswordPage}>
                                         <p className="text-end mt-1 text-sm text-blue-700 hover:text-secondary hover:font-bold transition-all duration-300 hover:underline">
-                                            Forgotten password?
+                                            {t('auth.forgotPassword')}
                                         </p>
                                     </Link>
                                 </div>
@@ -246,12 +251,12 @@ export function LoginPage() {
                                 {/*  <div className="flex mt-5">
                                     <input type="checkbox" id="rememberMeCheckbox" value="yes"
                                            className="mr-2 w-5 h-5 border-secondary border-2"/>
-                                    <label htmlFor="maCheckbox" className="font-bold text-sm">Remember Me</label>
+                                    <label htmlFor="maCheckbox" className="font-bold text-sm">{t('auth.rememberMe')}</label>
                                 </div>*/}
 
                                 <button type="submit"
                                     className="text-white text-2xl bg-gradient-to-r from-primary-start to-primary-end w-full h-12 rounded-lg mt-5 mb-5 font-bold">
-                                    Log In
+                                    {t('common.login')}
                                 </button>
                             </form>
                         </div>

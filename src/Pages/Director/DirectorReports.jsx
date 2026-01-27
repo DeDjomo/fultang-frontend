@@ -2,6 +2,7 @@ import { DirectorDashBoard } from "./Components/DirectorDashboard";
 import { DirectorNavLink } from "./DirectorNavLink";
 import { DirectorNavBar } from "./Components/DirectorNavBar";
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
     FaFileAlt,
     FaPaperPlane,
@@ -20,6 +21,7 @@ import jsPDF from "jspdf";
 import { rapportApi, personnelApi } from "../../services/comptabiliteMatiereApi";
 
 export function DirectorReports() {
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState(null);
@@ -99,7 +101,7 @@ export function DirectorReports() {
 
             // Vérifier que l'utilisateur est connecté
             if (!currentUserId) {
-                setError("Utilisateur non identifié. Veuillez vous reconnecter.");
+                setError(t('director.userNotIdentified'));
                 setLoading(false);
                 return;
             }
@@ -130,7 +132,7 @@ export function DirectorReports() {
 
         } catch (err) {
             console.error("Erreur lors du chargement des rapports:", err);
-            setError("Impossible de charger les rapports. Vérifiez que le backend est en cours d'exécution.");
+            setError(t('director.unableToLoadReports'));
         } finally {
             setLoading(false);
         }
@@ -401,7 +403,7 @@ export function DirectorReports() {
                 <div className="flex items-center justify-center h-96">
                     <div className="text-center">
                         <FaSpinner className="animate-spin text-4xl text-primary-start mx-auto mb-4" />
-                        <p className="text-gray-600">Chargement des rapports...</p>
+                        <p className="text-gray-600">{t('director.loadingReports')}</p>
                     </div>
                 </div>
             </DirectorDashBoard>
@@ -418,14 +420,14 @@ export function DirectorReports() {
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <FaFileAlt className="text-4xl text-primary-start" />
-                        <h1 className="text-3xl font-bold text-gray-800">Gestion des Rapports</h1>
+                        <h1 className="text-3xl font-bold text-gray-800">{t('director.reportsManagement')}</h1>
                     </div>
                     <button
                         onClick={loadData}
                         disabled={loading}
                         className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all"
                     >
-                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> Actualiser
+                        <FaSyncAlt className={loading ? "animate-spin" : ""} /> {t('director.refresh')}
                     </button>
                 </div>
 
@@ -445,13 +447,13 @@ export function DirectorReports() {
                 <div className="bg-white rounded-lg shadow-lg p-6">
                     <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
                         <FaEnvelope className="text-primary-end" />
-                        Rédiger un Nouveau Rapport
+                        {t('director.writeNewReport')}
                     </h2>
                     <form onSubmit={handleSubmitReport} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Objet *
+                                    {t('director.subject')} *
                                 </label>
                                 <input
                                     type="text"
@@ -459,14 +461,14 @@ export function DirectorReports() {
                                     value={reportForm.objet}
                                     onChange={(e) => setReportForm({ ...reportForm, objet: e.target.value })}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
-                                    placeholder="Objet du rapport (max 10 car.)"
+                                    placeholder={t('director.subjectMaxChars')}
                                     required
                                 />
-                                <p className="text-xs text-gray-500 mt-1">{reportForm.objet.length}/10 caractères</p>
+                                <p className="text-xs text-gray-500 mt-1">{reportForm.objet.length}/10 {t('director.characters')}</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Destinataire *
+                                    {t('director.recipient')} *
                                 </label>
                                 <select
                                     value={reportForm.destinataire || ''}
@@ -474,7 +476,7 @@ export function DirectorReports() {
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
                                     required
                                 >
-                                    <option value="">-- Sélectionner un destinataire --</option>
+                                    <option value="">-- {t('director.selectRecipient')} --</option>
                                     {personnelList
                                         .filter(p => ['comptable_matiere', 'directeur', 'pharmacien'].includes(p.poste?.toLowerCase()))
                                         .filter(p => p.id !== currentUserId) // Exclure l'utilisateur connecté
@@ -485,18 +487,18 @@ export function DirectorReports() {
                                         ))
                                     }
                                 </select>
-                                <p className="text-xs text-gray-500 mt-1">Sélectionnez le destinataire du rapport</p>
+                                <p className="text-xs text-gray-500 mt-1">{t('director.selectRecipientHelp')}</p>
                             </div>
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Corps du rapport *
+                                {t('director.reportBody')} *
                             </label>
                             <textarea
                                 value={reportForm.corps}
                                 onChange={(e) => setReportForm({ ...reportForm, corps: e.target.value })}
                                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-end focus:border-transparent"
-                                placeholder="Rédigez le contenu de votre rapport ici..."
+                                placeholder={t('director.writeReportContent')}
                                 rows="6"
                                 required
                             />
@@ -508,7 +510,7 @@ export function DirectorReports() {
                                 className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-start to-primary-end text-white rounded-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {submitting ? <FaSpinner className="animate-spin" /> : <FaPaperPlane />}
-                                Envoyer
+                                {t('common.send')}
                             </button>
                         </div>
                     </form>
@@ -521,14 +523,14 @@ export function DirectorReports() {
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                 <FaPaperPlane className="text-blue-500" />
-                                Rapports Envoyés ({sentReports.length})
+                                {t('director.sentReports')} ({sentReports.length})
                             </h2>
                             <button
                                 onClick={exportAllSentToPDF}
                                 disabled={sentReports.length === 0}
                                 className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm disabled:opacity-50"
                             >
-                                <FaFilePdf /> Exporter PDF
+                                <FaFilePdf /> {t('director.exportPdf')}
                             </button>
                         </div>
                         <div className="max-h-96 overflow-y-auto space-y-3">
@@ -540,10 +542,11 @@ export function DirectorReports() {
                                         type="sent"
                                         onView={() => viewReportDetails(report, false)}
                                         onExport={() => exportReportToPDF(report, false)}
+                                        t={t}
                                     />
                                 ))
                             ) : (
-                                <p className="text-gray-500 text-center py-4">Aucun rapport envoyé</p>
+                                <p className="text-gray-500 text-center py-4">{t('director.noSentReports')}</p>
                             )}
                         </div>
                     </div>
@@ -553,10 +556,10 @@ export function DirectorReports() {
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                 <FaInbox className="text-green-500" />
-                                Rapports Reçus ({receivedReports.length})
+                                {t('director.receivedReports')} ({receivedReports.length})
                                 {receivedReports.filter(r => !r.isRead).length > 0 && (
                                     <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                                        {receivedReports.filter(r => !r.isRead).length} nouveau(x)
+                                        {receivedReports.filter(r => !r.isRead).length} {t('director.new')}
                                     </span>
                                 )}
                             </h2>
@@ -565,7 +568,7 @@ export function DirectorReports() {
                                 disabled={receivedReports.length === 0}
                                 className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm disabled:opacity-50"
                             >
-                                <FaFilePdf /> Exporter PDF
+                                <FaFilePdf /> {t('director.exportPdf')}
                             </button>
                         </div>
                         <div className="max-h-96 overflow-y-auto space-y-3">
@@ -577,10 +580,11 @@ export function DirectorReports() {
                                         type="received"
                                         onView={() => viewReportDetails(report, true)}
                                         onExport={() => exportReportToPDF(report, true)}
+                                        t={t}
                                     />
                                 ))
                             ) : (
-                                <p className="text-gray-500 text-center py-4">Aucun rapport reçu</p>
+                                <p className="text-gray-500 text-center py-4">{t('director.noReceivedReports')}</p>
                             )}
                         </div>
                     </div>
@@ -596,7 +600,7 @@ export function DirectorReports() {
                                 <div className="bg-primary-end/20 p-2 rounded-full">
                                     <FaFileAlt className="w-5 h-5 text-primary-start" />
                                 </div>
-                                <h2 className="text-xl font-bold text-gray-800">Détails du Rapport</h2>
+                                <h2 className="text-xl font-bold text-gray-800">{t('director.reportDetails')}</h2>
                             </div>
                             <button
                                 onClick={() => setShowDetailModal(false)}
@@ -609,39 +613,39 @@ export function DirectorReports() {
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gray-50 p-3 rounded-lg">
-                                    <p className="text-sm text-gray-600">Référence</p>
+                                    <p className="text-sm text-gray-600">{t('director.reference')}</p>
                                     <p className="font-bold text-gray-800">{selectedReport.id}</p>
                                 </div>
                                 <div className="bg-gray-50 p-3 rounded-lg">
-                                    <p className="text-sm text-gray-600">Date d&apos;envoi</p>
+                                    <p className="text-sm text-gray-600">{t('director.sendDate')}</p>
                                     <p className="font-bold text-gray-800">{selectedReport.dateEnvoi}</p>
                                 </div>
                             </div>
 
                             <div className="bg-gray-50 p-3 rounded-lg">
-                                <p className="text-sm text-gray-600">Objet</p>
+                                <p className="text-sm text-gray-600">{t('director.subject')}</p>
                                 <p className="font-bold text-gray-800">{selectedReport.objet}</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-blue-50 p-3 rounded-lg">
                                     <p className="text-sm text-blue-600 flex items-center gap-1">
-                                        <FaUser /> Expéditeur
+                                        <FaUser /> {t('director.sender')}
                                     </p>
                                     <p className="font-bold text-gray-800">
-                                        {selectedReport.isReceived ? selectedReport.expediteurName : "Vous"}
+                                        {selectedReport.isReceived ? selectedReport.expediteurName : t('director.you')}
                                     </p>
                                 </div>
                                 <div className="bg-green-50 p-3 rounded-lg">
                                     <p className="text-sm text-green-600 flex items-center gap-1">
-                                        <FaUser /> Destinataire
+                                        <FaUser /> {t('director.recipient')}
                                     </p>
                                     <p className="font-bold text-gray-800">{selectedReport.concerneName}</p>
                                 </div>
                             </div>
 
                             <div className="bg-gray-50 p-4 rounded-lg">
-                                <p className="text-sm text-gray-600 mb-2 font-semibold">Corps du rapport</p>
+                                <p className="text-sm text-gray-600 mb-2 font-semibold">{t('director.reportBody')}</p>
                                 <p className="text-gray-800 whitespace-pre-wrap">{selectedReport.corps}</p>
                             </div>
 
@@ -653,13 +657,13 @@ export function DirectorReports() {
                                     }}
                                     className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
                                 >
-                                    <FaFilePdf /> Télécharger PDF
+                                    <FaFilePdf /> {t('director.downloadPdf')}
                                 </button>
                                 <button
                                     onClick={() => setShowDetailModal(false)}
                                     className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all"
                                 >
-                                    Fermer
+                                    {t('common.close')}
                                 </button>
                             </div>
                         </div>
@@ -670,12 +674,13 @@ export function DirectorReports() {
     );
 }
 
-function ReportCard({ report, type, onView, onExport }) {
+function ReportCard({ report, type, onView, onExport, t }) {
     ReportCard.propTypes = {
         report: PropTypes.object.isRequired,
         type: PropTypes.oneOf(['sent', 'received']).isRequired,
         onView: PropTypes.func.isRequired,
-        onExport: PropTypes.func.isRequired
+        onExport: PropTypes.func.isRequired,
+        t: PropTypes.func.isRequired
     };
 
     const isUnread = type === 'received' && !report.isRead;
@@ -694,12 +699,12 @@ function ReportCard({ report, type, onView, onExport }) {
                         </span>
                         {isUnread && (
                             <span className="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">
-                                Nouveau
+                                {t('director.new')}
                             </span>
                         )}
                     </div>
                     <p className="text-sm text-gray-600 mt-1">
-                        {type === 'sent' ? `À: ${report.concerneName}` : `De: ${report.expediteurName}`}
+                        {type === 'sent' ? `${t('director.to')}: ${report.concerneName}` : `${t('director.from')}: ${report.expediteurName}`}
                     </p>
                 </div>
                 <span className="text-xs text-gray-500">{report.dateEnvoi}</span>
@@ -715,7 +720,7 @@ function ReportCard({ report, type, onView, onExport }) {
                         : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
                         }`}
                 >
-                    <FaEye /> Voir
+                    <FaEye /> {t('common.view')}
                 </button>
                 <button
                     onClick={onExport}

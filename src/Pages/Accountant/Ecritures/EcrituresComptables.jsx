@@ -244,7 +244,7 @@ export function EcrituresComptablesPage() {
                             style={{ width: 200 }}
                             onChange={(value) => setSelectedJournal(value)}
                             options={[
-                                { value: null, label: 'Tous les journaux' },
+                                { value: undefined, label: 'Tous les journaux' },
                                 ...journaux.map(j => ({ value: j.code, label: `${j.code} - ${j.libelle}` }))
                             ]}
                         />

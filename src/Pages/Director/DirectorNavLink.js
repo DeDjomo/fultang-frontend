@@ -2,12 +2,12 @@ import { FaHome, FaFileAlt } from "react-icons/fa";
 
 export const DirectorNavLink = [
     {
-        name: "Tableau de bord",
+        nameKey: "sidebar.dashboard",
         link: "/director/dashboard",
         icon: FaHome
     },
     {
-        name: "Rapports",
+        nameKey: "sidebar.reports",
         link: "/director/reports",
         icon: FaFileAlt
     }

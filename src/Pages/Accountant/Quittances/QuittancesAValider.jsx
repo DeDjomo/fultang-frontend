@@ -32,7 +32,7 @@ export function QuittancesAValiderPage() {
     // Validation Modal state
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [selectedQuittance, setSelectedQuittance] = useState(null);
-    const [selectedCompte, setSelectedCompte] = useState(null);
+    const [selectedCompte, setSelectedCompte] = useState(undefined);
     const [isValidating, setIsValidating] = useState(false);
 
     // Details Modal state
@@ -81,7 +81,7 @@ export function QuittancesAValiderPage() {
 
     const openValidationModal = (quittance) => {
         setSelectedQuittance(quittance);
-        setSelectedCompte(null);
+        setSelectedCompte(undefined);
         setIsModalVisible(true);
     };
 

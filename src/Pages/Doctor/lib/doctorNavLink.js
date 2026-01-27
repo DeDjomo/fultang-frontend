@@ -4,17 +4,17 @@ import { Calendar, Users } from "lucide-react";
 
 export const doctorNavLink = [
     {
-        name: 'Waiting Room',
+        nameKey: "sidebar.waitingRoom",
         icon: Users,
         link: '/doctor/waiting-room',
     },
     {
-        name: 'Appointments',
+        nameKey: "sidebar.appointments",
         icon: Calendar,
         link: appRoutes.doctorAppointment,
     },
     {
-        name: 'Help Center',
+        nameKey: "sidebar.help",
         icon: FaQuestionCircle,
         link: appRoutes.helpCenterPage,
     }

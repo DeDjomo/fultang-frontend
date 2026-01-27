@@ -4,22 +4,22 @@ import { FaQuestionCircle } from "react-icons/fa";
 
 export const receptionistNavLink = [
     {
-        name: 'Patient List',
+        nameKey: "sidebar.patientList",
         icon: Users,
         link: appRoutes.receptionistPage,
     },
     {
-        name: 'Hospitalized',
+        nameKey: "sidebar.hospitalized",
         icon: BedDouble,
         link: appRoutes.hospitalizedPatientsPage,
     },
     {
-        name: 'Appointments',
+        nameKey: "sidebar.appointments",
         icon: Calendar,
         link: appRoutes.appointmentsPage,
     },
     {
-        name: 'Help Center',
+        nameKey: "sidebar.help",
         icon: FaQuestionCircle,
         link: appRoutes.helpCenterPage,
     }

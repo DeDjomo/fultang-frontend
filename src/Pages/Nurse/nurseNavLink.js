@@ -4,17 +4,17 @@ import { Calendar, Users } from "lucide-react";
 
 export const nurseNavLink = [
     {
-        name: 'Salle d\'attente',
+        nameKey: "sidebar.waitingRoom",
         icon: Users,
         link: appRoutes.nurseWaitingRoomPage,
     },
     {
-        name: 'Rendez-vous',
+        nameKey: "sidebar.appointments",
         icon: Calendar,
         link: appRoutes.nurseAppointmentsPage,
     },
     {
-        name: 'Help Center',
+        nameKey: "sidebar.help",
         icon: FaQuestionCircle,
         link: appRoutes.helpCenterPage,
     }

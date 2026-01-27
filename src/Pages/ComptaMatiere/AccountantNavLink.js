@@ -12,58 +12,50 @@ import {
 
 export const AccountantNavLink = [
   {
-    name: "Tableau de bord",
+    nameKey: "sidebar.dashboard",
     link: appRoutes.comptaMatiereDashboard,
     icon: FaHome,
-    description: "Vue d'ensemble des activités"
   },
 
   {
-    name: "Émettre un besoin",
+    nameKey: "sidebar.emitNeed",
     link: appRoutes.comptaMatiereEmitNeed,
     icon: FaClipboardList,
-    description: "Créer une demande de matériel"
   },
 
   {
-    name: "Enregistrer une livraison",
+    nameKey: "sidebar.registerDelivery",
     link: appRoutes.comptaMatiereRegisterDelivery,
     icon: FaTruck,
-    description: "Enregistrer la réception de matériel"
   },
 
   {
-    name: "Enregistrer une sortie",
+    nameKey: "sidebar.registerOutput",
     link: appRoutes.comptaMatiereRegisterOutput,
     icon: FaBoxOpen,
-    description: "Enregistrer la sortie de matériel"
   },
 
   {
-    name: "Consulter Inventaire",
+    nameKey: "sidebar.inventoryArchives",
     link: appRoutes.comptaMatiereInventoryArchives,
     icon: FaArchive,
-    description: "Voir les inventaires terminés"
   },
 
   {
-    name: "Rapports",
+    nameKey: "sidebar.reports",
     link: appRoutes.comptaMatiereReports,
     icon: FaChartLine,
-    description: "Consulter les rapports"
   },
 
   {
-    name: "Liste du matériel",
+    nameKey: "sidebar.materialList",
     link: appRoutes.comptaMatiereMaterialList,
     icon: FaBoxes,
-    description: "Inventaire du matériel disponible"
   },
 
   {
-    name: "Liste des sorties",
+    nameKey: "sidebar.outputsList",
     link: appRoutes.comptaMatiereOutputList,
     icon: FaListAlt,
-    description: "Historique des sorties de matériel"
   },
 ];

@@ -1,96 +1,71 @@
-import {FaFileInvoiceDollar, FaHome, FaNotesMedical, FaPlus,FaUserMd, FaUsers} from "react-icons/fa";
-import {AppRoutesPaths as appRoutes} from "../../Router/appRouterPaths.js";
-import {Bed, BedDouble, Calendar} from "lucide-react";
-import {FiList} from "react-icons/fi";
-import {GiMedicines} from "react-icons/gi";
-import { FaListAlt } from "react-icons/fa";
+import { FaHome, FaUserMd, FaUsers, FaPlus, FaListAlt, FaPills } from "react-icons/fa";
+import { AppRoutesPaths as appRoutes } from "../../Router/appRouterPaths.js";
+import { BedDouble } from "lucide-react";
 import { MdMedicalServices } from "react-icons/md";
-import { FaPills } from "react-icons/fa";
 
 export const adminNavLink = [
     {
-        name: "Dashboard",
+        nameKey: "sidebar.dashboard",
         link: appRoutes.adminHomePage,
         icon: FaHome,
     },
     {
-        name: 'Patient List',
+        nameKey: "sidebar.patientList",
         icon: FaUsers,
         link: appRoutes.adminPatientListPage,
     },
     {
-        name: "Medical Staffs",
+        nameKey: "sidebar.medicalStaffs",
         icon: FaUserMd,
         subLinks: [
             {
                 icon: FaUsers,
-                name: "Medical Staff List",
+                nameKey: "sidebar.medicalStaffList",
                 link: appRoutes.adminMedicalStaffListPage
             },
             {
                 icon: FaPlus,
-                name: "Add A Medical Staff",
+                nameKey: "sidebar.addMedicalStaff",
                 link: appRoutes.addMedicalStaff
             }
         ]
     },
-  /*  {
-        name: 'Consultation List',
-        icon: FiList,
-        link: appRoutes.adminConsultationListPage,
-    },
-   /* {
-        name: 'Appointments',
-        icon: Calendar,
-        link: appRoutes.adminAppointmentsListPage,
-    },*/
     {
-        name: 'Exams',
+        nameKey: "sidebar.exams",
         icon: MdMedicalServices,
         subLinks: [
             {
                 icon: FaListAlt,
-                name: "Exams List",
+                nameKey: "sidebar.examsList",
                 link: appRoutes.adminExamsListPage,
             },
             {
                 icon: FaPlus,
-                name: "Add An Exam",
+                nameKey: "sidebar.addExam",
                 link: appRoutes.addExam
             }
         ]
-        
+
     },
     {
-        name: 'Drugs',
+        nameKey: "sidebar.drugs",
         icon: FaPills,
         subLinks: [
             {
                 icon: FaListAlt,
-                name: "Drugs List",
+                nameKey: "sidebar.drugsList",
                 link: appRoutes.adminDrugsListPage,
             },
             {
                 icon: FaPlus,
-                name: "Add A Drug",
+                nameKey: "sidebar.addDrug",
                 link: appRoutes.addDrug
             }
         ]
-        
-    }
-    /*,
-    {
-        name: 'Medicine',
-        icon: GiMedicines,
-        link: appRoutes.nursePage,
+
     },
     {
-        name: 'Financial Report',
-        icon: FaFileInvoiceDollar,
-        link: appRoutes.adminFinancialReportsPage,
-    },*/
-    ,{
-        name: 'Hospital Rooms',
+        nameKey: "sidebar.hospitalRooms",
         icon: BedDouble,
         link: appRoutes.adminHospitalRoomPage
     },

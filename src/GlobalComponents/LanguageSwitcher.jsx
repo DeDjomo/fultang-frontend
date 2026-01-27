@@ -1,23 +1,30 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Globe } from 'lucide-react';
 
 /**
- * Composant de selection de langue.
- * Permet de basculer entre l'anglais et le francais.
- * La preference est sauvegardee automatiquement dans localStorage.
+ * Composant de sélection de langue avec drapeaux.
+ * Permet de basculer entre l'anglais et le français.
+ * La préférence est sauvegardée automatiquement dans localStorage.
+ * 
+ * Style: Bouton avec drapeau de la langue actuelle, dropdown pour changer
  */
-export function LanguageSwitcher() {
-    const { i18n, t } = useTranslation();
+export function LanguageSwitcher({ className = "" }) {
+    const { i18n } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
 
     const languages = [
-        { code: 'en', name: t('language.english'), flag: '🇬🇧' },
-        { code: 'fr', name: t('language.french'), flag: '🇫🇷' }
+        { code: 'fr', name: 'Français', flag: '🇫🇷' },
+        { code: 'en', name: 'English', flag: '🇬🇧' }
     ];
 
-    const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0];
+    // Déterminer la langue actuelle (fallback sur français)
+    const getCurrentLanguage = () => {
+        const currentCode = i18n.language?.substring(0, 2) || 'fr';
+        return languages.find(lang => lang.code === currentCode) || languages[0];
+    };
+
+    const currentLanguage = getCurrentLanguage();
 
     const changeLanguage = (langCode) => {
         i18n.changeLanguage(langCode);
@@ -37,34 +44,33 @@ export function LanguageSwitcher() {
     }, []);
 
     return (
-        <div className="relative" ref={dropdownRef}>
+        <div className={`relative ${className}`} ref={dropdownRef}>
+            {/* Bouton principal avec drapeau */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
-                aria-label={t('language.selectLanguage')}
+                className="w-12 h-10 mt-1 border-2 bg-gray-100 flex justify-center items-center rounded-xl shadow-xl hover:bg-secondary text-secondary text-2xl hover:text-white transition-all duration-300"
+                aria-label="Changer de langue"
+                title={`Langue: ${currentLanguage.name}`}
             >
-                <Globe className="w-5 h-5 text-gray-600" />
-                <span className="text-2xl">{currentLanguage.flag}</span>
-                <span className="text-sm font-medium text-gray-700 hidden md:inline">
-                    {currentLanguage.name}
-                </span>
+                <span>{currentLanguage.flag}</span>
             </button>
 
+            {/* Dropdown avec les langues disponibles */}
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                     {languages.map((language) => (
                         <button
                             key={language.code}
                             onClick={() => changeLanguage(language.code)}
-                            className={`w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-100 transition-colors ${i18n.language === language.code ? 'bg-gray-50' : ''
+                            className={`w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-100 transition-colors ${i18n.language?.startsWith(language.code) ? 'bg-blue-50' : ''
                                 }`}
                         >
-                            <span className="text-2xl">{language.flag}</span>
+                            <span className="text-xl">{language.flag}</span>
                             <span className="text-sm font-medium text-gray-700">
                                 {language.name}
                             </span>
-                            {i18n.language === language.code && (
-                                <span className="ml-auto text-primary-end">✓</span>
+                            {i18n.language?.startsWith(language.code) && (
+                                <span className="ml-auto text-secondary font-bold">✓</span>
                             )}
                         </button>
                     ))}
@@ -73,3 +79,5 @@ export function LanguageSwitcher() {
         </div>
     );
 }
+
+export default LanguageSwitcher;

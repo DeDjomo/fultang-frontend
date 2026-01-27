@@ -60,6 +60,9 @@ function useLogin() {
         setIsLoading(false);
         console.log("logged user data: ", response);
 
+        // IMPORTANT: Nettoyer les anciennes données avant de sauvegarder les nouvelles
+        clearLocalStorage();
+
         // Sauvegarder les tokens
         saveAuthParameters(response.data.data.access, response.data.data.refresh);
 
@@ -224,7 +227,7 @@ function useLogin() {
     setIsLogged(false);
     setUserData({});
     setUserRole("");
-    //window.location.href = "/login";
+    window.location.href = "/login";
   }
 
   const authMethods = useMemo(

@@ -1,59 +1,66 @@
 import axiosInstance from '../Utils/axiosInstance';
 
 /**
- * Service API pour la gestion des rendez-vous
+ * Service API pour les rendez-vous.
  */
 
+const BASE_URL = '/rendez-vous';
+
 /**
- * Récupère tous les rendez-vous
+ * Recupere tous les rendez-vous.
  */
 export const getAllRendezVous = async () => {
-    const response = await axiosInstance.get('/rendez-vous/');
-    return response.data;
+    try {
+        const response = await axiosInstance.get(`${BASE_URL}/`);
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching rendez-vous:', error);
+        throw error;
+    }
 };
 
 /**
- * Récupère tous les rendez-vous d'un médecin spécifique
- * @param {number} medecinId - ID du médecin
+ * Cree un nouveau rendez-vous.
+ * @param {Object} data - {id_patient, id_medecin, date_heure}
  */
-export const getRendezVousByMedecin = async (medecinId) => {
-    const response = await axiosInstance.get(`/rendez-vous/medecin/${medecinId}/`);
-    return response.data;
+export const createRendezVous = async (data) => {
+    try {
+        const response = await axiosInstance.post(`${BASE_URL}/`, data);
+        return response.data;
+    } catch (error) {
+        console.error('Error creating rendez-vous:', error);
+        throw error;
+    }
 };
 
 /**
- * Crée un nouveau rendez-vous
- * @param {Object} rendezVousData - Données du rendez-vous (id_medecin, id_patient, date_heure)
- */
-export const createRendezVous = async (rendezVousData) => {
-    const response = await axiosInstance.post('/rendez-vous/', rendezVousData);
-    return response.data;
-};
-
-/**
- * Récupère un rendez-vous par son ID
- * @param {number} id - ID du rendez-vous
- */
-export const getRendezVousById = async (id) => {
-    const response = await axiosInstance.get(`/rendez-vous/${id}/`);
-    return response.data;
-};
-
-/**
- * Met à jour un rendez-vous
- * @param {number} id - ID du rendez-vous
- * @param {Object} rendezVousData - Données à mettre à jour
- */
-export const updateRendezVous = async (id, rendezVousData) => {
-    const response = await axiosInstance.patch(`/rendez-vous/${id}/`, rendezVousData);
-    return response.data;
-};
-
-/**
- * Supprime un rendez-vous
- * @param {number} id - ID du rendez-vous
+ * Supprime un rendez-vous.
  */
 export const deleteRendezVous = async (id) => {
-    const response = await axiosInstance.delete(`/rendez-vous/${id}/`);
-    return response.data;
+    try {
+        const response = await axiosInstance.delete(`${BASE_URL}/${id}/`);
+        return response.data;
+    } catch (error) {
+        console.error('Error deleting rendez-vous:', error);
+        throw error;
+    }
 };
+
+/**
+ * Met a jour un rendez-vous (pour reporter).
+ * @param {number} id - ID du rendez-vous
+ * @param {Object} data - Donnees a mettre a jour {date_rendez_vous, heure_rendez_vous}
+ */
+export const updateRendezVous = async (id, data) => {
+    try {
+        const response = await axiosInstance.patch(`${BASE_URL}/${id}/`, data);
+        return response.data;
+    } catch (error) {
+        console.error('Error updating rendez-vous:', error);
+        throw error;
+    }
+};
+
+/**
+ * Recupere tous les rendez-vous d'un medecin specifique.
+ * @para
